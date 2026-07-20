@@ -1,0 +1,106 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+
+  :root {
+    --neon-cyan: #00f0ff;
+    --neon-pink: #ff00aa;
+    --neon-green: #00ff88;
+    --neon-yellow: #ffdd00;
+    --neon-red: #ff3355;
+    --bg-dark: #0a0a0f;
+    --bg-panel: #12121a;
+    --bg-card: #1a1a2e;
+    --text-primary: #e0e0ff;
+    --text-dim: #606080;
+    --text-muted: #404060;
+    --border-color: #2a2a4a;
+    --radius: 8px;
+  }
+
+  html {
+    font-size: 14px;
+  }
+
+  body {
+    @apply bg-dark text-[#e0e0ff] font-sans antialiased;
+    min-height: 100vh;
+    overflow-x: hidden;
+    background-image:
+      linear-gradient(rgba(0, 240, 255, 0.06) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0, 240, 255, 0.06) 1px, transparent 1px);
+    background-size: 40px 40px;
+  }
+
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { @apply bg-dark-panel; }
+  ::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--text-dim); }
+}
+
+@layer components {
+  .neon-text {
+    color: var(--neon-cyan);
+    text-shadow: 0 0 10px rgba(0, 240, 255, 0.3), 0 0 20px rgba(0, 240, 255, 0.1);
+  }
+  .neon-text-pink {
+    color: var(--neon-pink);
+    text-shadow: 0 0 10px rgba(255, 0, 170, 0.3), 0 0 20px rgba(255, 0, 170, 0.1);
+  }
+  .panel {
+    @apply bg-dark-panel border border-[var(--border-color)] rounded-[var(--radius)] p-4;
+  }
+  .card {
+    @apply bg-dark-card border border-[var(--border-color)] rounded-[var(--radius)] p-3;
+    transition: background 0.2s, border-color 0.2s;
+  }
+  .card:hover {
+    @apply bg-dark-hover;
+    border-color: var(--neon-cyan);
+  }
+  .btn-neon {
+    @apply bg-transparent text-neon-cyan border border-neon-cyan rounded-[var(--radius)] px-4 py-2 font-semibold transition-all duration-200;
+    box-shadow: 0 0 10px rgba(0, 240, 255, 0.3), 0 0 20px rgba(0, 240, 255, 0.1);
+  }
+  .btn-neon:hover {
+    background: rgba(0, 240, 255, 0.1);
+    box-shadow: 0 0 20px rgba(0, 240, 255, 0.4);
+  }
+  .btn-neon:active { transform: scale(0.97); }
+  .btn-neon-pink {
+    @apply bg-transparent text-neon-pink border border-neon-pink rounded-[var(--radius)] px-4 py-2 font-semibold transition-all duration-200;
+    box-shadow: 0 0 10px rgba(255, 0, 170, 0.3), 0 0 20px rgba(255, 0, 170, 0.1);
+  }
+  .btn-neon-pink:hover { background: rgba(255, 0, 170, 0.1); }
+  .btn-neon-pink:active { transform: scale(0.97); }
+  .btn-solid-cyan { @apply bg-neon-cyan text-dark font-semibold px-4 py-2 rounded-[var(--radius)]; }
+  .btn-solid-cyan:hover { @apply bg-[#33f3ff]; }
+  .badge {
+    @apply inline-block text-[0.7rem] font-bold px-2 py-0.5 rounded uppercase tracking-wider;
+  }
+  .badge-cyan {
+    @apply bg-[rgba(0,240,255,0.15)] text-neon-cyan;
+    border: 1px solid rgba(0, 240, 255, 0.3);
+  }
+  .badge-pink {
+    @apply bg-[rgba(255,0,170,0.15)] text-neon-pink;
+    border: 1px solid rgba(255, 0, 170, 0.3);
+  }
+  .badge-green {
+    @apply bg-[rgba(0,255,136,0.15)] text-neon-green;
+    border: 1px solid rgba(0, 255, 136, 0.3);
+  }
+  .badge-red {
+    @apply bg-[rgba(255,51,85,0.15)] text-neon-red;
+    border: 1px solid rgba(255, 51, 85, 0.3);
+  }
+}
