@@ -6,6 +6,7 @@ import { randomUUID } from 'crypto';
 import { Server as SocketIOServer, Socket } from 'socket.io';
 import { GameManager } from './core/GameManager';
 import { YouTubeChatService, isQuotaErrorMessage, type YouTubeHealthSnapshot } from './core/YouTubeChatService';
+import { env, validateStartupConfig } from './config/env';
 import { initDatabase } from './db/db';
 import { getDb } from './db/db';
 import { countIncompleteMatches } from './db/history';
@@ -26,9 +27,9 @@ import { GuessingGame } from './games/GuessingGame';
 import { DrawingGame } from './games/DrawingGame';
 import { HideSeekGame } from './games/HideSeekGame';
 
-const PORT = process.env.PORT ? parseInt(process.env.PORT) : 4000;
+const PORT = env.PORT ? parseInt(env.PORT) : 4000;
 /** Live-chat polling cadence. 8000ms ≈ 60% better YouTube quota life than 5s. */
-const YOUTUBE_POLL_MS = process.env.YOUTUBE_POLL_MS ? Math.max(2000, parseInt(process.env.YOUTUBE_POLL_MS, 10)) : 8000;
+const YOUTUBE_POLL_MS = env.YOUTUBE_POLL_MS ? Math.max(2000, parseInt(env.YOUTUBE_POLL_MS, 10)) : 8000;
 
 // ---------------------------------------------------------------------------
 // Admin authorization (Phase 9A). The token NEVER reaches client-side code:
@@ -37,9 +38,7 @@ const YOUTUBE_POLL_MS = process.env.YOUTUBE_POLL_MS ? Math.max(2000, parseInt(pr
 // ephemeral token is generated per boot and printed to the server console so
 // local development stays usable while the default remains deny-by-default.
 // ---------------------------------------------------------------------------
-const ADMIN_TOKEN = process.env.ADMIN_TOKEN && process.env.ADMIN_TOKEN.trim().length > 0
-  ? process.env.ADMIN_TOKEN.trim()
-  : randomUUID();
+const ADMIN_TOKEN = env.ADMIN_TOKEN ?? randomUUID();
 
 function isSocketAdmin(socket: Socket): boolean {
   // Phase 9A break-glass token handshake stays the primary path.
@@ -60,6 +59,8 @@ function rejectUnauthorized(socket: Socket, action: string): void {
 // ---------------------------------------------------------------------------
 const dbInfo = initDatabase();
 console.log(`[Falfoos] Database ready (${dbInfo.dbPath}) migrations=${dbInfo.totalMigrations}`);
+// Phase 19 — startup configuration report (names/statuses only, never values).
+validateStartupConfig();
 // Phase 11G — crashed/interrupted activations stay honestly incomplete (NULL
 // ended_at); they are never fabricated into completions.
 const incompleteMatches = countIncompleteMatches();
@@ -152,7 +153,7 @@ gameManager.registerGame(hideSeekGame);
 
 gameManager.switchGame('trivia');
 
-const youtubeApiKey = process.env.YOUTUBE_API_KEY;
+const youtubeApiKey = env.YOUTUBE_API_KEY;
 
 let youtubeChatService: YouTubeChatService | null = null;
 
@@ -503,7 +504,7 @@ server.on('error', (err: NodeJS.ErrnoException) => {
 server.listen(PORT, () => {
   console.log(`[Falfoos] Server running on port ${PORT}`);
   console.log(`[Falfoos] Registered games: ${gameManager.getRegisteredGames().map((g) => g.id).join(', ')}`);
-  if (process.env.ADMIN_TOKEN && process.env.ADMIN_TOKEN.trim().length > 0) {
+  if (env.ADMIN_TOKEN) {
     console.log('[Falfoos] Admin authorization: ADMIN_TOKEN loaded from environment');
   } else {
     console.log('[Falfoos] Admin authorization: ADMIN_TOKEN not set — ephemeral token for this boot:');

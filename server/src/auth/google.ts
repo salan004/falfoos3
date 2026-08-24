@@ -1,4 +1,5 @@
 import crypto from 'crypto';
+import { env } from '../config/env';
 
 /**
  * Phase 11C — hand-rolled Google OAuth 2.0 Authorization Code flow with PKCE.
@@ -24,11 +25,13 @@ export interface GoogleOAuthConfig {
 }
 
 export function getGoogleConfig(): GoogleOAuthConfig | null {
-  const clientId = process.env.GOOGLE_CLIENT_ID?.trim();
-  const clientSecret = process.env.GOOGLE_CLIENT_SECRET?.trim();
-  let redirectUri = process.env.GOOGLE_REDIRECT_URI?.trim();
+  // Phase 19 — values now flow through the centralized config layer; the
+  // trim/derivation semantics are byte-identical to the previous inline reads.
+  const clientId = env.GOOGLE_CLIENT_ID;
+  const clientSecret = env.GOOGLE_CLIENT_SECRET;
+  let redirectUri = env.GOOGLE_REDIRECT_URI;
   if (!redirectUri) {
-    const base = process.env.APP_BASE_URL?.trim().replace(/\/+$/, '');
+    const base = env.APP_BASE_URL?.replace(/\/+$/, '');
     if (base) redirectUri = `${base}/api/auth/google/callback`;
   }
   if (!clientId || !clientSecret || !redirectUri) return null;

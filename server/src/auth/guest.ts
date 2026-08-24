@@ -2,6 +2,7 @@ import crypto from 'crypto';
 import type { Request, Response } from 'express';
 import { getDb } from '../db/db';
 import { readCookie } from './session';
+import { isProduction } from '../config/env';
 
 /**
  * Phase 11D — stable anonymous guest identity.
@@ -21,9 +22,7 @@ export const GUEST_COOKIE = 'falfoos_guest';
 const GUEST_TTL_MS = 365 * 24 * 60 * 60 * 1000;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-function isProduction(): boolean {
-  return process.env.NODE_ENV === 'production';
-}
+// isProduction() comes from the centralized config layer (Phase 19).
 
 function setGuestCookie(res: Response, playerId: string): void {
   res.cookie(GUEST_COOKIE, playerId, {

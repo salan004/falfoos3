@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 import type { Request, Response } from 'express';
 import { getDb } from '../db/db';
+import { env, isProduction } from '../config/env';
 
 /**
  * Phase 11C — opaque browser sessions backed by the Phase 11B `sessions` table.
@@ -24,9 +25,7 @@ export interface SessionUser {
   role: 'user' | 'admin';
 }
 
-function isProduction(): boolean {
-  return process.env.NODE_ENV === 'production';
-}
+// isProduction() comes from the centralized config layer (Phase 19).
 
 function baseCookieOptions() {
   return {
@@ -97,7 +96,8 @@ export function clearSessionCookie(res: Response): void {
  */
 function bootstrapAdminRole(userId: string, currentRole: 'user' | 'admin', email?: string): void {
   if (!email || currentRole === 'admin') return;
-  const allowList = (process.env.ADMIN_EMAILS ?? '')
+  // Phase 19 — allow-list flows through the centralized config layer.
+  const allowList = (env.ADMIN_EMAILS ?? '')
     .split(',')
     .map((e) => e.trim().toLowerCase())
     .filter((e) => e.length > 0);

@@ -3,6 +3,7 @@ import fs from 'fs';
 import Database from 'better-sqlite3';
 import { runMigrations } from './migrate';
 import { migrations } from './migrations';
+import { env } from '../config/env';
 
 /**
  * Phase 11B — SQLite foundation (better-sqlite3).
@@ -23,7 +24,7 @@ let instance: Database.Database | null = null;
 let initResult: DbInitResult | null = null;
 
 function resolveDbPath(): string {
-  const fromEnv = process.env.DB_PATH?.trim();
+  const fromEnv = env.DB_PATH; // Phase 19 — centralized config
   if (fromEnv) return fromEnv;
   // __dirname is <server>/dist/db (built) or <server>/src/db (ts-node-dev);
   // resolving two levels up lands on the server root in both cases.
