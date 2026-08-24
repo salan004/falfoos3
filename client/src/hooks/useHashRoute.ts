@@ -28,3 +28,13 @@ export function matchGameRoute(path: string): { gameId: string } | null {
   const m = path.match(/^\/game\/([a-z_]+)$/i);
   return m ? { gameId: m[1] } : null;
 }
+
+/**
+ * Phase 12C — #/profile (own profile) and #/profile/:playerId (public,
+ * read-only). The optional segment is a guests.player_id: a bare UUID or
+ * `user:<uuid>` (hence the colon in the allowed characters).
+ */
+export function matchProfileRoute(path: string): { playerId?: string } | null {
+  const m = path.match(/^\/profile(?:\/([A-Za-z0-9:_-]+))?$/i);
+  return m ? { playerId: m[1] } : null;
+}

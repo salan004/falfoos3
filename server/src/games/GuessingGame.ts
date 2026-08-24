@@ -31,9 +31,13 @@ export class GuessingGame extends BaseGame {
     participants: [],
   };
 
-  private gameManagerRef: { updateScore: (pid: string, name: string, delta: number, avatarUrl?: string) => void } | null;
+  private gameManagerRef: {
+    updateScore: (pid: string, name: string, delta: number, avatarUrl?: string, reason?: string) => void;
+  } | null;
 
-  constructor(gameManager: { updateScore: (pid: string, name: string, delta: number, avatarUrl?: string) => void }) {
+  constructor(gameManager: {
+    updateScore: (pid: string, name: string, delta: number, avatarUrl?: string, reason?: string) => void;
+  }) {
     super();
     this.gameManagerRef = gameManager;
   }
@@ -59,8 +63,10 @@ export class GuessingGame extends BaseGame {
       this.state.winnerId = msg.authorId;
       // The winning guess registers the viewer in the roster too.
       this.tryRegisterParticipant({ authorId: msg.authorId, displayName: msg.author, avatarUrl: msg.authorImageUrl });
-      this.gameManagerRef?.updateScore(msg.authorId, msg.author, 200, msg.authorImageUrl);
+      this.gameManagerRef?.updateScore(msg.authorId, msg.author, 200, msg.authorImageUrl, 'guessing:win');
       this.broadcast({ type: 'guessing:winner', payload: { winner: msg.author, winnerId: msg.authorId, answer: this.state.answer }, timestamp: Date.now() });
+      // Phase 12A — round-scoped victory (per-game statistics only).
+      this.announceWinners([msg.authorId], 'round');
       this.broadcastGameState();
     }
   }

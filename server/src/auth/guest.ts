@@ -16,7 +16,8 @@ import { readCookie } from './session';
  * players with or without a Google account.
  */
 
-const GUEST_COOKIE = 'falfoos_guest';
+/** Phase 12B — exported so HTTP routes share the exact cookie name. */
+export const GUEST_COOKIE = 'falfoos_guest';
 const GUEST_TTL_MS = 365 * 24 * 60 * 60 * 1000;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 

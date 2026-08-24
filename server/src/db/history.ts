@@ -21,6 +21,11 @@ interface HistoryStatements {
   scoreEvent: BetterSqlite3.Statement;
   completeMatch: BetterSqlite3.Statement;
   incompleteCount: BetterSqlite3.Statement;
+  /** Phase 12A — winner rows (both scopes) with idempotent PK. */
+  matchWinnerInserts: {
+    insertWinner: BetterSqlite3.Statement;
+    ensureGuest: BetterSqlite3.Statement;
+  };
 }
 
 let statements: HistoryStatements | null = null;
@@ -37,10 +42,18 @@ function stmts(): HistoryStatements {
         'INSERT OR IGNORE INTO participations (match_id, player_id, status, joined_at) VALUES (?, ?, ?, ?)'
       ),
       scoreEvent: db.prepare(
-        'INSERT INTO score_events (match_id, player_id, points, reason, created_at) VALUES (?, ?, ?, NULL, ?)'
+        'INSERT INTO score_events (match_id, player_id, points, reason, created_at) VALUES (?, ?, ?, ?, ?)'
       ),
       completeMatch: db.prepare('UPDATE matches SET ended_at = ? WHERE id = ? AND ended_at IS NULL'),
       incompleteCount: db.prepare('SELECT COUNT(*) AS n FROM matches WHERE ended_at IS NULL'),
+      matchWinnerInserts: {
+        insertWinner: db.prepare(
+          'INSERT OR IGNORE INTO match_winners (match_id, player_id, scope, created_at) VALUES (?, ?, ?, ?)'
+        ),
+        ensureGuest: db.prepare(
+          'INSERT OR IGNORE INTO guests (player_id, display_name, avatar_url, first_seen, last_seen) VALUES (?, ?, ?, ?, ?)'
+        ),
+      },
     };
   }
   return statements;
@@ -66,9 +79,47 @@ export function recordParticipation(matchId: string, playerId: string): void {
   stmts().participation.run(matchId, playerId, 'joined', Date.now());
 }
 
-/** Appends one score event. Returns false when no such match exists. */
-export function recordScoreEvent(matchId: string, playerId: string, points: number): boolean {
-  return stmts().scoreEvent.run(matchId, playerId, points, Date.now()).changes > 0;
+/**
+ * Appends one score event. Returns false when no such match exists.
+ * `reason` is an optional free-form code (e.g. 'guessing:win') — Phase 12A
+ * starts populating it so future analytics/achievements keep signal.
+ */
+export function recordScoreEvent(
+  matchId: string,
+  playerId: string,
+  points: number,
+  reason?: string
+): boolean {
+  return stmts().scoreEvent.run(matchId, playerId, points, reason ?? null, Date.now()).changes > 0;
+}
+
+/**
+ * Phase 12A — persists winner rows for a match.
+ * scope='match'  → full-activation victory (Profile "Wins" statistic)
+ * scope='round'  → single-round victory (per-game statistics only)
+ *
+ * Idempotent via PK; guest rows are ensured defensively so the FK holds even
+ * for a winner who somehow never scored/joined. Runs in ONE transaction so a
+ * partial winner list can never land.
+ */
+export function recordMatchWinners(
+  matchId: string,
+  playerIds: string[],
+  scope: 'match' | 'round'
+): number {
+  if (!Array.isArray(playerIds) || playerIds.length === 0) return 0;
+  const now = Date.now();
+  const { insertWinner, ensureGuest } = stmts().matchWinnerInserts;
+  const tx = getDb().transaction((ids: string[]): number => {
+    let inserted = 0;
+    for (const playerId of ids) {
+      if (typeof playerId !== 'string' || playerId.length === 0) continue;
+      ensureGuest.run(playerId, 'لاعب', null, now, now);
+      inserted += insertWinner.run(matchId, playerId, scope, now).changes;
+    }
+    return inserted;
+  });
+  return tx(playerIds);
 }
 
 /** Stamps ended_at once. Incomplete (crashed) matches keep ended_at NULL forever. */

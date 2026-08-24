@@ -36,9 +36,13 @@ export class DrawingGame extends BaseGame {
     participants: [],
   };
 
-  private gameManagerRef: { updateScore: (pid: string, name: string, delta: number, avatarUrl?: string) => void } | null;
+  private gameManagerRef: {
+    updateScore: (pid: string, name: string, delta: number, avatarUrl?: string, reason?: string) => void;
+  } | null;
 
-  constructor(gameManager: { updateScore: (pid: string, name: string, delta: number, avatarUrl?: string) => void }) {
+  constructor(gameManager: {
+    updateScore: (pid: string, name: string, delta: number, avatarUrl?: string, reason?: string) => void;
+  }) {
     super();
     this.gameManagerRef = gameManager;
   }
@@ -78,8 +82,11 @@ export class DrawingGame extends BaseGame {
         this.state.wordWinner = msg.author;
         this.state.wordWinnerId = msg.authorId;
         this.tryRegisterParticipant({ authorId: msg.authorId, displayName: msg.author, avatarUrl: msg.authorImageUrl });
-        this.gameManagerRef?.updateScore(msg.authorId, msg.author, 150, msg.authorImageUrl);
-        this.broadcast({ type: 'drawing:wordGuessed', payload: { winner: msg.author, word: this.state.currentWord }, timestamp: Date.now() });
+        this.gameManagerRef?.updateScore(msg.authorId, msg.author, 150, msg.authorImageUrl, 'drawing:wordGuessed');
+        // Phase 12A — winnerId joins the payload so the result is auditable.
+        this.broadcast({ type: 'drawing:wordGuessed', payload: { winner: msg.author, winnerId: msg.authorId, word: this.state.currentWord }, timestamp: Date.now() });
+        // Phase 12A — round-scoped victory (per-game statistics only).
+        this.announceWinners([msg.authorId], 'round');
         this.broadcastGameState();
       }
     }

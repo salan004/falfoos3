@@ -5,9 +5,12 @@ import {
   completeMatch,
   ensureGuestRow,
   recordMatchStart,
+  recordMatchWinners,
   recordParticipation,
   recordScoreEvent,
 } from '../db/history';
+import type { WinnerScope } from './BaseGame';
+import { evaluateAchievements } from '../achievements/catalog';
 
 interface LeaderboardEntry {
   playerId: string;
@@ -221,9 +224,16 @@ export class GameManager {
   /**
    * Phase 9G: avatarUrl is optional so every existing 3-arg caller keeps
    * compiling. Entries are enriched with the active game's id/sessionId at
-   * score time — no scoring rules are changed here.
+   * score time — no scoring rules are changed here. `reason` (Phase 12A) is
+   * an optional free-form code persisted with the score event.
    */
-  updateScore(playerId: string, displayName: string, delta: number, avatarUrl?: string): void {
+  updateScore(
+    playerId: string,
+    displayName: string,
+    delta: number,
+    avatarUrl?: string,
+    reason?: string
+  ): void {
     const current = this.scores.get(playerId) ?? 0;
     this.scores.set(playerId, current + delta);
     this.playerNames.set(playerId, displayName);
@@ -236,7 +246,7 @@ export class GameManager {
     if (this.currentMatchId) {
       try {
         ensureGuestRow(playerId, displayName, avatarUrl);
-        recordScoreEvent(this.currentMatchId, playerId, delta);
+        recordScoreEvent(this.currentMatchId, playerId, delta, reason);
       } catch (err) {
         console.warn('[GameManager] History: failed to record score event:', err instanceof Error ? err.message : err);
       }
@@ -288,6 +298,13 @@ export class GameManager {
     if (event.type === 'game:playerJoined') {
       this.observePlayerJoined(event.payload);
     }
+    // Phase 12A — observe the standardized result contract (BaseGame.
+    // announceWinners). Winners are persisted additively; a match-scope
+    // finish also stamps ended_at (natural completion, not just switch/
+    // shutdown). Persistence failures never reach gameplay.
+    if (event.type === 'game:finished') {
+      this.observeGameFinished(event.payload);
+    }
     if (!this.io) return;
     this.io.emit('game:event', event);
   }
@@ -300,6 +317,47 @@ export class GameManager {
       recordParticipation(this.currentMatchId, p.playerId);
     } catch (err) {
       console.warn('[GameManager] History: failed to record participation:', err instanceof Error ? err.message : err);
+    }
+  }
+
+  /**
+   * Phase 12A — persists `game:finished` results against the CURRENT match
+   * row. scope='match' additionally stamps ended_at once (completeMatch is
+   * guarded by ended_at IS NULL, so a later switch/shutdown close is a no-op).
+   *
+   * currentMatchId is intentionally NOT cleared: games may keep emitting
+   * within the same activation (and self-reset via init() is a known Phase
+   * 11G quirk — switchGame remains the authoritative match boundary).
+   */
+  private observeGameFinished(payload: unknown): void {
+    if (!this.currentMatchId) return;
+    const p = payload as { winnerIds?: unknown; scope?: unknown };
+    const winnerIds = Array.isArray(p?.winnerIds)
+      ? p.winnerIds.filter((id): id is string => typeof id === 'string' && id.length > 0)
+      : [];
+    if (winnerIds.length === 0) return;
+    const scope: WinnerScope = p?.scope === 'match' ? 'match' : 'round';
+
+    try {
+      const inserted = recordMatchWinners(this.currentMatchId, winnerIds, scope);
+      console.log(`[GameManager] History: ${inserted} ${scope} winner(s) recorded for match ${this.currentMatchId}`);
+      if (scope === 'match') {
+        completeMatch(this.currentMatchId);
+      }
+      // Phase 12D — achievements are evaluated ONLY here (event-driven, off
+      // the scoring hot path). Failures never reach gameplay.
+      for (const winnerId of winnerIds) {
+        try {
+          const awarded = evaluateAchievements(winnerId);
+          if (awarded.length > 0) {
+            console.log(`[GameManager] Achievements awarded to ${winnerId}: ${awarded.join(', ')}`);
+          }
+        } catch (err) {
+          console.warn('[GameManager] Achievements: evaluation failed:', err instanceof Error ? err.message : err);
+        }
+      }
+    } catch (err) {
+      console.warn('[GameManager] History: failed to record match result:', err instanceof Error ? err.message : err);
     }
   }
 

@@ -2584,3 +2584,304 @@ button.hub-orb:hover .hub-label {
     radial-gradient(300px 74px at 50% 42%, rgba(0, 240, 255, 0.05), transparent 72%),
     rgba(13, 15, 19, 0.8);
 }
+
+/* ============================================================
+   PHASE 12C/12D/12E — PLAYER PROFILE PAGE
+   Extends the Phase 12 hub language: glass panels on
+   --hub-surface/--hub-border, cyan accent only, full RTL.
+   ============================================================ */
+
+/* Nav chip (AuthWidget) → profile link keeps the exact same visuals */
+.auth-profile-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: inherit;
+  text-decoration: none;
+  border-radius: 999px;
+}
+.auth-profile-link:hover .player-avatar {
+  border-color: var(--neon-cyan);
+  box-shadow: 0 0 14px rgba(0, 240, 255, 0.35);
+}
+
+.profile-loading-panel {
+  padding: 40px 20px;
+  text-align: center;
+}
+.profile-loading-text {
+  color: var(--text-dim);
+  font-size: 0.95rem;
+}
+
+/* Hero */
+.profile-hero {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 22px;
+  margin-bottom: 14px;
+}
+.profile-hero-main { flex: 1; min-width: 0; }
+.profile-name {
+  font-size: 1.35rem;
+  font-weight: 800;
+  color: var(--text-primary);
+  margin: 0 0 6px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.profile-level-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+.profile-scope-note {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+.level-progress {
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  overflow: hidden;
+}
+.level-progress-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(0, 240, 255, 0.55), var(--neon-cyan));
+  box-shadow: 0 0 12px var(--accent-glow);
+  transition: width 0.4s ease;
+}
+.level-progress-hint {
+  margin-top: 6px;
+  font-size: 0.75rem;
+  color: var(--text-dim);
+}
+
+/* Stat trio */
+.profile-stats-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-bottom: 26px;
+}
+.profile-stat-card {
+  background: var(--hub-surface);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid var(--hub-border);
+  border-radius: 16px;
+  padding: 16px 12px;
+  text-align: center;
+}
+.profile-stat-wins {
+  border-color: rgba(0, 240, 255, 0.28);
+  box-shadow: inset 0 0 24px rgba(0, 240, 255, 0.04);
+}
+.profile-stat-value {
+  font-size: 1.55rem;
+  font-weight: 800;
+  color: var(--neon-cyan);
+  line-height: 1.2;
+}
+.profile-stat-wins .profile-stat-value {
+  text-shadow: 0 0 18px var(--accent-glow);
+}
+.profile-stat-label {
+  margin-top: 2px;
+  font-size: 0.78rem;
+  color: var(--text-dim);
+}
+
+/* Section titles inside the page */
+.profile-section-title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 22px 0 10px;
+}
+.profile-empty {
+  padding: 26px 18px;
+  text-align: center;
+  color: var(--text-dim);
+  font-size: 0.92rem;
+}
+
+/* Per-game cards */
+.pergame-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 12px;
+}
+.pergame-card {
+  background: var(--hub-surface);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid var(--hub-border);
+  border-radius: 16px;
+  padding: 14px;
+  transition: transform 0.25s ease, border-color 0.25s ease;
+}
+.pergame-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--pg-accent, rgba(0, 240, 255, 0.35));
+}
+.pergame-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.pergame-icon {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  font-size: 1.05rem;
+  border-radius: 10px;
+  border: 1px solid var(--pg-accent, rgba(0, 240, 255, 0.3));
+  background: rgba(0, 0, 0, 0.25);
+}
+.pergame-name {
+  font-weight: 700;
+  font-size: 0.92rem;
+  color: var(--text-primary);
+}
+.pergame-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  margin: 0;
+}
+.pergame-stats > div {
+  text-align: center;
+}
+.pergame-stats dt {
+  font-size: 0.68rem;
+  color: var(--text-muted);
+}
+.pergame-stats dd {
+  margin: 2px 0 0;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+/* Match history */
+.history-list {
+  display: flex;
+  flex-direction: column;
+}
+.history-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 2px;
+  border-bottom: 1px solid var(--border-color);
+}
+.history-item:last-child {
+  border-bottom: none;
+}
+.history-game-icon {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  font-size: 1.05rem;
+  border-radius: 10px;
+  border: 1px solid var(--border-color);
+  background: rgba(0, 0, 0, 0.25);
+  flex-shrink: 0;
+}
+.history-game {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+.history-date {
+  font-size: 0.74rem;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.history-open-badge {
+  font-size: 0.62rem;
+  padding: 1px 7px;
+}
+.history-points {
+  font-weight: 800;
+  color: var(--neon-green);
+  font-size: 0.95rem;
+  direction: ltr;
+}
+.win-badge {
+  font-size: 0.66rem;
+}
+.history-more {
+  padding: 10px 2px 6px;
+  text-align: center;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+/* Achievements */
+.ach-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 10px;
+}
+.ach-badge {
+  background: var(--hub-surface);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid var(--hub-border);
+  border-radius: 14px;
+  padding: 12px 10px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  transition: border-color 0.25s ease, box-shadow 0.25s ease;
+}
+.ach-badge.earned {
+  border-color: rgba(0, 240, 255, 0.32);
+  box-shadow: 0 0 18px rgba(0, 240, 255, 0.07), inset 0 0 20px rgba(0, 240, 255, 0.04);
+}
+.ach-badge.locked {
+  opacity: 0.45;
+  filter: saturate(0.4);
+}
+.ach-icon {
+  font-size: 1.5rem;
+  line-height: 1.2;
+}
+.ach-title {
+  font-weight: 700;
+  font-size: 0.82rem;
+  color: var(--text-primary);
+}
+.ach-desc {
+  font-size: 0.7rem;
+  color: var(--text-dim);
+  line-height: 1.5;
+}
+.ach-date {
+  font-size: 0.64rem;
+  color: var(--neon-cyan);
+}
+
+@media (max-width: 560px) {
+  .profile-hero {
+    flex-direction: column;
+    text-align: center;
+  }
+  .profile-name { white-space: normal; }
+  .profile-level-row { justify-content: center; }
+  .profile-stats-row { gap: 8px; }
+  .pergame-stats { grid-template-columns: repeat(2, 1fr); }
+}

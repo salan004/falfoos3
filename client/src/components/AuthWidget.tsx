@@ -95,10 +95,11 @@ export function AuthWidget() {
 
   return (
     <div className="auth-user" dir="ltr">
-      <PlayerAvatar id={user.id} name={user.displayName} avatarUrl={user.avatarUrl ?? undefined} size={30} />
-      <span className="auth-name" title={user.displayName}>
-        {user.displayName}
-      </span>
+      {/* Phase 12C — the chip opens the player's profile (#/profile). */}
+      <a className="auth-profile-link" href="#/profile" title="ملفي الشخصي">
+        <PlayerAvatar id={user.id} name={user.displayName} avatarUrl={user.avatarUrl ?? undefined} size={30} />
+        <span className="auth-name">{user.displayName}</span>
+      </a>
       {claimPhase === 'idle' && !guestLinked && (
         <button className="nav-link" onClick={() => void startClaim()} title="ربط هوية الضيف بحسابك">
           ربط

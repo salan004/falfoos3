@@ -860,6 +860,19 @@ export class MafiaGame extends BaseGame {
       timestamp: Date.now(),
     });
 
+    // Phase 12A — full-match victory goes to the members of the winning side
+    // who are STILL ALIVE when the match ends (locked decision: eliminated
+    // members are not counted as match winners).
+    if (this.state.winner) {
+      const aliveWinners = this.state.players
+        .filter(p =>
+          p.isAlive &&
+          (this.state.winner === "mafia" ? p.role === "mafia" : p.role !== "mafia")
+        )
+        .map(p => p.id);
+      this.announceWinners(aliveWinners, "match");
+    }
+
     this.broadcastGameState();
   }
 

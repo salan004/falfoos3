@@ -11,6 +11,7 @@ import { getDb } from './db/db';
 import { countIncompleteMatches } from './db/history';
 import { authRoutes } from './routes/authRoutes';
 import { guestRoutes } from './routes/guestRoutes';
+import { playerRoutes } from './routes/playerRoutes';
 import { setCurrentChatService } from './auth/claiming';
 import {
   attachSocketIdentity,
@@ -88,6 +89,9 @@ app.use('/api/auth', authRoutes);
 
 // Phase 11D: stable anonymous guest identity (httpOnly cookie, server-issued).
 app.use('/api/guest', guestRoutes);
+
+// Phase 12B: player profiles & stats (public read-only + /me resolution).
+app.use('/api', playerRoutes);
 
 const server = http.createServer(app);
 const io = new SocketIOServer(server, {

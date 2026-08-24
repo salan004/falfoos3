@@ -309,6 +309,8 @@ export class MusicalChairsGame extends BaseGame {
         },
         timestamp: Date.now(),
       });
+      // Phase 12A — full-match victory (Profile "Wins" statistic).
+      if (this.state.winner) this.announceWinners([this.state.winner], 'match');
     } else {
       this.state.currentRound++;
       this.state.chairsAvailable = remaining.length - 1;

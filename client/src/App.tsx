@@ -13,9 +13,10 @@ import { HomePage } from './pages/HomePage';
 import { GamesPage } from './pages/GamesPage';
 import { LeaderboardPage } from './pages/LeaderboardPage';
 import { LinksPage } from './pages/LinksPage';
+import { ProfilePage } from './pages/ProfilePage';
 import { GAMES_CATALOG, PHASE_LABELS_AR, resolveGameName } from './data/gamesCatalog';
 import { useGameState } from './hooks/useGameState';
-import { useHashRoute, matchGameRoute } from './hooks/useHashRoute';
+import { useHashRoute, matchGameRoute, matchProfileRoute } from './hooks/useHashRoute';
 
 function ConnectPage({ game }: { game: ReturnType<typeof useGameState> }) {
   return (
@@ -146,6 +147,7 @@ export default function App() {
   }, []);
 
   const gameRoute = matchGameRoute(path);
+  const profileRoute = matchProfileRoute(path);
 
   return (
     <div dir="rtl" style={{ position: 'relative', minHeight: '100vh' }}>
@@ -157,9 +159,16 @@ export default function App() {
       {path === '/links' && <LinksPage />}
       {path === '/connect' && <ConnectPage game={game} />}
       {gameRoute && <GamePage key={gameRoute.gameId} gameId={gameRoute.gameId} game={game} />}
+      {profileRoute && (
+        <ProfilePage
+          key={profileRoute.playerId ?? 'me'}
+          playerId={profileRoute.playerId}
+        />
+      )}
       {path === '/dashboard' && <Dashboard game={game} />}
       {!['/', '/games', '/leaderboard', '/links', '/connect', '/dashboard'].includes(path) &&
-        !gameRoute && (
+        !gameRoute &&
+        !profileRoute && (
           <main className="page">
             <h2 className="page-title">الصفحة غير موجودة</h2>
           </main>

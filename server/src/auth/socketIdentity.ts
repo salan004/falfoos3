@@ -34,8 +34,11 @@ export interface SocketIdentity {
  * Authenticated players score under ONE stable id:
  * - claimed user  → their CLAIMED guest row (history continuity, Option A)
  * - unclaimed user→ a dedicated `user:<id>` guests row minted on first connect
+ *
+ * Phase 12B — exported so HTTP routes (/api/me/profile) resolve the SAME
+ * canonical scoring id as the socket handshake. Single source of truth.
  */
-function ensureUserCanonicalPlayer(user: SessionUser): string {
+export function ensureUserCanonicalPlayer(user: SessionUser): string {
   const db = getDb();
   const now = Date.now();
 

@@ -27,6 +27,13 @@ export interface GameConfig {
 
 export type GamePhase = 'idle' | 'lobby' | 'playing' | 'paused' | 'finished';
 
+/**
+ * Phase 12A — winner scope for the standardized `game:finished` event.
+ * 'match' → full-activation victory (Profile "Wins" statistic)
+ * 'round' → single-round victory (per-game statistics only)
+ */
+export type WinnerScope = 'match' | 'round';
+
 export interface PlayerState {
   id: string;
   displayName: string;
@@ -88,6 +95,27 @@ export abstract class BaseGame {
 
   setBroadcast(fn: BroadcastFn): void {
     this.broadcast = fn;
+  }
+
+  /**
+   * Phase 12A — the ONE way games report results. GameManager intercepts the
+   * emitted `game:finished` event to persist winners additively (and, for
+   * scope='match', to stamp the match's ended_at). Gameplay is untouched:
+   * persistence failures are logged by GameManager and never thrown here.
+   *
+   * Trivia intentionally never announces round winners (multiple players
+   * score per question); Hide & Seek has no winner concept at all.
+   */
+  protected announceWinners(winnerIds: string[], scope: WinnerScope): void {
+    const ids = (Array.isArray(winnerIds) ? winnerIds : []).filter(
+      (id) => typeof id === 'string' && id.length > 0
+    );
+    if (ids.length === 0) return;
+    this.broadcast({
+      type: 'game:finished',
+      payload: { winnerIds: ids, scope },
+      timestamp: Date.now(),
+    });
   }
 
   /**

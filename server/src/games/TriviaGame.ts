@@ -50,10 +50,12 @@ export class TriviaGame extends BaseGame {
   };
 
   state: TriviaState = this.initialState();
-  private gameManagerRef: { updateScore: (pid: string, name: string, delta: number, avatarUrl?: string) => void } | null = null;
+  private gameManagerRef: {
+    updateScore: (pid: string, name: string, delta: number, avatarUrl?: string, reason?: string) => void;
+  } | null = null;
   private timers: NodeJS.Timeout[] = [];
 
-  constructor(gameManager: { updateScore: (pid: string, name: string, delta: number) => void }) {
+  constructor(gameManager: { updateScore: (pid: string, name: string, delta: number, avatarUrl?: string, reason?: string) => void }) {
     super();
     this.gameManagerRef = gameManager;
   }
@@ -277,7 +279,7 @@ export class TriviaGame extends BaseGame {
       if (record.answer === this.state.currentQuestion.correctAnswer) {
         const points = 100 + Math.floor(calculateSpeedBonus(record.responseTimeMs, 50, 5));
         const rosterAvatar = this.state.players.find((p) => p.id === record.playerId)?.avatarUrl;
-        this.gameManagerRef?.updateScore(record.playerId, record.displayName, points, rosterAvatar);
+        this.gameManagerRef?.updateScore(record.playerId, record.displayName, points, rosterAvatar, 'trivia:correctAnswer');
       }
     }
 
