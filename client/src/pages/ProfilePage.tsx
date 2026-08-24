@@ -123,7 +123,7 @@ export function ProfilePage({ playerId }: { playerId?: string }) {
             id={player.playerId}
             name={player.displayName}
             avatarUrl={player.avatarUrl ?? undefined}
-            size={76}
+            size={88}
           />
           <div className="profile-hero-main">
             <h1 className="profile-name">{player.displayName}</h1>
