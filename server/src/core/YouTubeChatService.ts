@@ -10,6 +10,30 @@ export type ErrorCallback = (error: Error, consecutiveFailures: number) => void;
 /** Hard cap per YouTube API request so a hung connection surfaces as a poll error instead of stalling forever. */
 const YOUTUBE_FETCH_TIMEOUT_MS = 10000;
 
+/** Phase 14 — connection health snapshot for admin-facing telemetry. */
+export interface YouTubeHealthSnapshot {
+  pollsOk: number;
+  pollsFailed: number;
+  lastSuccessAt: number | null;
+  lastErrorAt: number | null;
+  lastErrorMessage: string | null;
+  consecutiveFailures: number;
+  /** Sticky until the next successful connect — polling cannot succeed while true. */
+  quotaExceeded: boolean;
+}
+
+export function isQuotaErrorMessage(message: string): boolean {
+  return message.includes('quotaExceeded') || message.includes('dailyLimitExceeded');
+}
+
+/** Surfaces YouTube API errors (incl. the quota reason) as tagged Error messages. */
+function throwOnApiError(res: Response, data: any): void {
+  if (res.ok) return;
+  const reason: string = data?.error?.errors?.[0]?.reason ?? 'httpError';
+  const apiMessage: string = data?.error?.message ?? String(res.status);
+  throw new Error(`yt:${reason}:${apiMessage}`);
+}
+
 export class YouTubeChatService {
   private videoId: string | null = null;
   private apiKey: string | null = null;
@@ -19,6 +43,14 @@ export class YouTubeChatService {
   private onMessage: ChatCallback;
   private onError: ErrorCallback | null;
   private pollMs: number;
+
+  // Phase 14 telemetry
+  private pollsOk = 0;
+  private pollsFailed = 0;
+  private lastSuccessAt: number | null = null;
+  private lastErrorAt: number | null = null;
+  private lastErrorMessage: string | null = null;
+  private quotaExceeded = false;
 
   constructor(onMessage: ChatCallback, pollMs = 5000, onError?: ErrorCallback) {
     this.onMessage = onMessage;
@@ -34,6 +66,19 @@ export class YouTubeChatService {
     return this.videoId;
   }
 
+  /** Phase 14 — read-only telemetry snapshot for status broadcasts. */
+  getHealth(): YouTubeHealthSnapshot {
+    return {
+      pollsOk: this.pollsOk,
+      pollsFailed: this.pollsFailed,
+      lastSuccessAt: this.lastSuccessAt,
+      lastErrorAt: this.lastErrorAt,
+      lastErrorMessage: this.lastErrorMessage,
+      consecutiveFailures: this.consecutiveFailures,
+      quotaExceeded: this.quotaExceeded,
+    };
+  }
+
   /**
    * Connects to the live chat of a video. Verifies that an active live chat
    * actually exists BEFORE reporting success; throws otherwise so the caller
@@ -44,6 +89,10 @@ export class YouTubeChatService {
     this.apiKey = apiKey;
     this.nextPageToken = null;
     this.consecutiveFailures = 0;
+
+    // A fresh connect clears the sticky quota flag — the owner explicitly
+    // asked to try again (e.g. quota renewed).
+    this.quotaExceeded = false;
 
     let liveChatId: string | null;
     try {
@@ -96,12 +145,21 @@ export class YouTubeChatService {
 
       const messages = await this.fetchMessages(liveChatId);
       this.consecutiveFailures = 0;
+      this.pollsOk++;
+      this.lastSuccessAt = Date.now();
       for (const msg of messages) {
         this.onMessage(msg);
       }
     } catch (err) {
       this.consecutiveFailures++;
+      this.pollsFailed++;
       const error = err instanceof Error ? err : new Error(String(err));
+      if (isQuotaErrorMessage(error.message)) {
+        // Sticky: further polls are pointless until the daily quota renews.
+        this.quotaExceeded = true;
+      }
+      this.lastErrorAt = Date.now();
+      this.lastErrorMessage = error.message;
       console.error(
         `[YouTubeChat] Poll error (${this.consecutiveFailures} consecutive):`,
         error.message
@@ -114,6 +172,7 @@ export class YouTubeChatService {
     const url = `https://www.googleapis.com/youtube/v3/videos?part=liveStreamingDetails&id=${this.videoId}&key=${this.apiKey}`;
     const res = await fetch(url, { signal: AbortSignal.timeout(YOUTUBE_FETCH_TIMEOUT_MS) });
     const data: any = await res.json();
+    throwOnApiError(res, data);
     return data?.items?.[0]?.liveStreamingDetails?.activeLiveChatId ?? null;
   }
 
@@ -132,6 +191,7 @@ export class YouTubeChatService {
 
     const res = await fetch(url, { signal: AbortSignal.timeout(YOUTUBE_FETCH_TIMEOUT_MS) });
     const data: any = await res.json();
+    throwOnApiError(res, data);
 
     const messages = (data?.items ?? []).map((item: Record<string, any>) => ({
       author: item.authorDetails.displayName,

@@ -5,10 +5,11 @@ import cors from 'cors';
 import { randomUUID } from 'crypto';
 import { Server as SocketIOServer, Socket } from 'socket.io';
 import { GameManager } from './core/GameManager';
-import { YouTubeChatService } from './core/YouTubeChatService';
+import { YouTubeChatService, isQuotaErrorMessage, type YouTubeHealthSnapshot } from './core/YouTubeChatService';
 import { initDatabase } from './db/db';
 import { getDb } from './db/db';
 import { countIncompleteMatches } from './db/history';
+import { getGlobalLeaderboard } from './db/stats';
 import { authRoutes } from './routes/authRoutes';
 import { guestRoutes } from './routes/guestRoutes';
 import { playerRoutes } from './routes/playerRoutes';
@@ -171,15 +172,60 @@ interface YouTubeStatusPayload {
   videoId?: string;
   error?: string;
   /** Why the status changed: manual disconnect, poll-failure auto-drop, or failed connect. */
-  reason?: 'manual' | 'pollFailure' | 'connectFailed';
+  reason?: 'manual' | 'pollFailure' | 'connectFailed' | 'reconnectFailed';
+  /** Phase 14 — present while the supervisor is retrying a dropped connection. */
+  reconnecting?: boolean;
+  attempt?: number;
+  maxAttempts?: number;
+  health?: YouTubeHealthSnapshot;
+}
+
+// Phase 14 — automatic reconnection: exponential backoff after an unplanned
+// poll-failure drop. Manual connect/disconnect and quota exhaustion cancel it.
+const RECONNECT_DELAYS_MS = [3000, 6000, 12000, 24000, 48000];
+let reconnectTimer: NodeJS.Timeout | null = null;
+let reconnectAttempt = 0;
+let reconnectVideoId: string | null = null;
+
+function cancelReconnect(): void {
+  if (reconnectTimer) {
+    clearTimeout(reconnectTimer);
+    reconnectTimer = null;
+  }
+  reconnectVideoId = null;
+  reconnectAttempt = 0;
+}
+
+function scheduleReconnect(): void {
+  if (!reconnectVideoId) return;
+  if (reconnectAttempt >= RECONNECT_DELAYS_MS.length) {
+    reconnectVideoId = null;
+    broadcastYouTubeStatus('تعذّرت إعادة الاتصال تلقائيًا بعد عدة محاولات — أعد التشغيل يدويًا.', 'reconnectFailed');
+    return;
+  }
+  const delay = RECONNECT_DELAYS_MS[reconnectAttempt];
+  reconnectAttempt++;
+  // Inform every tab that a supervised retry is pending (attempt N of M).
+  broadcastYouTubeStatus();
+  reconnectTimer = setTimeout(() => {
+    reconnectTimer = null;
+    const vid = reconnectVideoId;
+    if (!vid) return;
+    void connectYouTube(vid, undefined, true);
+  }, delay);
 }
 
 function buildYouTubeStatus(error?: string, reason?: YouTubeStatusPayload['reason']): YouTubeStatusPayload {
+  const reconnecting = reconnectTimer !== null || reconnectAttempt > 0;
   return {
     connected: youtubeChatService?.isConnected() ?? false,
     videoId: youtubeChatService?.getVideoId() ?? undefined,
     error,
     reason,
+    reconnecting,
+    attempt: reconnecting ? reconnectAttempt : undefined,
+    maxAttempts: RECONNECT_DELAYS_MS.length,
+    health: youtubeChatService?.getHealth(),
   };
 }
 
@@ -205,8 +251,9 @@ function disconnectYouTube(): void {
   setCurrentChatService(null);
 }
 
-async function connectYouTube(videoId: string, socketId?: string): Promise<void> {
+async function connectYouTube(videoId: string, socketId?: string, keepReconnect = false): Promise<void> {
   if (!youtubeApiKey) {
+    cancelReconnect();
     const error = 'YouTube API key not configured on server';
     if (socketId) sendYouTubeStatus(socketId, error, 'connectFailed');
     else broadcastYouTubeStatus(error, 'connectFailed');
@@ -214,12 +261,16 @@ async function connectYouTube(videoId: string, socketId?: string): Promise<void>
   }
 
   if (!/^[a-zA-Z0-9_-]{11}$/.test(videoId)) {
+    cancelReconnect();
     const error = 'Invalid video ID';
     if (socketId) sendYouTubeStatus(socketId, error, 'connectFailed');
     else broadcastYouTubeStatus(error, 'connectFailed');
     return;
   }
 
+  // A supervised reconnect keeps its bookkeeping alive across this call so a
+  // failed retry can schedule the next backoff step.
+  if (!keepReconnect) cancelReconnect();
   disconnectYouTube();
   const generation = ++connectGeneration;
 
@@ -233,9 +284,24 @@ async function connectYouTube(videoId: string, socketId?: string): Promise<void>
         consecutiveFailures >= MAX_CONSECUTIVE_POLL_FAILURES &&
         youtubeChatService === service
       ) {
+        // Capture health BEFORE teardown so the quota decision is accurate.
+        const health = youtubeChatService?.getHealth();
+        const failedVideoId = youtubeChatService?.getVideoId() ?? null;
         disconnectYouTube();
         console.log('[YouTubeChat] Connection dropped after repeated poll failures');
-        broadcastYouTubeStatus('Lost connection to the YouTube live chat', 'pollFailure');
+        if (health?.quotaExceeded || (health?.lastErrorMessage && isQuotaErrorMessage(health.lastErrorMessage))) {          // Retrying while the daily quota is exhausted only burns more units.
+          broadcastYouTubeStatus(
+            'تم تجاوز حصة YouTube API اليومية — أعد المحاولة بعد تجدد الحصة.',
+            'pollFailure'
+          );
+          return;
+        }
+        if (failedVideoId) {
+          reconnectVideoId = failedVideoId;
+          scheduleReconnect();
+        } else {
+          broadcastYouTubeStatus('Lost connection to the YouTube live chat', 'pollFailure');
+        }
       }
     }
   );
@@ -246,8 +312,15 @@ async function connectYouTube(videoId: string, socketId?: string): Promise<void>
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Failed to connect to YouTube';
     console.error('[YouTubeChat] Connect failed:', message);
-    // A disconnect/newer connect superseded this attempt — stay silent.
+    // A disconnect/newer connect superseded this attempt ? stay silent.
     if (generation !== connectGeneration) return;
+    // Supervised retry: a failed RE-connect attempt schedules the next backoff
+    // step instead of giving up. First-time manual connects fail immediately.
+    if (keepReconnect && reconnectVideoId) {
+      scheduleReconnect();
+      return;
+    }
+    cancelReconnect();
     broadcastYouTubeStatus(message, 'connectFailed');
     return;
   }
@@ -259,12 +332,14 @@ async function connectYouTube(videoId: string, socketId?: string): Promise<void>
     return;
   }
 
+  cancelReconnect();
   youtubeChatService = service;
   setCurrentChatService(service);
   broadcastYouTubeStatus();
 }
 
 function shutdown(): void {
+  cancelReconnect();
   if (youtubeChatService) {
     youtubeChatService.disconnect();
     console.log('[YouTubeChat] Disconnected on shutdown');
@@ -358,6 +433,8 @@ io.on('connection', (socket) => {
       sendYouTubeStatus(socket.id, 'يتطلب ربط البث صلاحية مشرف.');
       return;
     }
+    // Manual connect always supersedes any supervised retry.
+    cancelReconnect();
     void connectYouTube(data.videoId, socket.id);
   });
 
@@ -366,6 +443,7 @@ io.on('connection', (socket) => {
       rejectUnauthorized(socket, 'youtube:disconnect');
       return;
     }
+    cancelReconnect();
     disconnectYouTube();
     broadcastYouTubeStatus(undefined, 'manual');
   });
@@ -385,6 +463,24 @@ app.get('/api/games', (_req, res) => {
 
 app.get('/api/leaderboard', (_req, res) => {
   res.json({ entries: gameManager.getLeaderboard() });
+});
+
+// Phase 13 — all-time leaderboard over persisted score events. Additive
+// READ only: gameId validated against registered games, limit clamped 1-100.
+app.get('/api/leaderboard/all-time', (req, res) => {
+  const rawGame = typeof req.query.gameId === 'string' ? req.query.gameId.trim() : '';
+  if (rawGame) {
+    const known = new Set(gameManager.getRegisteredGames().map((g) => g.id));
+    if (!known.has(rawGame)) {
+      res.status(400).json({ error: 'invalidGameId' });
+      return;
+    }
+  }
+  const rawLimit = Number(req.query.limit);
+  const limit = Number.isFinite(rawLimit)
+    ? Math.max(1, Math.min(100, Math.floor(rawLimit)))
+    : 50;
+  res.json({ entries: getGlobalLeaderboard(rawGame || null, limit) });
 });
 
 // Fail loudly and clearly if the port cannot be bound — this is the root cause

@@ -137,11 +137,26 @@ export interface HideSeekGameState extends GameState {
   searchedZones: string[];
 }
 
+export interface YouTubeHealthSnapshot {
+  pollsOk: number;
+  pollsFailed: number;
+  lastSuccessAt: number | null;
+  lastErrorAt: number | null;
+  lastErrorMessage: string | null;
+  consecutiveFailures: number;
+  quotaExceeded: boolean;
+}
+
 export interface YouTubeConnectionStatus {
   connected: boolean;
   videoId?: string;
   channelName?: string;
   error?: string;
   /** Why the status changed: manual disconnect, poll-failure auto-drop, failed connect. */
-  reason?: 'manual' | 'pollFailure' | 'connectFailed';
+  reason?: 'manual' | 'pollFailure' | 'connectFailed' | 'reconnectFailed';
+  /** Phase 14 — supervised retry in progress after an unplanned drop. */
+  reconnecting?: boolean;
+  attempt?: number;
+  maxAttempts?: number;
+  health?: YouTubeHealthSnapshot;
 }
