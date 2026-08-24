@@ -1,13 +1,20 @@
 import { SOCIAL_LINKS } from '../data/socialLinks';
 
 /**
- * Phase 12 — the owner's links page. Renders SOCIAL_LINKS from
- * data/socialLinks.ts; shows a calm empty state until real links are added.
+ * Phase 12F — the owner's links page. Premium glass presentation over
+ * SOCIAL_LINKS (order defined in data/socialLinks.ts); anchors keep plain
+ * external behaviour — no router navigation.
  */
 export function LinksPage() {
   return (
     <main className="page-fade">
       <div className="content-page">
+        <header className="lk-hero">
+          <span className="lk-hero-glyph" aria-hidden="true">🔗</span>
+          <h1 className="lk-title">روابط FalFoos</h1>
+          <p className="lk-subtitle">تابع حساباتنا الرسمية وانضم إلى مجتمع FalFoos</p>
+        </header>
+
         {SOCIAL_LINKS.length === 0 ? (
           <div
             className="panel"
@@ -24,15 +31,21 @@ export function LinksPage() {
         ) : (
           <div className="links-grid">
             {SOCIAL_LINKS.map((link) => (
-              <a key={link.id} className="link-card" href={link.url} target="_blank" rel="noopener noreferrer">
-                <span className="link-card-icon" aria-hidden>
-                  {link.icon}
+              <a
+                key={link.id}
+                className={`link-card lk-${link.id}`}
+                href={link.url}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <span className="lk-icon-chip" aria-hidden>
+                  <img className="lk-logo" src={link.icon} alt="" loading="lazy" draggable={false} />
                 </span>
-                <span style={{ minWidth: 0 }}>
+                <span className="lk-copy">
                   <span className="link-card-name">{link.platform}</span>
-                  <br />
                   {link.handle && <span className="link-card-handle">{link.handle}</span>}
                 </span>
+                <span className="lk-arrow" aria-hidden="true">↗</span>
               </a>
             ))}
           </div>
