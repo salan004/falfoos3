@@ -1,31 +1,51 @@
 import { GameState, DrawingGameState } from '../../types/game';
+import { LobbyPanel } from '../game-room/LobbyPanel';
+import { PlayerAvatar } from '../PlayerAvatar';
 
 export function DrawingCanvas({ gameState }: { gameState: GameState }) {
   const state = gameState as DrawingGameState;
+  const participants = state.participants ?? [];
   const grid = state.grid ?? [];
   const size = state.gridSize ?? 16;
-  const cellSize = Math.min(12, Math.floor(400 / size));
+  const cellSize = Math.min(22, Math.floor(560 / size));
+
+  if (state.phase !== 'playing') {
+    return (
+      <LobbyPanel
+        title="الرسم التفاعلي"
+        icon="🎨"
+        accent="var(--neon-green)"
+        players={participants}
+        instruction="اكتب !انضم في البث للانضمام إلى الرسامين"
+        commandHint="لوّن بكسلة عبر !draw B5 #ff00aa — أو خمّن الكلمة عبر !guess"
+      >
+        <div className="text-center text-sm text-[var(--text-muted)] mt-4">
+          اضغط «بدء» من لوحة التحكم لتفعيل اللوحة
+        </div>
+      </LobbyPanel>
+    );
+  }
 
   return (
-    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', gap: '12px', alignItems: 'center', justifyContent: 'center' }}>
-      <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-        <span className="badge badge-cyan">Drawing Canvas</span>
+    <div className="h-full flex flex-col items-center gap-5 justify-center">
+      <div className="flex gap-2 flex-wrap justify-center items-center">
+        <span className="badge badge-cyan badge-lg">👥 {participants.length} مشارك</span>
         {state.currentWord && !state.wordAnswered && (
-          <span className="badge badge-pink animate-pulse">Word set — guessing open!</span>
+          <span className="badge badge-pink badge-lg animate-pulse">🪄 الكلمة سرية — خمّنوها!</span>
         )}
         {state.wordAnswered && (
-          <span className="badge badge-green">Word guessed!</span>
+          <span className="badge badge-green badge-lg">
+            ✅ الكلمة كانت: {state.currentWord}
+            {state.wordWinner ? ` — ${state.wordWinner}` : ''}
+          </span>
         )}
       </div>
+
       {grid.length > 0 ? (
         <div
+          className="drawing-frame"
           style={{
-            display: 'grid',
             gridTemplateColumns: `repeat(${size}, ${cellSize}px)`,
-            gap: '1px',
-            background: 'var(--border-color)',
-            padding: '1px',
-            borderRadius: '4px',
           }}
         >
           {grid.map((row, ri) =>
@@ -36,18 +56,29 @@ export function DrawingCanvas({ gameState }: { gameState: GameState }) {
                   width: cellSize,
                   height: cellSize,
                   background: color,
-                  borderRadius: '1px',
                 }}
               />
             ))
           )}
         </div>
       ) : (
-        <div style={{ color: 'var(--text-dim)' }}>Grid initializing...</div>
+        <div className="text-[var(--text-dim)]">جارٍ تهيئة اللوحة…</div>
       )}
-      <div style={{ fontSize: '0.8rem', color: 'var(--text-dim)' }}>
-        Type <strong>!draw B5 #ff00aa</strong> to color a pixel
+
+      <div className="instruction-hint" style={{ fontSize: '0.85rem' }}>
+        لوِّن بكسلة: <strong>!draw B5 #ff00aa</strong>
       </div>
+
+      {participants.length > 0 && (
+        <div className="players-grid w-full mt-1">
+          {participants.slice(0, 12).map((p) => (
+            <div key={p.id} className="card player-chip">
+              <PlayerAvatar id={p.id} name={p.displayName} avatarUrl={p.avatarUrl} size={30} />
+              <span className="player-chip-name">{p.displayName}</span>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

@@ -17,12 +17,12 @@ export function Leaderboard({ entries }: LeaderboardProps) {
   return (
     <div className="panel max-h-[350px] overflow-auto">
       <div className="text-[0.7rem] text-[var(--text-muted)] mb-2 uppercase tracking-wider">
-        Leaderboard
+        🏆 المتصدرون
       </div>
 
       {entries.length === 0 && (
         <div className="text-[var(--text-muted)] text-sm text-center py-3">
-          No scores yet
+          لا توجد نقاط بعد
         </div>
       )}
 

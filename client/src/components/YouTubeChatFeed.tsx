@@ -32,12 +32,12 @@ export function YouTubeChatFeed({ messages }: YouTubeChatFeedProps) {
           letterSpacing: '1px',
         }}
       >
-        Live Chat Feed
+        دردشة البث المباشر
       </div>
       <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '4px' }}>
         {messages.length === 0 && (
           <div style={{ color: 'var(--text-muted)', fontSize: '0.8rem', textAlign: 'center', padding: '20px' }}>
-            Waiting for chat messages...
+            بانتظار رسائل المشاهدين…
           </div>
         )}
         {messages.map((msg, i) => (
@@ -51,7 +51,7 @@ export function YouTubeChatFeed({ messages }: YouTubeChatFeedProps) {
               fontSize: '0.8rem',
             }}
           >
-            <span style={{ color: 'var(--neon-cyan)', fontWeight: 600, marginRight: '6px' }}>
+            <span style={{ color: 'var(--neon-cyan)', fontWeight: 600, marginInlineEnd: '6px' }}>
               {msg.author}
             </span>
             <span style={{ color: 'var(--text-primary)' }}>{msg.message}</span>

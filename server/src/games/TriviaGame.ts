@@ -3,7 +3,9 @@ import {
   GameConfig,
   ChatMessage,
   GamePhase,
+  PlayerIdentity,
 } from '../core/BaseGame';
+import { normalizeChatCommand } from '../core/chatCommands';
 import { calculateSpeedBonus } from '../utils/scoring';
 import questionsData from '../data/trivia-questions.json';
 
@@ -36,7 +38,7 @@ interface TriviaState {
   showTimerSeconds: number;
   correctAnswer: string | null;
   roundFinished: boolean;
-  players: { id: string; displayName: string }[];
+  players: { id: string; displayName: string; avatarUrl?: string }[];
 }
 
 export class TriviaGame extends BaseGame {
@@ -48,7 +50,7 @@ export class TriviaGame extends BaseGame {
   };
 
   state: TriviaState = this.initialState();
-  private gameManagerRef: { updateScore: (pid: string, name: string, delta: number) => void } | null = null;
+  private gameManagerRef: { updateScore: (pid: string, name: string, delta: number, avatarUrl?: string) => void } | null = null;
   private timers: NodeJS.Timeout[] = [];
 
   constructor(gameManager: { updateScore: (pid: string, name: string, delta: number) => void }) {
@@ -76,6 +78,7 @@ export class TriviaGame extends BaseGame {
   }
 
   init(): void {
+    this.newSessionId();
     this.reset();
     this.broadcastGameState();
   }
@@ -104,7 +107,7 @@ export class TriviaGame extends BaseGame {
     if (this.state.roundFinished) return;
     if (!this.state.currentQuestion) return;
 
-    const match = msg.message.match(/^!?([1-4])$/);
+    const match = normalizeChatCommand(msg.message).match(/^!?([1-4])$/);
     if (!match) return;
 
     const answerStr = match[1];
@@ -122,10 +125,53 @@ export class TriviaGame extends BaseGame {
       responseTimeMs: responseTime,
     });
 
-    if (!this.state.players.some((p) => p.id === msg.authorId)) {
-      this.state.players.push({ id: msg.authorId, displayName: msg.author });
+    this.ensureRegistered({ authorId: msg.authorId, displayName: msg.author, avatarUrl: msg.authorImageUrl });
+
+    this.broadcastGameState();
+  }
+
+  /** Registers a viewer into the roster unless already present. */
+  private ensureRegistered(identity: PlayerIdentity): void {
+    if (this.tryRegisterPlayer(this.state.players, identity, () => ({
+      id: identity.authorId,
+      displayName: identity.displayName,
+      avatarUrl: identity.avatarUrl,
+    })) === 'added') {
+      this.broadcast({
+        type: 'game:playerJoined',
+        payload: {
+          gameId: this.config.id,
+          playerId: identity.authorId,
+          displayName: identity.displayName,
+          avatarUrl: identity.avatarUrl,
+          playerCount: this.state.players.length,
+        },
+        timestamp: Date.now(),
+      });
+    }
+  }
+
+  /**
+   * Global !انضم entry point. Trivia has no lobby gate — viewers can join the
+   * roster at any time except after the game finished.
+   */
+  handleJoinCommand(identity: PlayerIdentity): void {
+    if (this.state.phase === 'finished') {
+      this.broadcast({
+        type: 'game:joinRejected',
+        payload: {
+          gameId: this.config.id,
+          playerId: identity.authorId,
+          displayName: identity.displayName,
+          reason: 'gameFinished',
+          message: 'انتهت الجولة الحالية — بانتظار إعادة تعيين اللعبة.',
+        },
+        timestamp: Date.now(),
+      });
+      return;
     }
 
+    this.ensureRegistered(identity);
     this.broadcastGameState();
   }
 
@@ -206,9 +252,15 @@ export class TriviaGame extends BaseGame {
           timestamp: Date.now(),
         });
 
-        const answerTimer = setTimeout(() => {
-          this.revealAnswer();
-        }, this.state.answerTimerSeconds * 1000);
+        // Answer phase counts down live (was a frozen setTimeout before).
+        const answerTimer = setInterval(() => {
+          this.state.timeLeft--;
+          this.broadcastGameState();
+          if (this.state.timeLeft <= 0) {
+            clearInterval(answerTimer);
+            this.revealAnswer();
+          }
+        }, 1000);
         this.timers.push(answerTimer);
       }
     }, 1000);
@@ -224,7 +276,8 @@ export class TriviaGame extends BaseGame {
     for (const record of this.state.answersThisRound) {
       if (record.answer === this.state.currentQuestion.correctAnswer) {
         const points = 100 + Math.floor(calculateSpeedBonus(record.responseTimeMs, 50, 5));
-        this.gameManagerRef?.updateScore(record.playerId, record.displayName, points);
+        const rosterAvatar = this.state.players.find((p) => p.id === record.playerId)?.avatarUrl;
+        this.gameManagerRef?.updateScore(record.playerId, record.displayName, points, rosterAvatar);
       }
     }
 
@@ -275,30 +328,51 @@ export class TriviaGame extends BaseGame {
     this.timers = [];
   }
 
+  getPublicState(): Record<string, unknown> {
+    // Phase 9E: per-player public status. While the round is open everyone is
+    // 'playing' (who answered is not revealed early); after the reveal each
+    // registered player maps to correct/wrong from the round's own records.
+    const statusByPlayer = new Map<string, string>();
+    if (this.state.roundFinished && this.state.currentQuestion) {
+      for (const record of this.state.answersThisRound) {
+        statusByPlayer.set(
+          record.playerId,
+          record.answer === this.state.currentQuestion.correctAnswer ? 'correct' : 'wrong'
+        );
+      }
+    }
+
+    return {
+      gameId: this.config.id,
+      sessionId: this.sessionId,
+      phase: this.state.phase,
+      roundNumber: this.state.roundNumber,
+      totalRounds: this.state.totalRounds,
+      category: this.state.category,
+      currentQuestion: this.state.currentQuestion
+        ? {
+            question: this.state.currentQuestion.question,
+            choices: this.state.currentQuestion.choices,
+            category: this.state.currentQuestion.category,
+            difficulty: this.state.currentQuestion.difficulty,
+          }
+        : null,
+      // The raw answer never leaves the server — clients only get it after reveal.
+      correctAnswer: this.state.roundFinished ? this.state.correctAnswer : null,
+      timeLeft: this.state.timeLeft,
+      roundFinished: this.state.roundFinished,
+      totalAnswered: this.state.answersThisRound.length,
+      playerCount: this.state.players.length,
+      players: this.state.players.map((p) => ({
+        id: p.id,
+        displayName: p.displayName,
+        avatarUrl: p.avatarUrl,
+        status: statusByPlayer.get(p.id) ?? 'playing',
+      })),
+    };
+  }
+
   private broadcastGameState(): void {
-    this.broadcast({
-      type: 'game:state',
-      payload: {
-        gameId: this.config.id,
-        phase: this.state.phase,
-        roundNumber: this.state.roundNumber,
-        totalRounds: this.state.totalRounds,
-        category: this.state.category,
-        currentQuestion: this.state.currentQuestion
-          ? {
-              question: this.state.currentQuestion.question,
-              choices: this.state.currentQuestion.choices,
-              category: this.state.currentQuestion.category,
-              difficulty: this.state.currentQuestion.difficulty,
-            }
-          : null,
-        correctAnswer: this.state.roundFinished ? this.state.correctAnswer : null,
-        timeLeft: this.state.timeLeft,
-        roundFinished: this.state.roundFinished,
-        totalAnswered: this.state.answersThisRound.length,
-        playerCount: this.state.players.length,
-      },
-      timestamp: Date.now(),
-    });
+    this.broadcast({ type: 'game:state', payload: this.getPublicState(), timestamp: Date.now() });
   }
 }

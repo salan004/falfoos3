@@ -1,6 +1,9 @@
 import { useState } from 'react';
 import { GameState } from '../types/game';
 import { sendAdminCommand } from '../utils/socket';
+import { GameSettingsPanel } from './game-settings/GameSettingsPanel';
+import { GameSettingsDisplay } from './game-settings/GameSettingsDisplay';
+import { useSocketEvent } from '../hooks/useWebSocket';
 
 interface AdminControlsProps {
   activeGameId: string | null;
@@ -14,13 +17,72 @@ export function AdminControls({ activeGameId, gameState }: AdminControlsProps) {
   const [guessAnswer, setGuessAnswer] = useState('');
   const [drawingWord, setDrawingWord] = useState('');
   const [searchZone, setSearchZone] = useState('');
+  const [serverSettingsErrors, setServerSettingsErrors] = useState<string[] | null>(null);
+
+  useSocketEvent('mafia:settingsError', (payload) => {
+    const errors = (payload as { errors?: string[] }).errors;
+    setServerSettingsErrors(
+      Array.isArray(errors) && errors.length > 0
+        ? errors
+        : ['حدث خطأ غير معروف أثناء حفظ الإعدادات']
+    );
+  });
+
+  useSocketEvent('mafia:settingsUpdated', () => {
+    setServerSettingsErrors(null);
+  });
 
   if (!activeGameId) return null;
 
+  const isMafia = activeGameId === 'mafia';
+  const phase = gameState?.phase;
+  const settingsEditable = !phase || phase === 'idle' || phase === 'lobby';
+
   const renderControls = () => {
+    const controls: React.ReactNode[] = [];
+
+    if (isMafia) {
+      if (settingsEditable) {
+        controls.push(
+          <GameSettingsPanel
+            key="mafia-settings"
+            activeGameId="mafia"
+            isLocked={false}
+            serverErrors={serverSettingsErrors}
+          />
+        );
+      } else {
+        controls.push(
+          <GameSettingsDisplay
+            key="mafia-settings-display"
+            gameId="mafia"
+            settings={gameState?.activeSettings ?? {}}
+            isLocked={true}
+          />
+        );
+      }
+
+      controls.push(
+        <div className="flex gap-2 flex-wrap">
+          <button className="btn-neon text-sm" onClick={() => sendAdminCommand('mafia:start')}>
+            ▶ بدء اللعبة
+          </button>
+          <button className="btn-neon text-sm" onClick={() => sendAdminCommand('mafia:nextPhase')}>
+            ⏭ تقدم للمرحلة التالية
+          </button>
+          <button className="btn-neon-pink text-sm" onClick={() => sendAdminCommand('mafia:forceEnd')}>
+            ⛔ إنهاء اللعبة
+          </button>
+          <button className="btn-neon-pink text-sm" onClick={() => sendAdminCommand('mafia:reset')}>
+            🔄 إعادة تعيين
+          </button>
+        </div>
+      );
+    }
+
     switch (activeGameId) {
       case 'trivia':
-        return (
+        controls.push(
           <div className="flex flex-wrap gap-2 items-center">
             <select
               value={triviaCategory}
@@ -65,12 +127,13 @@ export function AdminControls({ activeGameId, gameState }: AdminControlsProps) {
             </label>
           </div>
         );
+        break;
 
       case 'musical_chairs':
-        return (
+        controls.push(
           <div className="flex gap-2 flex-wrap">
             <button className="btn-neon text-sm" onClick={() => sendAdminCommand('mc:start')}>
-              افتح الصالة (!دخول)
+              فتح الصالة يدوياً
             </button>
             <button className="btn-neon-pink text-sm" onClick={() => sendAdminCommand('mc:closeLobby')}>
               أغلق الصالة
@@ -83,19 +146,11 @@ export function AdminControls({ activeGameId, gameState }: AdminControlsProps) {
             </button>
           </div>
         );
-
-      case 'mafia':
-        return (
-          <div className="flex gap-2 flex-wrap">
-            <button className="btn-neon text-sm" onClick={() => sendAdminCommand('mafia:assignRoles')}>
-              توزيع الأدوار
-            </button>
-          </div>
-        );
+        break;
 
       case 'guessing':
-        return (
-          <div className="flex gap-2 items-center">
+        controls.push(
+          <div className="flex gap-2 items-center flex-wrap">
             <input
               placeholder="أدخل الإجابة..."
               value={guessAnswer}
@@ -105,12 +160,16 @@ export function AdminControls({ activeGameId, gameState }: AdminControlsProps) {
             <button className="btn-neon text-sm" onClick={() => sendAdminCommand('guessing:setAnswer', guessAnswer)}>
               تعيين الإجابة
             </button>
+            <button className="btn-neon-pink text-sm" onClick={() => { sendAdminCommand('guessing:reset'); setGuessAnswer(''); }}>
+              🔄 إعادة تعيين
+            </button>
           </div>
         );
+        break;
 
       case 'drawing':
-        return (
-          <div className="flex gap-2 items-center">
+        controls.push(
+          <div className="flex gap-2 items-center flex-wrap">
             <input
               placeholder="أدخل الكلمة..."
               value={drawingWord}
@@ -120,11 +179,15 @@ export function AdminControls({ activeGameId, gameState }: AdminControlsProps) {
             <button className="btn-neon text-sm" onClick={() => sendAdminCommand('drawing:setWord', drawingWord)}>
               تعيين الكلمة
             </button>
+            <button className="btn-neon-pink text-sm" onClick={() => { sendAdminCommand('drawing:reset'); setDrawingWord(''); }}>
+              🔄 إعادة تعيين
+            </button>
           </div>
         );
+        break;
 
       case 'hide_and_seek':
-        return (
+        controls.push(
           <div className="flex gap-2 items-center">
             <input
               placeholder="المنطقة (مثلاً A1)"
@@ -140,11 +203,16 @@ export function AdminControls({ activeGameId, gameState }: AdminControlsProps) {
             </button>
           </div>
         );
+        break;
 
       default:
-        return <span className="text-[var(--text-muted)] text-sm">لا توجد أدوات تحكم</span>;
+        controls.push(<span className="text-[var(--text-muted)] text-sm">لا توجد أدوات تحكم</span>);
     }
+
+    return <div className="flex flex-wrap gap-2">{controls}</div>;
   };
+
+  if (!activeGameId) return null;
 
   return (
     <div className="panel flex items-center gap-2 flex-wrap">

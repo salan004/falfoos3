@@ -13,13 +13,14 @@ export default {
           red: '#ff3355',
         },
         dark: {
-          DEFAULT: '#0a0a0f',
-          panel: '#12121a',
-          card: '#1a1a2e',
-          hover: '#222240',
+          DEFAULT: '#0f1115',
+          panel: '#15181d',
+          card: '#1b1e24',
+          hover: '#23262d',
         },
       },
       fontFamily: {
+        sans: ['"Segoe UI"', 'Tahoma', '"Noto Sans Arabic"', '"Helvetica Neue"', 'Arial', 'sans-serif'],
         mono: ["'Courier New'", 'Consolas', 'monospace'],
       },
       boxShadow: {

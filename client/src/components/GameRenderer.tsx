@@ -24,7 +24,7 @@ export function GameRenderer({ activeGameId, gameState }: GameRendererProps) {
   if (!activeGameId) {
     return (
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-dim)' }}>
-        Select a game to begin
+        اختر لعبة للبدء
       </div>
     );
   }
@@ -33,7 +33,7 @@ export function GameRenderer({ activeGameId, gameState }: GameRendererProps) {
   if (!GameComponent) {
     return (
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-dim)' }}>
-        Unknown game: {activeGameId}
+        لعبة غير معروفة: {activeGameId}
       </div>
     );
   }

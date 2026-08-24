@@ -1,109 +1,127 @@
+import { useEffect, useState } from 'react';
 import { GameState, MusicalChairsGameState } from '../../types/game';
+import { LobbyPanel } from '../game-room/LobbyPanel';
+import { PlayerAvatar } from '../PlayerAvatar';
+import { useSocketEvent } from '../../hooks/useWebSocket';
 
 export function MusicalChairsPanel({ gameState }: { gameState: GameState }) {
   const state = gameState as MusicalChairsGameState;
+  const players = state.players ?? [];
+  const [hostNotice, setHostNotice] = useState<{ msg: string; at: number } | null>(null);
+
+  // Host feedback: closing the lobby with too few players used to be silent.
+  useSocketEvent('mc:notEnoughPlayers', () => {
+    setHostNotice({ msg: '⚠️ لاعبون غير كافيين — يلزم لاعبان على الأقل لبدء الجولات', at: Date.now() });
+  });
+  useEffect(() => {
+    if (!hostNotice) return;
+    const t = setTimeout(() => setHostNotice(null), 6000);
+    return () => clearTimeout(t);
+  }, [hostNotice]);
 
   if (state.phase === 'idle') {
     return (
-      <div className="flex items-center justify-center h-full text-[var(--text-dim)]">
-        <div className="text-center">
-          <div className="neon-text-pink text-2xl font-extrabold mb-2">كراسي موسيقية</div>
-          <div className="text-sm">افتح الصالة ليتمكن المشاهدون من كتابة <strong>!دخول</strong></div>
+      <LobbyPanel
+        title="كراسي موسيقية"
+        icon="🎵"
+        accent="var(--neon-pink)"
+        players={players}
+        minPlayers={2}
+        instruction="اكتب !انضم في البث للانضمام إلى الصالة"
+        commandHint="الأمر القديم !دخول يعمل أيضاً"
+      >
+        <div className="text-center text-sm text-[var(--text-muted)] mt-4">
+          افتح الصالة من لوحة التحكم ثم أغلقها لبدء الجولات
         </div>
-      </div>
+      </LobbyPanel>
     );
   }
 
   if (state.phase === 'finished') {
-    const winner = state.players?.find((p) => p.id === state.winner);
+    const winner = players.find((p) => p.id === state.winner);
     return (
       <div className="flex items-center justify-center h-full">
-        <div className="text-center">
-          <div className="text-3xl font-extrabold mb-2">🏆 الفائز</div>
-          <div className="text-xl neon-text-pink font-bold">
+        <div className="text-center" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
+          <div className="text-5xl">🏆</div>
+          <div className="glow-text-pink text-3xl font-extrabold">الفائز!</div>
+          {winner && (
+            <PlayerAvatar id={winner.id} name={winner.displayName} avatarUrl={winner.avatarUrl} size={64} />
+          )}
+          <div className="text-2xl font-extrabold glow-text-cyan">
             {winner?.displayName ?? 'غير معروف'}
           </div>
-          <div className="text-[var(--text-dim)] mt-2">آخر من بقي على قيد الحياة!</div>
+          <div className="text-[var(--text-dim)]">آخر من بقي على قيد الحياة!</div>
         </div>
       </div>
     );
   }
 
-  const alivePlayers = state.players?.filter((p) => !p.eliminated) ?? [];
-  const eliminatedPlayers = state.players?.filter((p) => p.eliminated) ?? [];
+  const alivePlayers = players.filter((p) => !p.eliminated);
+  const eliminatedPlayers = players.filter((p) => p.eliminated);
   const seated = alivePlayers.filter((p) => p.sat).length;
 
   const phaseHint =
     state.phase === 'lobby'
-      ? 'اكتب !دخول للانضمام'
-      : 'اكتب !جلوس لجلوس';
+      ? 'الصالة مفتوحة — اكتب !انضم للانضمام'
+      : 'الموسيقى تتوقف قريباً — اكتب !جلوس بسرعة!';
 
   return (
     <div className="h-full flex flex-col gap-4">
-      <div className="flex justify-between items-center">
-        <div className="flex gap-3 items-center">
-          <span className="badge badge-cyan">جولة {state.currentRound}</span>
-          <span className="badge badge-green">{alivePlayers.length} متبقي</span>
-          <span className="badge badge-pink">{state.chairsAvailable} كراسي</span>
-          {state.phase === 'lobby' && (
-            <span className="badge badge-red animate-pulse">الصالة مفتوحة</span>
-          )}
+      <div className="flex justify-between items-center flex-wrap gap-2">
+        <div className="flex gap-2 items-center flex-wrap">
+          <span className="badge badge-purple badge-lg">جولة {state.currentRound}</span>
+          <span className="badge badge-green badge-lg">👥 {alivePlayers.length} متبقي</span>
+          <span className="badge badge-yellow badge-lg">🪑 {state.chairsAvailable} كراسي</span>
+          <span className="badge badge-cyan badge-lg">✅ {seated} جالسون</span>
         </div>
+        {state.phase === 'lobby' && (
+          <span className="badge badge-green badge-lg pulse-dot">🔴 الصالة مفتوحة</span>
+        )}
       </div>
 
-      <div className="text-center text-[0.75rem] text-[var(--text-dim)] animate-pulse">
+      <div className={`instruction-hint ${state.phase !== 'lobby' ? 'instruction-hint-hot' : ''}`}>
         {phaseHint}
       </div>
 
-      {state.phase === 'lobby' && (
-        <div className="flex items-center justify-center flex-1">
-          <div className="text-center">
-            <div className="neon-text text-4xl font-extrabold">
-              {state.players?.length ?? 0}
-            </div>
-            <div className="text-[var(--text-dim)] mt-1">لاعباً انضموا</div>
-          </div>
-        </div>
+      {hostNotice && (
+        <div className="notice-line notice-notEnoughPlayers text-center">{hostNotice.msg}</div>
       )}
 
-      {state.phase === 'playing' && (
-        <div className="flex-1 flex flex-col gap-3 overflow-auto">
-          <div className="grid grid-cols-[repeat(auto-fill,minmax(130px,1fr))] gap-2">
+      {state.phase === 'lobby' ? (
+        <div className="flex flex-col items-center justify-center flex-1 gap-3">
+          <div className="stat-number glow-text-pink">{players.length}</div>
+          <div className="text-lg text-[var(--text-dim)]">لاعب في الصالة</div>
+          <div className="players-grid w-full mt-2">
+            {players.map((player) => (
+              <div key={player.id} className="card player-chip animate-fade-in">
+                <PlayerAvatar id={player.id} name={player.displayName} avatarUrl={player.avatarUrl} size={38} />
+                <span className="player-chip-name">{player.displayName}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : (
+        <div className="flex-1 flex flex-col gap-4 overflow-auto">
+          <div className="players-grid">
             {alivePlayers.map((player) => (
               <div
                 key={player.id}
-                className={`card text-center p-3 ${
-                  player.sat ? 'shadow-neon-green' : ''
-                }`}
-                style={{
-                  borderColor: player.sat
-                    ? 'var(--neon-green)'
-                    : 'var(--border-color)',
-                  background: player.sat
-                    ? 'rgba(0,255,136,0.05)'
-                    : 'var(--bg-card)',
-                }}
+                className={`card player-chip ${player.sat ? 'chip-seated' : ''}`}
               >
-                <div className="text-xl mb-1">
-                  {player.sat ? '🪑' : '💃'}
-                </div>
-                <div className="text-sm font-semibold">{player.displayName}</div>
-                {player.sat && (
-                  <div className="text-[0.65rem] text-neon-green mt-0.5">جالس</div>
-                )}
+                <PlayerAvatar id={player.id} name={player.displayName} avatarUrl={player.avatarUrl} size={38} />
+                <span className="player-chip-name">{player.displayName}</span>
+                {player.sat && <span className="badge badge-green" style={{ fontSize: '0.6rem' }}>🪑 جالس</span>}
               </div>
             ))}
           </div>
 
           {eliminatedPlayers.length > 0 && (
             <div>
-              <div className="text-neon-red text-xs font-semibold mb-1.5">
-                خارج ⨯
-              </div>
+              <div className="text-neon-red text-sm font-bold mb-2">خارج اللعبة ✕</div>
               <div className="flex gap-1.5 flex-wrap">
                 {eliminatedPlayers.map((p) => (
-                  <span key={p.id} className="badge badge-red opacity-70">
-                    {p.displayName}
+                  <span key={p.id} className="badge badge-red opacity-75">
+                    💀 {p.displayName}
                   </span>
                 ))}
               </div>

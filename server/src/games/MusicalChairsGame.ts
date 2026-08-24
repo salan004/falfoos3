@@ -1,8 +1,10 @@
-import { BaseGame, GameConfig, ChatMessage, GamePhase } from '../core/BaseGame';
+import { BaseGame, GameConfig, ChatMessage, GamePhase, PlayerIdentity } from '../core/BaseGame';
+import { normalizeChatCommand } from '../core/chatCommands';
 
 interface MusicalChairsPlayer {
   id: string;
   displayName: string;
+  avatarUrl?: string;
   sat: boolean;
   eliminated: boolean;
   joinedAt: number;
@@ -29,6 +31,14 @@ export class MusicalChairsGame extends BaseGame {
 
   state: MusicalChairsState = this.initialState();
 
+  /**
+   * Single managed handle for the seating window. Both the full-duration timer
+   * and the early "all seats filled" path route through it, so endSeating can
+   * never run twice (the old double-elimination race).
+   */
+  private seatingTimer: NodeJS.Timeout | null = null;
+  private seatingActive = false;
+
   private initialState(): MusicalChairsState {
     return {
       phase: 'idle',
@@ -43,6 +53,7 @@ export class MusicalChairsGame extends BaseGame {
   }
 
   init(): void {
+    this.newSessionId();
     this.reset();
     this.broadcastGameState();
   }
@@ -55,27 +66,89 @@ export class MusicalChairsGame extends BaseGame {
   }
 
   stop(): void {
+    this.clearSeatingTimer();
     this.state.phase = 'idle';
     this.broadcast({ type: 'mc:stopped', payload: {}, timestamp: Date.now() });
     this.broadcastGameState();
   }
 
   reset(): void {
+    this.clearSeatingTimer();
     this.state = this.initialState();
   }
 
-  handleChatMessage(msg: ChatMessage): void {
-    const text = msg.message.trim();
+  private clearSeatingTimer(): void {
+    if (this.seatingTimer) {
+      clearTimeout(this.seatingTimer);
+      this.seatingTimer = null;
+    }
+    this.seatingActive = false;
+  }
 
-    if (text === '!دخول') {
-      this.handleJoin(msg);
+  handleChatMessage(msg: ChatMessage): void {
+    const text = normalizeChatCommand(msg.message);
+
+    if (/^!\s*دخول$/.test(text)) {
+      // Legacy alias — same path as the global !انضم command.
+      this.handleJoinCommand({ authorId: msg.authorId, displayName: msg.author, avatarUrl: msg.authorImageUrl, socketId: msg.socketId });
       return;
     }
 
-    if (text === '!جلوس') {
+    if (/^!\s*جلوس$/.test(text)) {
       this.handleSit(msg);
       return;
     }
+  }
+
+  /**
+   * Global !انضم entry point. Consistent with Mafia: the first join while the
+   * game is idle opens the lobby automatically; admin mc:start still works.
+   */
+  handleJoinCommand(identity: PlayerIdentity): void {
+    if (this.state.phase === 'idle') {
+      this.start();
+    }
+
+    if (this.state.phase === 'playing' || this.state.phase === 'finished') {
+      this.broadcast({
+        type: 'game:joinRejected',
+        payload: {
+          gameId: this.config.id,
+          playerId: identity.authorId,
+          displayName: identity.displayName,
+          reason: this.state.phase === 'finished' ? 'gameFinished' : 'gameInProgress',
+          message: this.state.phase === 'finished'
+            ? 'انتهت الجولة الحالية — بانتظار إعادة تعيين اللعبة.'
+            : 'الجولة بدأت بالفعل، انتظروا الجولة القادمة.',
+        },
+        timestamp: Date.now(),
+      });
+      return;
+    }
+
+    if (this.state.players.has(identity.authorId)) return;
+
+    this.state.players.set(identity.authorId, {
+      id: identity.authorId,
+      displayName: identity.displayName,
+      avatarUrl: identity.avatarUrl,
+      sat: false,
+      eliminated: false,
+      joinedAt: Date.now(),
+    });
+
+    this.broadcast({
+      type: 'game:playerJoined',
+      payload: {
+        gameId: this.config.id,
+        playerId: identity.authorId,
+        displayName: identity.displayName,
+        avatarUrl: identity.avatarUrl,
+        playerCount: this.state.players.size,
+      },
+      timestamp: Date.now(),
+    });
+    this.broadcastGameState();
   }
 
   handleAdminCommand(command: string, _payload?: unknown): void {
@@ -97,26 +170,6 @@ export class MusicalChairsGame extends BaseGame {
         this.init();
         break;
     }
-  }
-
-  private handleJoin(msg: ChatMessage): void {
-    if (this.state.phase !== 'lobby') return;
-    if (this.state.players.has(msg.authorId)) return;
-
-    this.state.players.set(msg.authorId, {
-      id: msg.authorId,
-      displayName: msg.author,
-      sat: false,
-      eliminated: false,
-      joinedAt: Date.now(),
-    });
-
-    this.broadcast({
-      type: 'mc:playerJoined',
-      payload: { playerId: msg.authorId, displayName: msg.author, playerCount: this.state.players.size },
-      timestamp: Date.now(),
-    });
-    this.broadcastGameState();
   }
 
   private handleSit(msg: ChatMessage): void {
@@ -144,9 +197,21 @@ export class MusicalChairsGame extends BaseGame {
     });
     this.broadcastGameState();
 
+    // All chairs taken: wrap up quickly (1s grace), replacing the long timer.
     if (seatedCount + 1 >= this.state.chairsAvailable) {
-      setTimeout(() => this.endSeating(), 1000);
+      this.scheduleSeatingEnd(1000);
     }
+  }
+
+  /** Arms the single seating-end timer; re-arming cancels any pending one. */
+  private scheduleSeatingEnd(ms: number): void {
+    if (this.seatingTimer) {
+      clearTimeout(this.seatingTimer);
+    }
+    this.seatingTimer = setTimeout(() => {
+      this.seatingTimer = null;
+      this.endSeating();
+    }, ms);
   }
 
   private closeLobby(): void {
@@ -187,6 +252,7 @@ export class MusicalChairsGame extends BaseGame {
     }
 
     this.state.seatingStartTime = Date.now();
+    this.seatingActive = true;
 
     this.broadcast({
       type: 'mc:musicStopped',
@@ -198,23 +264,24 @@ export class MusicalChairsGame extends BaseGame {
     });
     this.broadcastGameState();
 
-    setTimeout(() => this.endSeating(), this.state.seatingDuration * 1000);
+    this.scheduleSeatingEnd(this.state.seatingDuration * 1000);
   }
 
   private endSeating(): void {
-    if (this.state.phase !== 'playing') return;
+    if (!this.seatingActive || this.state.phase !== 'playing') return;
+    // Re-entry guard: whichever trigger fires first cancels the other.
+    this.clearSeatingTimer();
 
-    const seatedCount = this.countSeated();
     const alivePlayers = this.getAlivePlayers();
 
+    // Core rule: when the music stops, EVERYONE left standing is out —
+    // regardless of whether every chair was taken (chairs are n-1 by design,
+    // so an all-filled round still leaves exactly one player standing).
     const eliminated: { id: string; displayName: string }[] = [];
-
-    if (seatedCount < this.state.chairsAvailable) {
-      for (const player of alivePlayers) {
-        if (!player.sat && !player.eliminated) {
-          player.eliminated = true;
-          eliminated.push({ id: player.id, displayName: player.displayName });
-        }
+    for (const player of alivePlayers) {
+      if (!player.sat) {
+        player.eliminated = true;
+        eliminated.push({ id: player.id, displayName: player.displayName });
       }
     }
 
@@ -222,7 +289,7 @@ export class MusicalChairsGame extends BaseGame {
       type: 'mc:roundEnded',
       payload: {
         round: this.state.currentRound,
-        seated: seatedCount,
+        seated: this.countSeated(),
         eliminated,
         remaining: this.getAlivePlayers().length,
       },
@@ -269,24 +336,32 @@ export class MusicalChairsGame extends BaseGame {
     return alive;
   }
 
+  getPublicState(): Record<string, unknown> {
+    return {
+      gameId: this.config.id,
+      sessionId: this.sessionId,
+      phase: this.state.phase,
+      currentRound: this.state.currentRound,
+      chairsAvailable: this.state.chairsAvailable,
+      players: Array.from(this.state.players.values()).map((p) => ({
+        id: p.id,
+        displayName: p.displayName,
+        avatarUrl: p.avatarUrl,
+        sat: p.sat,
+        eliminated: p.eliminated,
+        joinedAt: p.joinedAt,
+        // Phase 9E: public status derived from existing rules only.
+        status: p.eliminated
+          ? 'eliminated'
+          : this.state.phase === 'finished' && this.state.winner === p.id
+            ? 'winner'
+            : 'playing',
+      })),
+      winner: this.state.winner,
+    };
+  }
+
   private broadcastGameState(): void {
-    this.broadcast({
-      type: 'game:state',
-      payload: {
-        gameId: this.config.id,
-        phase: this.state.phase,
-        currentRound: this.state.currentRound,
-        chairsAvailable: this.state.chairsAvailable,
-        players: Array.from(this.state.players.values()).map((p) => ({
-          id: p.id,
-          displayName: p.displayName,
-          sat: p.sat,
-          eliminated: p.eliminated,
-          joinedAt: p.joinedAt,
-        })),
-        winner: this.state.winner,
-      },
-      timestamp: Date.now(),
-    });
+    this.broadcast({ type: 'game:state', payload: this.getPublicState(), timestamp: Date.now() });
   }
 }
