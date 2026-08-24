@@ -62,3 +62,16 @@ export interface PlayerProfile {
   level: LevelInfo;
   achievements: AchievementView[];
 }
+
+/** Phase 13 — mirror of GET /api/leaderboard/all-time rows. */
+export interface AllTimeLeaderRow {
+  rank: number;
+  playerId: string;
+  displayName: string;
+  avatarUrl: string | null;
+  identityKind: 'guest' | 'user';
+  totalPoints: number;
+  matchesPlayed: number;
+  matchWins: number;
+  level: LevelInfo;
+}

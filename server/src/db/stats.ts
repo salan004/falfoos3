@@ -225,3 +225,110 @@ export function getMatchHistory(
   }));
   return { items, total: getPlayerTotals(playerId).matchesPlayed };
 }
+
+/* ------------------------------------------------------------------ */
+/* Phase 13 — Advanced Leaderboard (all-time, optionally per game).   */
+/* Additive reads over the SAME history tables; the runtime scoring   */
+/* path and session leaderboard are untouched.                        */
+/* ------------------------------------------------------------------ */
+
+export interface AllTimeLeaderRow {
+  rank: number;
+  playerId: string;
+  displayName: string;
+  avatarUrl: string | null;
+  identityKind: 'guest' | 'user';
+  totalPoints: number;
+  matchesPlayed: number;
+  matchWins: number;
+  level: LevelInfo;
+}
+
+interface GlobalLeaderStatements {
+  allTimePoints: import('better-sqlite3').Statement;
+  perGamePoints: import('better-sqlite3').Statement;
+  allTimeMatchWins: import('better-sqlite3').Statement;
+  perGameMatchWins: import('better-sqlite3').Statement;
+}
+
+let globalStmts: GlobalLeaderStatements | null = null;
+
+function globalStmtFns(): GlobalLeaderStatements {
+  if (!globalStmts) {
+    const db = getDb();
+    globalStmts = {
+      allTimePoints: db.prepare(
+        `SELECT se.player_id AS pid,
+                COALESCE(SUM(se.points), 0) AS pts,
+                COUNT(DISTINCT se.match_id) AS played
+         FROM score_events se
+         GROUP BY se.player_id
+         ORDER BY pts DESC
+         LIMIT @limit`
+      ),
+      perGamePoints: db.prepare(
+        `SELECT se.player_id AS pid,
+                COALESCE(SUM(se.points), 0) AS pts,
+                COUNT(DISTINCT se.match_id) AS played
+         FROM score_events se JOIN matches m ON m.id = se.match_id
+         WHERE m.game_id = @gid
+         GROUP BY se.player_id
+         ORDER BY pts DESC
+         LIMIT @limit`
+      ),
+      allTimeMatchWins: db.prepare(
+        `SELECT player_id AS pid, COUNT(*) AS n
+         FROM match_winners
+         WHERE scope = 'match'
+         GROUP BY player_id`
+      ),
+      perGameMatchWins: db.prepare(
+        `SELECT mw.player_id AS pid, COUNT(*) AS n
+         FROM match_winners mw JOIN matches m ON m.id = mw.match_id
+         WHERE mw.scope = 'match' AND m.game_id = @gid
+         GROUP BY mw.player_id`
+      ),
+    };
+  }
+  return globalStmts;
+}
+
+/**
+ * All-time top players by aggregated score-event points. Identity comes from
+ * the guests/users tables exactly like profiles do (claimed accounts present
+ * their Google identity). Levels are derived, never stored.
+ */
+export function getGlobalLeaderboard(
+  gameId: string | null,
+  limit = 50
+): AllTimeLeaderRow[] {
+  const safeLimit = Math.max(1, Math.min(100, Math.floor(limit) || 50));
+  const g = globalStmtFns();
+
+  const pointRows = (
+    gameId
+      ? g.perGamePoints.all({ gid: gameId, limit: safeLimit })
+      : g.allTimePoints.all({ limit: safeLimit })
+  ) as { pid: string; pts: number; played: number }[];
+  if (pointRows.length === 0) return [];
+
+  const winRows = (
+    gameId ? g.perGameMatchWins.all({ gid: gameId }) : g.allTimeMatchWins.all()
+  ) as { pid: string; n: number }[];
+  const winsById = new Map(winRows.map((r) => [r.pid, r.n]));
+
+  return pointRows.map((row, i) => {
+    const identity = getProfileIdentity(row.pid);
+    return {
+      rank: i + 1,
+      playerId: row.pid,
+      displayName: identity?.displayName ?? 'لاعب',
+      avatarUrl: identity?.avatarUrl ?? null,
+      identityKind: identity?.identityKind ?? 'guest',
+      totalPoints: row.pts,
+      matchesPlayed: row.played,
+      matchWins: winsById.get(row.pid) ?? 0,
+      level: computeLevel(row.pts),
+    };
+  });
+}
