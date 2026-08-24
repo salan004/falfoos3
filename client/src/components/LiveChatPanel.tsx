@@ -61,39 +61,26 @@ export function LiveChatPanel({ messages, status }: LiveChatPanelProps) {
               <img
                 src={msg.authorImageUrl}
                 alt=""
-                className="w-9 h-9 rounded-full object-cover shrink-0 mt-0.5"
-                style={{ border: '1px solid var(--border-color)' }}
+                className="lc-avatar"
+                loading="lazy"
               />
             ) : (
-              <div
-                className="w-9 h-9 rounded-full shrink-0 mt-0.5 flex items-center justify-center text-sm font-bold"
-                style={{
-                  color: 'var(--neon-cyan)',
-                  background: 'rgba(0,240,255,0.07)',
-                  border: '1px solid rgba(0,240,255,0.22)',
-                }}
-              >
+              <div className="lc-avatar lc-avatar-fallback">
                 {msg.author.slice(0, 1)}
               </div>
             )}
 
             <div className="min-w-0 flex-1">
               <div className="flex items-baseline gap-2 flex-wrap">
-                <span className="text-[0.8rem] font-bold truncate max-w-[160px]" style={{ color: 'var(--neon-cyan)' }}>
-                  {msg.author}
-                </span>
+                <span className="lc-name">{msg.author}</span>
                 {msg.isModerator === true && (
-                  <span className="badge badge-green" style={{ fontSize: '0.55rem', padding: '1px 5px' }}>
-                    🛡️ مشرف
-                  </span>
+                  <span className="badge badge-green lc-mod">🛡️ مشرف</span>
                 )}
-                <span className="text-[0.65rem] ms-auto shrink-0" style={{ color: 'var(--text-muted)' }}>
+                <span className="lc-time ms-auto shrink-0">
                   {formatTime(msg.timestamp)}
                 </span>
               </div>
-              <div className="text-sm break-words leading-relaxed mt-0.5" style={{ color: 'var(--text-primary)' }}>
-                {msg.message}
-              </div>
+              <div className="lc-text">{msg.message}</div>
             </div>
           </div>
         ))}
