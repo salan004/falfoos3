@@ -1,8 +1,10 @@
+import { useState } from 'react';
 import { useHashRoute } from '../hooks/useHashRoute';
 import { useAuthSession } from '../hooks/useAuthSession';
 import { BrandLogo } from './BrandLogo';
 import { ConnectionStatusPill } from './ConnectionStatusPill';
 import { AuthWidget } from './AuthWidget';
+import { isSoundMuted, setSoundMuted } from '../utils/soundService';
 
 const PAGE_TITLES: Record<string, string> = {
   '/': 'الرئيسية',
@@ -26,9 +28,15 @@ export function PageHeader({ youtubeStatus }: PageHeaderProps) {
   const { path, navigate } = useHashRoute();
   const { user, isLoading } = useAuthSession();
   const isRoleAdmin = user?.role === 'admin';
+  // Phase 12F — persisted sound preference (default ON, low volume).
+  const [soundOff, setSoundOff] = useState<boolean>(() => isSoundMuted());
 
   const pageTitle =
     PAGE_TITLES[path] ?? (path.startsWith('/game/') ? 'غرفة اللعبة' : 'FalFoos');
+
+  // Phase 12F FINAL — header YouTube controls exist ONLY on /games; the 📡
+  // opens the dedicated connection interface at /connect.
+  const showYouTubeHeader = path === '/games';
 
   return (
     <header className="site-header">
@@ -49,18 +57,34 @@ export function PageHeader({ youtubeStatus }: PageHeaderProps) {
       </button>
 
       <div className="site-header-utils">
-        <ConnectionStatusPill status={youtubeStatus} compact />
+        {showYouTubeHeader && (
+          <ConnectionStatusPill status={youtubeStatus} compact />
+        )}
         <button
-          className={`header-icon-btn ${youtubeStatus.connected ? 'is-live' : ''}`}
-          onClick={() => navigate('/connect')}
-          title={youtubeStatus.connected ? 'البث متصل — إدارة الاتصال' : 'ربط بث YouTube'}
-          aria-label="ربط البث"
+          className="header-icon-btn"
+          onClick={() => {
+            setSoundMuted(!soundOff);
+            setSoundOff(!soundOff);
+          }}
+          title={soundOff ? 'تشغيل أصوات الواجهة' : 'كتم أصوات الواجهة'}
+          aria-label={soundOff ? 'تشغيل الأصوات' : 'كتم الأصوات'}
+          aria-pressed={!soundOff}
         >
-          📡
+          {soundOff ? '🔇' : '🔊'}
         </button>
+        {showYouTubeHeader && (
+          <button
+            className={`header-icon-btn ${youtubeStatus.connected ? 'is-live' : ''}`}
+            onClick={() => navigate('/connect')}
+            aria-label="YouTube Live"
+            title="YouTube Live"
+          >
+            📡
+          </button>
+        )}
         {!isLoading && isRoleAdmin && (
           <button
-            className="header-icon-btn"
+            className={`header-icon-btn ${path === '/dashboard' ? 'is-active-page' : ''}`}
             onClick={() => navigate('/dashboard')}
             title="لوحة التحكم"
             aria-label="لوحة التحكم"

@@ -4,9 +4,9 @@ import { PageTransition } from './components/PageTransition';
 import { Dashboard } from './components/Dashboard';
 import { GameRenderer } from './components/GameRenderer';
 import { LiveChatPanel } from './components/LiveChatPanel';
-import { YouTubeConnectPanel } from './components/YouTubeConnectPanel';
 import { ConnectionStatusPill } from './components/ConnectionStatusPill';
 import { AdminGate } from './components/AdminGate';
+import { YouTubeConnectPanel } from './components/YouTubeConnectPanel';
 import { PlayersPanel } from './components/game-room/PlayersPanel';
 import { RoomLeaderboard } from './components/game-room/RoomLeaderboard';
 import { HomePage } from './pages/HomePage';
@@ -17,6 +17,11 @@ import { ProfilePage } from './pages/ProfilePage';
 import { GAMES_CATALOG, PHASE_LABELS_AR, resolveGameName } from './data/gamesCatalog';
 import { useGameState } from './hooks/useGameState';
 import { useHashRoute, matchGameRoute, matchProfileRoute } from './hooks/useHashRoute';
+import { useGameSounds } from './hooks/useGameSounds';
+
+// Phase 12F — the /connect route was consolidated into the Games page
+// (#/games → «بث يوتيوب المباشر» section). The YouTube connection logic,
+// socket protocol and server behavior are unchanged.
 
 function ConnectPage({ game }: { game: ReturnType<typeof useGameState> }) {
   return (
@@ -140,6 +145,7 @@ function GamePage({ gameId, game }: { gameId: string; game: ReturnType<typeof us
 export default function App() {
   const { path } = useHashRoute();
   const game = useGameState();
+  useGameSounds();
 
   useEffect(() => {
     game.loadGames();
