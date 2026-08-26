@@ -2,6 +2,8 @@ import "dotenv/config";
 import express from 'express';
 import http from 'http';
 import cors from 'cors';
+import path from 'path';
+import fs from 'fs';
 import { randomUUID } from 'crypto';
 import { Server as SocketIOServer, Socket } from 'socket.io';
 import { GameManager } from './core/GameManager';
@@ -483,6 +485,22 @@ app.get('/api/leaderboard/all-time', (req, res) => {
     : 50;
   res.json({ entries: getGlobalLeaderboard(rawGame || null, limit) });
 });
+
+// ---------------------------------------------------------------------------
+// Phase 19 completion — single-origin production hosting.
+// When the client has been built (client/dist), serve it from this process so
+// browsers reach API + Socket.IO on the SAME origin. Dev (Vite :3000 proxy)
+// is unaffected: this directory does not exist unless the client was built.
+// ---------------------------------------------------------------------------
+const clientDist = path.resolve(__dirname, '..', '..', 'client', 'dist');
+if (fs.existsSync(path.join(clientDist, 'index.html'))) {
+  app.use(express.static(clientDist));
+  app.get('*', (req, res, next) => {
+    if (req.path.startsWith('/api/') || req.path.startsWith('/socket.io/')) return next();
+    res.sendFile(path.join(clientDist, 'index.html'));
+  });
+  console.log(`[Falfoos] Serving client from ${clientDist}`);
+}
 
 // Fail loudly and clearly if the port cannot be bound — this is the root cause
 // behind "server started" followed by endless proxy ECONNREFUSED: a second

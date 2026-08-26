@@ -4029,3 +4029,47 @@ button.hub-orb:hover .hub-label {
   outline: 2px solid rgba(0, 240, 255, 0.65);
   outline-offset: 2px;
 }
+
+/* ============================================================
+   MOBILE HEADER COMPACT — Variant B (≤640px ONLY)
+   Absolute overlay → normal flex flow; overlap impossible.
+   Desktop/tablet rules are never evaluated inside this block.
+   ============================================================ */
+@media (max-width: 640px) {
+  .site-header {
+    justify-content: space-between;
+    padding: 8px 12px;
+    gap: 10px;
+  }
+  /* Title becomes a truncating flex child instead of an overlaid center */
+  .site-header-title {
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-size: clamp(1.05rem, 4vw, 1.3rem);
+  }
+  .site-header-logo img.brand-logo {
+    height: clamp(28px, 7vw, 36px);
+  }
+  /* Out of overlay; participates in layout */
+  .site-header-utils {
+    position: static;
+    transform: none;
+    inset: auto;
+    gap: 8px;
+    flex-shrink: 1;
+  }
+  .header-icon-btn {
+    width: 34px;
+    height: 34px;
+    font-size: 1rem;
+    border-radius: 9px;
+    flex-shrink: 0;
+  }
+  /* Pill → icon + status dot only (tooltip preserved via title attr) */
+  .conn-pill.compact .conn-label { display: none; }
+  .conn-pill.compact { padding: 4px 8px; gap: 4px; flex-shrink: 0; }
+  .auth-user { gap: 6px; }
+  .auth-user .nav-link { padding: 5px 10px; font-size: 0.76rem; }
+}
