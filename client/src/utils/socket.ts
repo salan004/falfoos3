@@ -13,6 +13,7 @@ export function getSocket(): Socket {
   if (!socket) {
     socket = io((import.meta.env.VITE_WS_URL || ''), {
       transports: ['websocket', 'polling'],
+      withCredentials: true,
     });
     socket.on('connect_error', (err) => {
       if ((err as Error)?.message === 'identity-required') {

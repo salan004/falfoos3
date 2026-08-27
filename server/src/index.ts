@@ -84,7 +84,10 @@ process.on('uncaughtException', (err) => {
 });
 
 const app = express();
-app.use(cors());
+app.use(cors({
+  origin: 'https://falfoos.vercel.app',
+  credentials: true,
+}));
 app.use(express.json());
 
 // Phase 11C: optional Google authentication. Fully additive — guests never
@@ -99,7 +102,7 @@ app.use('/api', playerRoutes);
 
 const server = http.createServer(app);
 const io = new SocketIOServer(server, {
-  cors: { origin: '*', methods: ['GET', 'POST'] },
+  cors: { origin: 'https://falfoos.vercel.app', credentials: true, methods: ['GET', 'POST'] },
 });
 
 // ---------------------------------------------------------------------------
