@@ -1,3 +1,4 @@
+import { apiFetch } from '../utils/api';
 import { useCallback, useEffect, useState } from 'react';
 
 export interface AuthUser {
@@ -23,7 +24,7 @@ export function useAuthSession() {
   useEffect(() => {
     if (cachedUser !== undefined) return;
     let alive = true;
-    fetch('/api/auth/me')
+    apiFetch('/api/auth/me')
       .then((r) => r.json())
       .then((data: { user: AuthUser | null; guestLinked?: boolean }) => {
         cachedUser = data.user ?? null;
@@ -44,7 +45,7 @@ export function useAuthSession() {
 
   const logout = useCallback(async (): Promise<void> => {
     try {
-      await fetch('/api/auth/logout', { method: 'POST' });
+      await apiFetch('/api/auth/logout', { method: 'POST' });
     } catch {
       // Even on network failure the cookie is the only state — clear locally.
     }

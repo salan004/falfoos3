@@ -1,3 +1,4 @@
+import { apiFetch } from '../utils/api';
 import { useState } from 'react';
 import { useAuthSession } from '../hooks/useAuthSession';
 import { useGuestIdentity } from '../hooks/useGuestIdentity';
@@ -36,7 +37,7 @@ export function AuthWidget() {
   async function startClaim(): Promise<void> {
     setClaimError('');
     try {
-      const res = await fetch('/api/auth/claim/start', { method: 'POST' });
+      const res = await apiFetch('/api/auth/claim/start', { method: 'POST' });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         setClaimPhase('error');
@@ -56,7 +57,7 @@ export function AuthWidget() {
   async function checkClaim(): Promise<void> {
     setClaimPhase('checking');
     try {
-      const res = await fetch('/api/auth/claim/check', {
+      const res = await apiFetch('/api/auth/claim/check', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ code: claimCode }),

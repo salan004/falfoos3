@@ -1,3 +1,4 @@
+import { apiFetch } from '../utils/api';
 import { useEffect } from 'react';
 
 /**
@@ -10,7 +11,7 @@ let identityPromise: Promise<void> | null = null;
 
 export function ensureGuestIdentity(): Promise<void> {
   if (!identityPromise) {
-    identityPromise = fetch('/api/guest/identity')
+    identityPromise = apiFetch('/api/guest/identity')
       .then(() => undefined)
       .catch(() => {
         // Allow a later retry — identity is progressive, never blocking UI.

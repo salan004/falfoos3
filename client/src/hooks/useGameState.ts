@@ -1,3 +1,4 @@
+import { apiFetch } from '../utils/api';
 import { useState, useCallback, useEffect } from 'react';
 import { useWebSocket } from './useWebSocket';
 import { GameState, LeaderboardEntry, ChatMessage, GameConfig, YouTubeConnectionStatus } from '../types/game';
@@ -74,7 +75,7 @@ export function useGameState() {
       setActiveGameId(data.gameId);
     });
     socket.emit('get:games');
-    fetch('/api/games')
+    apiFetch('/api/games')
       .then((r) => r.json())
       .then((data) => {
         if (Array.isArray(data.games)) {
@@ -88,7 +89,7 @@ export function useGameState() {
     // initial board on connect, so a fresh viewer would see empty scores until
     // the next scoring event. Uses the existing REST endpoint (same pattern as
     // /api/games above); live updates keep flowing via leaderboard:update.
-    fetch('/api/leaderboard')
+    apiFetch('/api/leaderboard')
       .then((r) => r.json())
       .then((data) => {
         if (Array.isArray(data.entries)) setLeaderboard(data.entries);
