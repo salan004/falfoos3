@@ -11,7 +11,7 @@ void ensureGuestIdentity().catch(() => undefined);
 
 export function getSocket(): Socket {
   if (!socket) {
-    socket = io('/', {
+    socket = io((import.meta.env.VITE_WS_URL || ''), {
       transports: ['websocket', 'polling'],
     });
     socket.on('connect_error', (err) => {
