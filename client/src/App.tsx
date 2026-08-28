@@ -3,7 +3,7 @@ import { PageHeader } from './components/PageHeader';
 import { PageTransition } from './components/PageTransition';
 import { Dashboard } from './components/Dashboard';
 import { GameRenderer } from './components/GameRenderer';
-import { LiveChatPanel } from './components/LiveChatPanel';
+import { ChatPanel } from './components/ChatPanel';
 import { ConnectionStatusPill } from './components/ConnectionStatusPill';
 import { YouTubeConnectPanel } from './components/YouTubeConnectPanel';
 import { PlayersPanel } from './components/game-room/PlayersPanel';
@@ -71,9 +71,9 @@ function GamePage({ gameId, game }: { gameId: string; game: ReturnType<typeof us
       style={{ width: 'min(1600px, calc(100% - 24px))', marginTop: '16px', '--room-accent': catalogMeta?.accent } as React.CSSProperties}
     >
       {!isActive && (
-        <div className="panel" style={{ marginBottom: '12px', borderColor: 'var(--neon-yellow)' }}>
-          <span className="text-neon-yellow text-sm font-bold">
-            ⚠️ هذه اللعبة غير مفعّلة حالياً — فعّلها من لوحة التحكم أو من صفحة الألعاب.
+        <div className="panel" style={{ marginBottom: '12px', borderColor: 'var(--border-color)' }}>
+          <span className="text-[var(--text-dim)] text-sm">
+            هذه اللعبة غير نشطة حالياً — انتظر حتى يبدأ المشرف اللعبة.
           </span>
         </div>
       )}
@@ -133,7 +133,7 @@ function GamePage({ gameId, game }: { gameId: string; game: ReturnType<typeof us
         </div>
 
         <div className="chat-col" style={{ minHeight: 0 }}>
-          <LiveChatPanel messages={game.chatMessages} status={game.youtubeStatus} />
+          <ChatPanel messages={game.chatMessages} status={game.youtubeStatus} variant="room" />
         </div>
       </div>
     </main>

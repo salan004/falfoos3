@@ -2,9 +2,13 @@ import { useEffect, useRef, useState } from 'react';
 import { ChatMessage, YouTubeConnectionStatus } from '../types/game';
 import { ConnectionStatusPill } from './ConnectionStatusPill';
 
-interface LiveChatPanelProps {
+interface ChatPanelProps {
   messages: ChatMessage[];
-  status: YouTubeConnectionStatus;
+  status?: YouTubeConnectionStatus;
+  showStatus?: boolean;
+  showHeader?: boolean;
+  variant?: 'room' | 'dashboard';
+  className?: string;
 }
 
 function formatTime(ts: number): string {
@@ -15,7 +19,14 @@ function formatTime(ts: number): string {
   }
 }
 
-export function LiveChatPanel({ messages, status }: LiveChatPanelProps) {
+export function ChatPanel({
+  messages,
+  status,
+  showStatus = true,
+  showHeader = true,
+  variant = 'room',
+  className = '',
+}: ChatPanelProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [stickToBottom, setStickToBottom] = useState(true);
 
@@ -32,14 +43,20 @@ export function LiveChatPanel({ messages, status }: LiveChatPanelProps) {
     setStickToBottom(distance < 80);
   };
 
+  const containerClass = `live-chat h-full flex flex-col ${className}`.trim();
+
   return (
-    <div className="glass live-chat h-full flex flex-col" style={{ minHeight: 0 }}>
-      <div className="flex items-center justify-between gap-2 px-4 pt-3 pb-2 border-b border-[var(--border-color)]">
-        <h3 className="text-sm font-extrabold" style={{ color: 'var(--text-primary)' }}>
-          💬 دردشة البث المباشر
-        </h3>
-        <ConnectionStatusPill status={status} compact />
-      </div>
+    <div className={containerClass} style={{ minHeight: 0 }}>
+      {showHeader && (
+        <div className="flex items-center justify-between gap-2 px-4 pt-3 pb-2 border-b border-[var(--border-color)]">
+          <h3 className="text-sm font-extrabold" style={{ color: 'var(--text-primary)' }}>
+            الشات المباشر
+          </h3>
+          {showStatus && status && (
+            <ConnectionStatusPill status={status} compact />
+          )}
+        </div>
+      )}
 
       <div
         ref={scrollRef}
@@ -84,13 +101,6 @@ export function LiveChatPanel({ messages, status }: LiveChatPanelProps) {
             </div>
           </div>
         ))}
-      </div>
-
-      <div
-        className="px-4 py-2 text-[0.68rem] text-center border-t border-[var(--border-color)]"
-        style={{ color: 'var(--text-muted)' }}
-      >
-        التفاعل مع الألعاب يتم عبر أوامر دردشة يوتيوب مباشرة
       </div>
     </div>
   );

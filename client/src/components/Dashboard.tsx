@@ -1,6 +1,6 @@
 import { GameSelector } from './GameSelector';
 import { GameRenderer } from './GameRenderer';
-import { YouTubeChatFeed } from './YouTubeChatFeed';
+import { ChatPanel } from './ChatPanel';
 import { YouTubeConnectPanel } from './YouTubeConnectPanel';
 import { Leaderboard } from './Leaderboard';
 import { AdminControls } from './AdminControls';
@@ -44,7 +44,7 @@ export function Dashboard({ game }: DashboardProps) {
 
         <div className="flex flex-col gap-3 overflow-hidden">
           <YouTubeConnectPanel youtubeStatus={game.youtubeStatus} />
-          <YouTubeChatFeed messages={game.chatMessages} />
+          <ChatPanel messages={game.chatMessages} variant="dashboard" showStatus={false} />
           <Leaderboard entries={game.leaderboard} />
           <div className="panel max-h-[130px] overflow-auto">
             <div className="text-[0.7rem] text-[var(--text-muted)] mb-1.5 uppercase tracking-wider">
