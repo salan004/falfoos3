@@ -70,14 +70,6 @@ function GamePage({ gameId, game }: { gameId: string; game: ReturnType<typeof us
       className={`page room-theme-${gameId}`}
       style={{ width: 'min(1600px, calc(100% - 24px))', marginTop: '16px', '--room-accent': catalogMeta?.accent } as React.CSSProperties}
     >
-      {!isActive && (
-        <div className="panel" style={{ marginBottom: '12px', borderColor: 'var(--border-color)' }}>
-          <span className="text-[var(--text-dim)] text-sm">
-            هذه اللعبة غير نشطة حالياً — انتظر حتى يبدأ المشرف اللعبة.
-          </span>
-        </div>
-      )}
-
       <div className="room-header">
         <div className="flex items-center gap-4 min-w-0">
           <span className="game-icon room-icon" style={{ borderColor: isActive ? catalogMeta?.accent : undefined, boxShadow: catalogMeta?.accent ? `0 0 22px ${catalogMeta.accent}30` : undefined }}>
@@ -117,8 +109,8 @@ function GamePage({ gameId, game }: { gameId: string; game: ReturnType<typeof us
           {roomTab === 'game' && (
             <section className="panel game-area flex-1">
               <GameRenderer
-                activeGameId={isActive ? gameId : null}
-                gameState={game.gameState}
+                activeGameId={gameId}
+                gameState={isActive ? game.gameState : null}
               />
             </section>
           )}
