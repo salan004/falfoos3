@@ -1,0 +1,28 @@
+name: Deploy FalFoos
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Deploy backend to VPS
+        uses: appleboy/ssh-action@v1.2.2
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: |
+            cd /opt/falfoos
+            git fetch origin
+            git reset --hard origin/master
+            npm ci
+            npm run build
+            sudo systemctl restart falfoos.service
+            sleep 3
+            sudo systemctl is-active --quiet falfoos.service
+            echo "Backend deployment successful"
