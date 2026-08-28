@@ -5,7 +5,6 @@ import { Dashboard } from './components/Dashboard';
 import { GameRenderer } from './components/GameRenderer';
 import { LiveChatPanel } from './components/LiveChatPanel';
 import { ConnectionStatusPill } from './components/ConnectionStatusPill';
-import { AdminGate } from './components/AdminGate';
 import { YouTubeConnectPanel } from './components/YouTubeConnectPanel';
 import { PlayersPanel } from './components/game-room/PlayersPanel';
 import { RoomLeaderboard } from './components/game-room/RoomLeaderboard';
@@ -33,7 +32,6 @@ function ConnectPage({ game }: { game: ReturnType<typeof useGameState> }) {
           اربط بثك المباشر ليصل تفاعل المشاهدين والأوامر إلى الألعاب — الاتصال ليس لعبة، بل بوابة التفاعل.
         </p>
       </div>
-      <AdminGate />
       <YouTubeConnectPanel youtubeStatus={game.youtubeStatus} />
       <div className="panel mt-4 text-sm text-[var(--text-dim)] leading-relaxed">
         بعد الربط ستبث رسائل المشاهدين مباشرة إلى الألعاب النشطة، وستظهر في دردشة كل صفحة لعب.

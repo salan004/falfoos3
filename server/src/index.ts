@@ -50,6 +50,17 @@ function isSocketAdmin(socket: Socket): boolean {
   return identity?.role === 'admin';
 }
 
+/**
+ * Phase A — broadcast connection permission.
+ * Admins always qualify. Authenticated users (kind === 'user') can connect/disconnect
+ * the YouTube broadcast. Guests (kind === 'guest') cannot.
+ */
+function isBroadcaster(socket: Socket): boolean {
+  if (isSocketAdmin(socket)) return true;
+  const identity = socket.data?.identity as SocketIdentity | undefined;
+  return identity?.kind === 'user';
+}
+
 function rejectUnauthorized(socket: Socket, action: string): void {
   console.warn(`[Falfoos] Unauthorized admin attempt (${action}) from socket ${socket.id} — rejected`);
   socket.emit('admin:error', { message: 'غير مصرح — سجّل الدخول كمشرف أولاً.', action });
@@ -434,9 +445,9 @@ io.on('connection', (socket) => {
   );
 
   socket.on('youtube:connect', (data: { videoId: string }) => {
-    if (!isSocketAdmin(socket)) {
+    if (!isBroadcaster(socket)) {
       rejectUnauthorized(socket, 'youtube:connect');
-      sendYouTubeStatus(socket.id, 'يتطلب ربط البث صلاحية مشرف.');
+      sendYouTubeStatus(socket.id, 'يتطلب ربط البث مستخدمًا مسجلاً الدخول.');
       return;
     }
     // Manual connect always supersedes any supervised retry.
@@ -445,7 +456,7 @@ io.on('connection', (socket) => {
   });
 
   socket.on('youtube:disconnect', () => {
-    if (!isSocketAdmin(socket)) {
+    if (!isBroadcaster(socket)) {
       rejectUnauthorized(socket, 'youtube:disconnect');
       return;
     }

@@ -2,6 +2,7 @@ import { useGameState } from '../hooks/useGameState';
 import { useHashRoute } from '../hooks/useHashRoute';
 import { useScrollReveal } from '../hooks/useScrollReveal';
 import { GameCard } from '../components/GameCard';
+import { ConnectionStatusPill } from '../components/ConnectionStatusPill';
 
 /** The game currently in active development gets visual emphasis. */
 const FEATURED_GAME_ID = 'mafia';
@@ -35,6 +36,37 @@ export function GamesPage({ game }: GamesPageProps) {
         <div className="brand-kicker">اختر تجربتك</div>
         <h1 className="hero-title" style={{ fontSize: '2rem' }}>الألعاب</h1>
         <p className="hero-subtitle">ست تجارب مباشرة — التفاعل كله عبر دردشة يوتيوب</p>
+      </div>
+
+      {/* Phase A — Broadcast connection entry */}
+      <div className="reveal mb-8">
+        <div className="panel" style={{ maxWidth: 620, margin: '0 auto' }}>
+          <div className="flex items-center justify-between gap-4 flex-wrap mb-3">
+            <div className="flex items-center gap-3">
+              <span className="game-icon" style={{ background: 'rgba(255,255,255,0.05)', borderColor: 'var(--neon-cyan)', boxShadow: '0 0 18px rgba(0,255,255,0.2)' }}>
+                📺
+              </span>
+              <div>
+                <h2 className="room-title" style={{ margin: 0 }}>بث YouTube المباشر</h2>
+                <p className="text-sm text-[var(--text-dim)]">اربط بثك لتفعيل أوامر الدردشة في الألعاب</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <ConnectionStatusPill status={game.youtubeStatus} compact />
+              <button
+                className="btn-neon text-sm"
+                onClick={() => navigate('/connect')}
+              >
+                ربط البث
+              </button>
+            </div>
+          </div>
+          {!game.youtubeStatus.connected && (
+            <p className="text-sm text-[var(--text-dim)] text-center">
+              يجب ربط البث قبل بدء الألعاب حتى تعمل أوامر المشاهدين مثل !انضم
+            </p>
+          )}
+        </div>
       </div>
 
       <div ref={gridRef} className="reveal games-grid mb-16">
