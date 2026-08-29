@@ -3,16 +3,25 @@ import { ensureGuestIdentity } from '../hooks/useGuestIdentity';
 
 let socket: Socket | null = null;
 
-void ensureGuestIdentity().catch(() => undefined);
+const identityReady = ensureGuestIdentity().catch(() => undefined);
 
 export function getSocket(): Socket {
   if (!socket) {
     socket = io((import.meta.env.VITE_WS_URL || ''), {
       transports: ['polling', 'websocket'],
       withCredentials: true,
+      autoConnect: false,
+    });
+
+    void identityReady.then(() => {
+      if (socket && !socket.connected) {
+        socket.connect();
+      }
     });
 
     socket.on('connect_error', (err) => {
+      console.error('[Socket] connect_error:', err.message);
+
       if ((err as Error)?.message === 'identity-required') {
         void ensureGuestIdentity()
           .then(() => {
