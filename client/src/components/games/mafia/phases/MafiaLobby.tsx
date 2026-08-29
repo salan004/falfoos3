@@ -28,7 +28,8 @@ export function MafiaLobby({ state }: MafiaLobbyProps) {
   const minPlayers = readNumberSetting(activeSettings, 'minPlayers', 4);
   const maxPlayers = readNumberSetting(activeSettings, 'maxPlayers', 20);
 
-  const alivePlayers = state.players.filter((p) => p.isAlive);
+  const players = state.players ?? [];
+  const alivePlayers = players.filter((p) => p.isAlive);
   const settingsEditable = state.phase === 'idle' || state.phase === 'lobby';
 
   return (
@@ -65,7 +66,7 @@ export function MafiaLobby({ state }: MafiaLobbyProps) {
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '8px' }}>
-            {state.players.map((p) => (
+            {players.map((p) => (
               <MafiaPlayerCard key={p.id} player={p} />
             ))}
           </div>

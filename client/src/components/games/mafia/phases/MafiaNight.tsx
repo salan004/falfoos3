@@ -11,10 +11,11 @@ interface MafiaNightProps {
 }
 
 export function MafiaNight({ state, timerWindow }: MafiaNightProps) {
-  const deadPlayers = state.players.filter((p) => !p.isAlive);
+  const players = state.players ?? [];
+  const deadPlayers = players.filter((p) => !p.isAlive);
   const aliveCount = typeof state.aliveCount === 'number'
     ? state.aliveCount
-    : state.players.filter((p) => p.isAlive).length;
+    : players.filter((p) => p.isAlive).length;
 
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -33,7 +34,7 @@ export function MafiaNight({ state, timerWindow }: MafiaNightProps) {
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '8px' }}>
-            {state.players.map((p) => (
+            {players.map((p) => (
               <MafiaPlayerCard key={p.id} player={p} />
             ))}
           </div>

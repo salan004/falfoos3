@@ -12,10 +12,11 @@ interface MafiaVotingProps {
 }
 
 export function MafiaVoting({ state, timerWindow }: MafiaVotingProps) {
-  const deadPlayers = state.players.filter((p) => !p.isAlive);
+  const players = state.players ?? [];
+  const deadPlayers = players.filter((p) => !p.isAlive);
   const aliveCount = typeof state.aliveCount === 'number'
     ? state.aliveCount
-    : state.players.filter((p) => p.isAlive).length;
+    : players.filter((p) => p.isAlive).length;
   const votedCount = typeof state.votedCount === 'number' ? state.votedCount : 0;
 
   return (
@@ -35,7 +36,7 @@ export function MafiaVoting({ state, timerWindow }: MafiaVotingProps) {
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '8px' }}>
-            {state.players.map((p) => (
+            {players.map((p) => (
               <MafiaPlayerCard key={p.id} player={p} />
             ))}
           </div>

@@ -11,12 +11,13 @@ interface MafiaDayProps {
 }
 
 export function MafiaDay({ state, timerWindow }: MafiaDayProps) {
-  const deadPlayers = state.players.filter((p) => !p.isAlive);
+  const players = state.players ?? [];
+  const deadPlayers = players.filter((p) => !p.isAlive);
   const aliveCount = typeof state.aliveCount === 'number'
     ? state.aliveCount
-    : state.players.filter((p) => p.isAlive).length;
+    : players.filter((p) => p.isAlive).length;
   const eliminated = state.eliminatedToday
-    ? state.players.find((p) => p.id === state.eliminatedToday)
+    ? players.find((p) => p.id === state.eliminatedToday)
     : null;
 
   return (
@@ -56,7 +57,7 @@ export function MafiaDay({ state, timerWindow }: MafiaDayProps) {
           )}
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '8px' }}>
-            {state.players.map((p) => (
+            {players.map((p) => (
               <MafiaPlayerCard key={p.id} player={p} />
             ))}
           </div>

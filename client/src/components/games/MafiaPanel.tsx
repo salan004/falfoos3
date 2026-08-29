@@ -18,13 +18,14 @@ type AnyRoomNotice = MafiaLiveNotice | RoomNotice;
 
 export function MafiaPanel({ gameState }: { gameState: GameState }) {
   const state = gameState as MafiaGameState;
+  const players = state.players ?? [];
   const live = useMafiaLiveEvents();
   const joinNotices = useGameRoomNotices('mafia');
   const subPhase = useMafiaPhase(state, live);
 
-  const deadCount = state.players.filter((p) => !p.isAlive).length;
+  const deadCount = players.filter((p) => !p.isAlive).length;
   const aliveCount =
-    typeof state.aliveCount === 'number' ? state.aliveCount : state.players.length - deadCount;
+    typeof state.aliveCount === 'number' ? state.aliveCount : players.length - deadCount;
 
   const atmoVars: React.CSSProperties | undefined =
     subPhase === 'voteResult' && live.votingResult
