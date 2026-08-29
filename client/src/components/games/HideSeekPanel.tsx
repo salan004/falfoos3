@@ -20,7 +20,8 @@ export function HideSeekPanel({ gameState }: { gameState: GameState }) {
         accent="var(--neon-purple)"
         players={players}
         instruction="اكتب !انضم في البث للانضمام إلى المختبئين"
-        commandHint="بعد الانضمام اختبئ عبر !hide A1 (المناطق من A1 إلى D4)"
+        commandHint="بعد الانضمام اختبئ عبر !اختبئ A1 (المناطق من A1 إلى D4)"
+        hideHeader
       >
         <div className="text-center text-sm text-[var(--text-muted)] mt-4">
           اضغط «بدء الاختباء» من لوحة التحكم لفتح الصالة
@@ -32,7 +33,6 @@ export function HideSeekPanel({ gameState }: { gameState: GameState }) {
   return (
     <div className="h-full flex flex-col gap-4">
       <div className="flex gap-2 items-center flex-wrap">
-        <span className="badge badge-purple badge-lg">👻 الغميضة</span>
         <span className="badge badge-cyan badge-lg">👥 {players.length} لاعب</span>
         <span className="badge badge-green badge-lg">🙈 {hiddenCount} مختبئون</span>
         <span className="badge badge-red badge-lg">💀 {caughtCount} ضُبطوا</span>

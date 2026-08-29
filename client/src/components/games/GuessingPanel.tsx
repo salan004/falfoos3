@@ -33,7 +33,8 @@ export function GuessingPanel({ gameState }: { gameState: GameState }) {
         accent="var(--neon-yellow)"
         players={participants}
         instruction="اكتب !انضم في البث للانضمام إلى المشاركين"
-        commandHint="حالما يضع المضيف الإجابة، خمّن عبر !guess <إجابتك>"
+        commandHint="حالما يضع المضيف الإجابة، خمّن عبر !تخمين <إجابتك>"
+        hideHeader
       >
         <div className="text-center text-sm text-[var(--text-muted)] mt-4">
           {state.phase === 'playing'
@@ -52,7 +53,7 @@ export function GuessingPanel({ gameState }: { gameState: GameState }) {
       </div>
 
       <div className="instruction-hint">
-        اكتب <strong>!guess</strong> متبوعة بتخمينك في دردشة البث
+        اكتب <strong>!تخمين</strong> متبوعة بتخمينك في دردشة البث
       </div>
 
       {state.hints.length > 0 && (

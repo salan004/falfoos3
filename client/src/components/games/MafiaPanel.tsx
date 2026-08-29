@@ -106,18 +106,6 @@ export function MafiaPanel({ gameState }: { gameState: GameState }) {
       className={`mafia-atmo atmo-${subPhase}`}
       style={{ height: '100%', display: 'flex', flexDirection: 'column', gap: '12px', ...atmoVars }}
     >
-      <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
-        <span className="badge badge-cyan badge-lg">🎭 مافيا</span>
-        <span className={`badge ${getPhaseColor(subPhase)} badge-lg`}>{getPhaseText(subPhase)}</span>
-        <span className="badge badge-green badge-lg">👥 {aliveCount} {MAFIA_TEXT.labels.aliveSuffix}</span>
-        {deadCount > 0 && (
-          <span className="badge badge-red badge-lg">💀 {deadCount}</span>
-        )}
-        {state.round > 0 && (
-          <span className="badge badge-purple badge-lg">{MAFIA_TEXT.labels.roundLabel} {state.round}</span>
-        )}
-      </div>
-
       {allNotices.length > 0 && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
           {allNotices.map((n) => (

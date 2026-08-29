@@ -357,11 +357,12 @@
     overflow: auto;
   }
   .chat-col {
-    height: 70vh;
+    height: 30vh;
+    min-height: 200px;
   }
   @media (min-width: 1025px) {
     .game-layout {
-      grid-template-columns: minmax(0, 1.95fr) minmax(0, 1fr);
+      grid-template-columns: minmax(0, 1fr) minmax(280px, 380px);
       height: calc(100vh - 96px);
       min-height: 560px;
     }
@@ -519,19 +520,18 @@
   .game-card:hover::before {
     opacity: 0.55;
   }
-  .btn-card-cta {
+.btn-card-cta {
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    font-size: 0.72rem;
-    font-weight: 700;
-    letter-spacing: 0.3px;
-    color: var(--text-muted);
-    border: 1px solid var(--border-color);
-    border-radius: 999px;
-    padding: 4px 12px;
-    background: rgba(255, 255, 255, 0.02);
-    transition: color 0.2s ease, border-color 0.2s ease, background 0.2s ease;
+    font-size: 0.78rem;
+    font-weight: 800;
+    padding: 7px 15px;
+    color: var(--text-primary);
+    border-color: color-mix(in srgb, var(--card-accent, var(--border-color)) 38%, var(--border-color));
+    background: color-mix(in srgb, var(--card-accent, transparent) 9%, rgba(255, 255, 255, 0.02));
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+    min-height: 44px;
   }
   .game-card:hover .btn-card-cta {
     color: var(--card-accent, var(--text-primary));
@@ -581,9 +581,10 @@
     color: var(--text-dim);
     border: 1px solid var(--border-color);
     border-radius: 999px;
-    padding: 4px 12px;
+    padding: 8px 16px;
     background: rgba(255, 255, 255, 0.02);
     transition: color 0.2s ease, border-color 0.2s ease, background 0.2s ease;
+    min-height: 44px;
   }
   .game-card:hover .game-card-learn-more {
     color: var(--card-accent, var(--text-primary));
@@ -663,8 +664,8 @@
     position: absolute;
     top: 12px;
     inset-inline-end: 12px;
-    width: 32px;
-    height: 32px;
+    width: 44px;
+    height: 44px;
     border-radius: 50%;
     border: 1px solid var(--border-color);
     background: var(--bg-card);
@@ -963,6 +964,7 @@
     .room-header {
       /* Smaller sticky offset: mobile nav is top 8px + ~48px height. */
       top: 60px;
+      padding: 12px 16px;
     }
     .page {
       margin-top: 12px;
@@ -984,8 +986,8 @@
       padding: 16px;
     }
     .chat-col {
-      height: 65vh;
-      min-height: 420px;
+      height: 30vh;
+      min-height: 200px;
     }
   }
 
@@ -1112,14 +1114,7 @@
     position: relative;
   }
   .game-area::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    border-radius: inherit;
-    pointer-events: none;
-    background:
-      radial-gradient(65% 42% at 50% 0%, color-mix(in srgb, var(--room-accent, transparent) 8%, transparent), transparent 72%),
-      radial-gradient(45% 35% at 88% 100%, color-mix(in srgb, var(--room-accent, transparent) 5%, transparent), transparent 70%);
+    display: none;
   }
 
   /* ---------- Lobby / game room shared ---------- */
@@ -1377,36 +1372,43 @@
   /* ---------- Game Room tabs (Phase 10B) ---------- */
   .room-tabs {
     display: flex;
-    gap: 6px;
-    padding: 5px;
-    border-radius: 14px;
-    background: rgba(13, 15, 20, 0.65);
-    border: 1px solid var(--border-color);
+    gap: 4px;
+    padding: 3px;
+    border-radius: 10px;
+    background: transparent;
+    border: none;
     flex-shrink: 0;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .room-tabs::-webkit-scrollbar {
+    display: none;
   }
   .room-tab {
     flex: 1;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    gap: 6px;
-    padding: 9px 12px;
-    border-radius: 10px;
-    font-size: 0.88rem;
+    gap: 4px;
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-size: 0.82rem;
     font-weight: 700;
     color: var(--text-dim);
     background: transparent;
     border: 1px solid transparent;
     cursor: pointer;
-    transition: color 0.18s ease, background 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+    transition: color 0.18s ease, border-color 0.18s ease;
     white-space: nowrap;
+    min-height: 44px;
   }
-  .room-tab:hover { color: var(--text-primary); background: rgba(233, 235, 239, 0.05); }
+  .room-tab:hover { color: var(--text-primary); border-color: var(--border-color); }
   .room-tab.active {
-    color: #eafcff;
-    border-color: color-mix(in srgb, var(--room-accent, var(--neon-cyan)) 50%, transparent);
-    background: color-mix(in srgb, var(--room-accent, var(--neon-cyan)) 10%, transparent);
-    box-shadow: 0 0 14px color-mix(in srgb, var(--room-accent, var(--neon-cyan)) 22%, transparent);
+    color: var(--neon-cyan);
+    border-color: var(--neon-cyan);
+    background: transparent;
+    box-shadow: none;
   }
 
   /* ---------- Game Room leaderboard (Phase 10B — read-only) ---------- */
@@ -1620,6 +1622,15 @@
     padding: 2px;
     border-radius: 8px;
     box-shadow: 0 0 24px rgba(0, 255, 136, 0.1), 0 10px 30px rgba(0, 0, 0, 0.4);
+    width: fit-content;
+    max-width: 100%;
+    overflow-x: auto;
+  }
+  @media (max-width: 480px) {
+    .drawing-frame {
+      gap: 0.5px;
+      padding: 1px;
+    }
   }
 
   /* ---------- Hide & Seek zones ---------- */
@@ -1669,6 +1680,13 @@
     .text-\[0\.68rem\] { font-size: 0.74rem; }
     .text-\[0\.7rem\] { font-size: 0.76rem; }
     .text-\[0\.72rem\] { font-size: 0.78rem; }
+  }
+
+  /* ---------- Arabic text wrapping ---------- */
+  .arabic-wrap {
+    overflow-wrap: anywhere;
+    word-break: keep-all;
+    hyphens: auto;
   }
 }
 

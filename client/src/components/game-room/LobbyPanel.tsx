@@ -13,6 +13,8 @@ interface LobbyPanelProps {
   instruction?: string;
   /** Optional secondary line (e.g. legacy command aliases). */
   commandHint?: string;
+  /** Hide the title/icon header when rendered inside GamePage (which has its own header). */
+  hideHeader?: boolean;
   children?: ReactNode;
 }
 
@@ -32,25 +34,28 @@ export function LobbyPanel({
   instruction = DEFAULT_INSTRUCTION,
   commandHint,
   children,
+  hideHeader = false,
 }: LobbyPanelProps) {
   const count = players.length;
   const belowMin = minPlayers !== null && count < minPlayers;
 
   return (
     <div className="lobby-panel" style={accent ? ({ '--lobby-accent': accent } as React.CSSProperties) : undefined}>
-      <div className="flex items-center justify-between gap-3 flex-wrap mb-4">
-        <div className="flex items-center gap-3">
-          {icon && (
-            <span className="game-icon" style={{ borderColor: accent, boxShadow: accent ? `0 0 18px ${accent}33` : undefined }}>
-              {icon}
-            </span>
-          )}
-          <h2 className="room-title" style={{ margin: 0 }}>{title}</h2>
+      {!hideHeader && (
+        <div className="flex items-center justify-between gap-3 flex-wrap mb-4">
+          <div className="flex items-center gap-3">
+            {icon && (
+              <span className="game-icon" style={{ borderColor: accent, boxShadow: accent ? `0 0 18px ${accent}33` : undefined }}>
+                {icon}
+              </span>
+            )}
+            <h2 className="room-title" style={{ margin: 0 }}>{title}</h2>
+          </div>
+          <span className="badge badge-green lobby-count">
+            👥 {count}{maxPlayers ? ` / ${maxPlayers}` : ''} لاعب
+          </span>
         </div>
-        <span className="badge badge-green lobby-count">
-          👥 {count}{maxPlayers ? ` / ${maxPlayers}` : ''} لاعب
-        </span>
-      </div>
+      )}
 
       <div className="join-banner" role="status">
         <span className="join-banner-dot" aria-hidden="true" />

@@ -14,6 +14,7 @@ export function TriviaPanel({ gameState }: { gameState: GameState }) {
         players={players}
         instruction="اكتب !انضم في البث للانضمام إلى اللاعبين"
         commandHint="أجب عبر كتابة 1 أو 2 أو 3 أو 4 في الدردشة"
+        hideHeader
       >
         <div className="text-center text-sm text-[var(--text-muted)] mt-4">
           اضغط «ابدأ» من لوحة التحكم لإطلاق الجولات

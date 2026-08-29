@@ -125,7 +125,7 @@ function GamePage({ gameId, game }: { gameId: string; game: ReturnType<typeof us
         </div>
 
         <div className="chat-col" style={{ minHeight: 0 }}>
-          <ChatPanel messages={game.chatMessages} status={game.youtubeStatus} variant="room" />
+          <ChatPanel messages={game.chatMessages} status={game.youtubeStatus} variant="room" showHeader={false} showStatus={false} />
         </div>
       </div>
     </main>

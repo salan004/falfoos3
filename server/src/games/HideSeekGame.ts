@@ -34,7 +34,7 @@ export class HideSeekGame extends BaseGame {
 
   handleChatMessage(msg: ChatMessage): void {
     // NOTE: !join / !انضم are handled globally by GameManager -> handleJoinCommand.
-    const hideMatch = normalizeChatCommand(msg.message).match(/^!\s*hide\s+([A-D][1-4])/i);
+    const hideMatch = normalizeChatCommand(msg.message).match(/^!\s*(?:hide|اختبئ)\s+([A-D][1-4])/i);
     if (hideMatch && this.state.phase === 'lobby') {
       const player = this.state.players.find((p) => p.id === msg.authorId);
       if (player) {
@@ -50,7 +50,7 @@ export class HideSeekGame extends BaseGame {
             playerId: msg.authorId,
             displayName: msg.author,
             reason: 'notJoined',
-            message: 'انضم أولاً عبر أمر !انضم ثم اختبئ عبر !hide A1.',
+            message: 'انضم أولاً عبر أمر !انضم ثم اختبئ عبر !hide A1 أو !اختبئ A1.',
           },
           timestamp: Date.now(),
         });

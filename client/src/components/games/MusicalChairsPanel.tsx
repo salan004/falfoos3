@@ -29,6 +29,7 @@ export function MusicalChairsPanel({ gameState }: { gameState: GameState }) {
         minPlayers={2}
         instruction="اكتب !انضم في البث للانضمام إلى الصالة"
         commandHint="الأمر القديم !دخول يعمل أيضاً"
+        hideHeader
       >
         <div className="text-center text-sm text-[var(--text-muted)] mt-4">
           افتح الصالة من لوحة التحكم ثم أغلقها لبدء الجولات

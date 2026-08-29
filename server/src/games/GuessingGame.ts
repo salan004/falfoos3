@@ -56,7 +56,7 @@ export class GuessingGame extends BaseGame {
 
   handleChatMessage(msg: ChatMessage): void {
     if (this.state.phase !== 'playing' || this.state.winner) return;
-    const match = normalizeChatCommand(msg.message).match(/^!\s*guess\s+(.+)/i);
+    const match = normalizeChatCommand(msg.message).match(/^!\s*(?:guess|تخمين)\s+(.+)/i);
     if (!match) return;
     if (match[1].trim().toLowerCase() === this.state.answer.trim().toLowerCase()) {
       this.state.winner = msg.author;

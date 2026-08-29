@@ -22,11 +22,15 @@ function formatTime(ts: number): string {
 export function ChatPanel({
   messages,
   status,
-  showStatus = true,
-  showHeader = true,
+  showStatus,
+  showHeader,
   variant = 'room',
   className = '',
 }: ChatPanelProps) {
+  const defaultShowHeader = variant === 'room' ? false : true;
+  const defaultShowStatus = variant === 'room' ? false : true;
+  const resolvedShowHeader = showHeader ?? defaultShowHeader;
+  const resolvedShowStatus = showStatus ?? defaultShowStatus;
   const scrollRef = useRef<HTMLDivElement>(null);
   const [stickToBottom, setStickToBottom] = useState(true);
 
@@ -47,12 +51,12 @@ export function ChatPanel({
 
   return (
     <div className={containerClass} style={{ minHeight: 0 }}>
-      {showHeader && (
+      {resolvedShowHeader && (
         <div className="flex items-center justify-between gap-2 px-4 pt-3 pb-2 border-b border-[var(--border-color)]">
           <h3 className="text-sm font-extrabold" style={{ color: 'var(--text-primary)' }}>
             الشات المباشر
           </h3>
-          {showStatus && status && (
+          {resolvedShowStatus && status && (
             <ConnectionStatusPill status={status} compact />
           )}
         </div>
