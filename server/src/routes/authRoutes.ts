@@ -37,12 +37,12 @@ authRoutes.get('/google', (req, res) => {
 /**
  * OAuth callback: validates state cookie + PKCE verifier, exchanges the
  * single-use code, upserts the user, issues a fresh session cookie, then
- * redirects to a clean RELATIVE url (open-redirect safe).
+ * redirects to the Vercel frontend.
  */
 authRoutes.get('/google/callback', async (req, res) => {
   const cfg = getGoogleConfig();
   if (!cfg) {
-    res.status(503).redirect('/?authError=unconfigured');
+    res.status(503).redirect('https://falfoos.vercel.app/?authError=unconfigured');
     return;
   }
 
@@ -53,7 +53,7 @@ authRoutes.get('/google/callback', async (req, res) => {
 
   if (!code || !state || !flow.state || !flow.codeVerifier || state !== flow.state) {
     console.warn('[Falfoos] OAuth callback rejected: state/code mismatch');
-    res.status(400).redirect('/?authError=state');
+    res.status(400).redirect('https://falfoos.vercel.app/?authError=state');
     return;
   }
 
@@ -63,13 +63,13 @@ authRoutes.get('/google/callback', async (req, res) => {
     // Fresh session id at every login — fixation-proof.
     createSession(res, user.id);
     console.log(`[Falfoos] User signed in via Google: ${user.id}`);
-    res.redirect('/');
+    res.redirect('https://falfoos.vercel.app');
   } catch (err) {
     console.error(
       '[Falfoos] OAuth callback failed:',
       err instanceof Error ? err.message : String(err)
     );
-    res.status(502).redirect('/?authError=exchange');
+    res.status(502).redirect('https://falfoos.vercel.app/?authError=exchange');
   }
 });
 
