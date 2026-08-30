@@ -3,22 +3,37 @@ import { ensureGuestIdentity } from '../hooks/useGuestIdentity';
 
 let socket: Socket | null = null;
 
-void ensureGuestIdentity().catch(() => undefined);
+const identityReady = ensureGuestIdentity().catch(() => undefined);
 
 export function getSocket(): Socket {
   if (!socket) {
     socket = io((import.meta.env.VITE_WS_URL || ''), {
       transports: ['polling', 'websocket'],
       withCredentials: true,
+      autoConnect: false,
+    });
+
+    /*
+     * Wait for guest identity before the first connection.
+     */
+    void identityReady.then(() => {
+      if (socket && !socket.connected) {
+        socket.connect();
+      }
     });
 
     socket.on('connect_error', (err) => {
+      console.error('[Socket] connect_error:', err.message);
+
+      /*
+       * TEMPORARILY DISABLED:
+       * Do not reconnect automatically after identity-required.
+       * This prevents the infinite reconnect loop while debugging.
+       */
       if ((err as Error)?.message === 'identity-required') {
-        void ensureGuestIdentity()
-          .then(() => {
-            socket?.connect();
-          })
-          .catch(() => undefined);
+        console.warn(
+          '[Socket] identity-required — automatic reconnect paused for debugging'
+        );
       }
     });
   }
@@ -55,18 +70,12 @@ export function onAdminAuthResult(
 }
 
 export function onAdminError(
-  handler: (payload: {
-    message?: string;
-    action?: string;
-  }) => void
+  handler: (payload: { message?: string; action?: string }) => void
 ): () => void {
   const s = getSocket();
 
   const listener = (payload: unknown) => {
-    handler(payload as {
-      message?: string;
-      action?: string;
-    });
+    handler(payload as { message?: string; action?: string });
   };
 
   s.on('admin:error', listener);
@@ -96,7 +105,10 @@ export function sendYouTubeDisconnect(): void {
 }
 
 /** Mafia secret actions via authenticated socket */
-export function sendMafiaNightAction(action: 'kill' | 'heal' | 'investigate', targetId: string): void {
+export function sendMafiaNightAction(
+  action: 'kill' | 'heal' | 'investigate',
+  targetId: string
+): void {
   const s = getSocket();
   s.emit('mafia:nightAction', { action, targetId });
 }
