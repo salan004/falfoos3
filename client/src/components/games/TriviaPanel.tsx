@@ -1,4 +1,4 @@
-import { GameState, TriviaGameState } from '../../types/game';
+import { GameState, TriviaGameState, TriviaRankingEntry } from '../../types/game';
 import { LobbyPanel } from '../game-room/LobbyPanel';
 
 export function TriviaPanel({ gameState }: { gameState: GameState }) {
@@ -24,13 +24,35 @@ export function TriviaPanel({ gameState }: { gameState: GameState }) {
   }
 
   if (state.phase === 'finished') {
+    const ranking = state.ranking ?? [];
     return (
-      <div className="flex items-center justify-center h-full">
+      <div className="flex flex-col items-center justify-center h-full gap-4 p-4">
         <div className="text-center">
           <div className="text-5xl mb-3">🏆</div>
           <div className="glow-text-yellow text-4xl font-extrabold">انتهت اللعبة</div>
           <div className="text-[var(--text-dim)] mt-2 text-lg">تم إكمال {state.totalRounds} جولة!</div>
         </div>
+        {ranking.length > 0 && (
+          <div className="w-full max-w-md">
+            <div className="card glow-border-yellow mb-3">
+              <div className="font-bold text-lg text-center mb-2">الترتيب النهائي</div>
+              <div className="grid grid-cols-4 gap-2 text-sm">
+                <div className="font-bold text-center">#</div>
+                <div className="font-bold text-center">اللاعب</div>
+                <div className="font-bold text-center">النقاط</div>
+                <div className="font-bold text-center">صحيحة/خاطئة</div>
+              </div>
+              {ranking.map((entry: TriviaRankingEntry, index: number) => (
+                <div key={entry.id} className="grid grid-cols-4 gap-2 text-sm py-1 items-center border-t border-[var(--border-color)]">
+                  <div className="font-bold text-center text-neon-yellow">{index + 1}</div>
+                  <div className="text-center truncate">{entry.displayName}</div>
+                  <div className="font-bold text-center text-neon-cyan">{entry.score}</div>
+                  <div className="text-center text-[var(--text-dim)]">{entry.correctAnswers} / {entry.wrongAnswers}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     );
   }

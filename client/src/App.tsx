@@ -53,6 +53,18 @@ function GamePage({ gameId, game }: { gameId: string; game: ReturnType<typeof us
   // when the route's gameId changes (GamePage is keyed by gameId in App).
   const [roomTab, setRoomTab] = useState<RoomTab>('game');
 
+  // Phase 5B: Mobile chat collapsed state with sessionStorage persistence
+  const storageKey = `chat-collapsed-${gameId}`;
+  const [chatCollapsed, setChatCollapsed] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return true;
+    const stored = sessionStorage.getItem(storageKey);
+    return stored !== 'false';
+  });
+
+  useEffect(() => {
+    sessionStorage.setItem(storageKey, String(chatCollapsed));
+  }, [chatCollapsed, storageKey]);
+
   if (!game.gameList.some((g) => g.id === gameId)) {
     return (
       <main className="page">
@@ -125,7 +137,16 @@ function GamePage({ gameId, game }: { gameId: string; game: ReturnType<typeof us
         </div>
 
         <div className="chat-col" style={{ minHeight: 0 }}>
-          <ChatPanel messages={game.chatMessages} status={game.youtubeStatus} variant="room" showHeader={false} showStatus={false} />
+          <ChatPanel
+            messages={game.chatMessages}
+            status={game.youtubeStatus}
+            variant="room"
+            showHeader={false}
+            showStatus={false}
+            collapsed={chatCollapsed}
+            onToggle={() => setChatCollapsed((v) => !v)}
+            messageCount={game.chatMessages.length}
+          />
         </div>
       </div>
     </main>

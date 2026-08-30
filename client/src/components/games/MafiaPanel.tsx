@@ -13,6 +13,7 @@ import { MafiaDay } from './mafia/phases/MafiaDay';
 import { MafiaVoting } from './mafia/phases/MafiaVoting';
 import { MafiaVoteResult } from './mafia/phases/MafiaVoteResult';
 import { MafiaGameOver } from './mafia/phases/MafiaGameOver';
+import { usePlayerId } from '../../hooks/useGuestIdentity';
 
 type AnyRoomNotice = MafiaLiveNotice | RoomNotice;
 
@@ -22,6 +23,7 @@ export function MafiaPanel({ gameState }: { gameState: GameState }) {
   const live = useMafiaLiveEvents();
   const joinNotices = useGameRoomNotices('mafia');
   const subPhase = useMafiaPhase(state, live);
+  const currentPlayerId = usePlayerId();
 
   const deadCount = players.filter((p) => !p.isAlive).length;
   const aliveCount =
@@ -89,11 +91,11 @@ export function MafiaPanel({ gameState }: { gameState: GameState }) {
       case 'roleReveal':
         return <MafiaRoleReveal rolesSummary={live.rolesSummary} activeWindow={live.activeWindow} />;
       case 'night':
-        return <MafiaNight state={state} timerWindow={windowFor('night')} />;
+        return <MafiaNight state={state} timerWindow={windowFor('night')} currentPlayerId={currentPlayerId} />;
       case 'day':
-        return <MafiaDay state={state} timerWindow={windowFor('day')} />;
+        return <MafiaDay state={state} timerWindow={windowFor('day')} currentPlayerId={currentPlayerId} />;
       case 'voting':
-        return <MafiaVoting state={state} timerWindow={windowFor('voting')} />;
+        return <MafiaVoting state={state} timerWindow={windowFor('voting')} currentPlayerId={currentPlayerId} />;
       case 'voteResult':
         return live.votingResult ? <MafiaVoteResult snapshot={live.votingResult} /> : null;
       case 'gameOver':

@@ -8,6 +8,7 @@ import type { MafiaPhaseWindow } from '../hooks/useMafiaLiveEvents';
 interface MafiaDayProps {
   state: MafiaGameState;
   timerWindow: MafiaPhaseWindow | null;
+  currentPlayerId?: string | null;
 }
 
 export function MafiaDay({ state, timerWindow }: MafiaDayProps) {

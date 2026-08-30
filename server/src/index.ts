@@ -153,7 +153,10 @@ gameManager.setSocketServer(io);
   });
 }
 
-const triviaGame = new TriviaGame(gameManager);
+const triviaGame = new TriviaGame({
+    updateScore: (pid, name, delta, avatarUrl, reason) => gameManager.updateScore(pid, name, delta, avatarUrl, reason),
+    sendToSocket: (socketId, event) => gameManager.sendToSocket(socketId, event),
+  });
 const musicalChairsGame = new MusicalChairsGame();
 const mafiaGame = new MafiaGame(gameManager, io);
 const guessingGame = new GuessingGame(gameManager);
@@ -463,6 +466,21 @@ io.on('connection', (socket) => {
     cancelReconnect();
     disconnectYouTube();
     broadcastYouTubeStatus(undefined, 'manual');
+  });
+
+  // Mafia secret actions via authenticated socket
+  socket.on('mafia:nightAction', (payload: { action: 'kill' | 'heal' | 'investigate'; targetId: string }) => {
+    const game = gameManager.getActiveGame();
+    if (game && game.config.id === 'mafia') {
+      (game as MafiaGame).handleNightActionSocket(socket, payload);
+    }
+  });
+
+  socket.on('mafia:vote', (payload: { targetId: string }) => {
+    const game = gameManager.getActiveGame();
+    if (game && game.config.id === 'mafia') {
+      (game as MafiaGame).handleVoteSocket(socket, payload);
+    }
   });
 
   socket.on('disconnect', () => {

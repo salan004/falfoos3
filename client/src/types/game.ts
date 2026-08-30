@@ -50,6 +50,22 @@ export interface GamePlayerSummary {
   status?: string;
 }
 
+export interface TriviaPlayerSummary extends GamePlayerSummary {
+  score?: number;
+  correctAnswers?: number;
+  wrongAnswers?: number;
+  rank?: number | null;
+}
+
+export interface TriviaRankingEntry {
+  id: string;
+  displayName: string;
+  score: number;
+  correctAnswers: number;
+  wrongAnswers: number;
+  avgResponseTimeMs: number;
+}
+
 export interface TriviaGameState extends GameState {
   roundNumber: number;
   totalRounds: number;
@@ -65,7 +81,8 @@ export interface TriviaGameState extends GameState {
   roundFinished: boolean;
   totalAnswered: number;
   playerCount: number;
-  players?: GamePlayerSummary[];
+  players?: TriviaPlayerSummary[];
+  ranking?: TriviaRankingEntry[];
 }
 
 export interface MusicalChairsGameState extends GameState {

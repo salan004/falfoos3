@@ -94,3 +94,14 @@ export function sendYouTubeDisconnect(): void {
   const s = getSocket();
   s.emit('youtube:disconnect', {});
 }
+
+/** Mafia secret actions via authenticated socket */
+export function sendMafiaNightAction(action: 'kill' | 'heal' | 'investigate', targetId: string): void {
+  const s = getSocket();
+  s.emit('mafia:nightAction', { action, targetId });
+}
+
+export function sendMafiaVote(targetId: string): void {
+  const s = getSocket();
+  s.emit('mafia:vote', { targetId });
+}

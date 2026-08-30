@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useId } from 'react';
 import { ChatMessage, YouTubeConnectionStatus } from '../types/game';
 import { ConnectionStatusPill } from './ConnectionStatusPill';
 
@@ -9,6 +9,9 @@ interface ChatPanelProps {
   showHeader?: boolean;
   variant?: 'room' | 'dashboard';
   className?: string;
+  collapsed?: boolean;
+  onToggle?: () => void;
+  messageCount?: number;
 }
 
 function formatTime(ts: number): string {
@@ -26,6 +29,9 @@ export function ChatPanel({
   showHeader,
   variant = 'room',
   className = '',
+  collapsed = false,
+  onToggle,
+  messageCount = 0,
 }: ChatPanelProps) {
   const defaultShowHeader = variant === 'room' ? false : true;
   const defaultShowStatus = variant === 'room' ? false : true;
@@ -33,6 +39,7 @@ export function ChatPanel({
   const resolvedShowStatus = showStatus ?? defaultShowStatus;
   const scrollRef = useRef<HTMLDivElement>(null);
   const [stickToBottom, setStickToBottom] = useState(true);
+  const messagesId = useId();
 
   useEffect(() => {
     if (!stickToBottom) return;
@@ -48,6 +55,30 @@ export function ChatPanel({
   };
 
   const containerClass = `live-chat h-full flex flex-col ${className}`.trim();
+
+  const isMobileRoom = variant === 'room' && typeof window !== 'undefined' && window.innerWidth < 1025;
+
+  if (isMobileRoom && collapsed) {
+    return (
+      <div className={containerClass} style={{ minHeight: 0 }}>
+        <button
+          type="button"
+          className="chat-toggle"
+          onClick={onToggle}
+          aria-expanded="false"
+          aria-controls={messagesId}
+        >
+          <span>الشات</span>
+          {messageCount > 0 && (
+            <span className="chat-toggle-badge" aria-live="polite" aria-atomic="true">
+              {messageCount}
+            </span>
+          )}
+          <span className="chat-toggle-chevron" aria-hidden="true">▲</span>
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className={containerClass} style={{ minHeight: 0 }}>
@@ -65,6 +96,10 @@ export function ChatPanel({
       <div
         ref={scrollRef}
         onScroll={handleScroll}
+        id={messagesId}
+        role="log"
+        aria-live="polite"
+        aria-atomic="false"
         className="flex-1 overflow-y-auto px-3 py-2 flex flex-col gap-2"
         style={{ minHeight: 0 }}
       >
@@ -106,6 +141,24 @@ export function ChatPanel({
           </div>
         ))}
       </div>
+
+      {isMobileRoom && !collapsed && onToggle && (
+        <button
+          type="button"
+          className="chat-toggle"
+          onClick={onToggle}
+          aria-expanded="true"
+          aria-controls={messagesId}
+        >
+          <span className="chat-toggle-chevron" aria-hidden="true">▼</span>
+          <span>الشات</span>
+          {messageCount > 0 && (
+            <span className="chat-toggle-badge" aria-live="polite" aria-atomic="true">
+              {messageCount}
+            </span>
+          )}
+        </button>
+      )}
     </div>
   );
 }

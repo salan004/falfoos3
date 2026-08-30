@@ -689,6 +689,10 @@
     outline-offset: 2px;
   }
 
+  .game-info-drag-handle {
+    display: none;
+  }
+
   .game-info-body {
     flex: 1;
     overflow-y: auto;
@@ -788,9 +792,10 @@
       height: 100%;
       display: flex;
       flex-direction: column;
+      padding-bottom: env(safe-area-inset-bottom, 0);
     }
     .game-info-body {
-      padding: 16px;
+      padding: 20px;
       gap: 16px;
     }
     .game-info-header {
@@ -805,6 +810,17 @@
     }
     .game-info-footer {
       padding: 12px 16px 16px;
+    }
+    .game-info-drag-handle {
+      display: block;
+      width: 40px;
+      height: 4px;
+      margin: 8px auto 12px;
+      border-radius: 2px;
+      background: var(--border-color);
+    }
+    .game-info-steps {
+      padding-inline-start: 12px;
     }
   }
 
@@ -830,7 +846,7 @@
   }
   .games-grid-loading { grid-column: 1 / -1; }
 
-  /* ---------- Mafia live notices ---------- */
+/* ---------- Mafia live notices ---------- */
   .notice-line {
     font-size: 0.74rem;
     font-weight: 600;
@@ -845,9 +861,10 @@
     color: var(--text-dim);
     animation: ff-fade-up 0.25s ease-out;
   }
-  @keyframes ff-fade-up {
-    from { opacity: 0; transform: translateY(-4px); }
-    to { opacity: 1; transform: none; }
+  @media (max-width: 640px) {
+    .notice-line {
+      font-size: 0.78rem;
+    }
   }
   .notice-playerJoined { color: var(--neon-green); border-color: rgba(0, 255, 136, 0.25); }
   .notice-joinRejected { color: var(--neon-yellow); border-color: rgba(255, 221, 0, 0.25); }
@@ -964,7 +981,20 @@
     .room-header {
       /* Smaller sticky offset: mobile nav is top 8px + ~48px height. */
       top: 60px;
-      padding: 12px 16px;
+      padding: 10px 14px;
+      gap: 12px;
+    }
+    .room-icon {
+      width: 56px;
+      height: 56px;
+      font-size: 1.8rem;
+      border-radius: 14px;
+    }
+    .room-title {
+      font-size: clamp(1.3rem, 3.2vw, 1.7rem);
+    }
+    .room-subtitle {
+      font-size: 0.8rem;
     }
     .page {
       margin-top: 12px;
@@ -975,9 +1005,6 @@
     .hero-title {
       font-size: clamp(2rem, 8vw, 2.4rem);
     }
-    .room-title {
-      font-size: 1.5rem;
-    }
     .section-title {
       font-size: 1.15rem;
     }
@@ -986,8 +1013,104 @@
       padding: 16px;
     }
     .chat-col {
-      height: 30vh;
+      height: 25vh;
       min-height: 200px;
+    }
+  }
+
+  /* ---------- Landscape mobile: compact header/tabs/chat ---------- */
+  @media (max-height: 450px) and (orientation: landscape) {
+    .room-header {
+      padding: 8px 12px;
+      gap: 8px;
+    }
+    .room-icon {
+      width: 48px;
+      height: 48px;
+      font-size: 1.5rem;
+    }
+    .room-title {
+      font-size: 1.2rem;
+    }
+    .room-tabs {
+      gap: 3px;
+      padding: 2px;
+    }
+    .room-tab {
+      padding: 6px 8px;
+      font-size: 0.72rem;
+      min-height: 40px;
+    }
+    .chat-col {
+      height: 20vh;
+      min-height: 140px;
+    }
+    .join-banner {
+      padding: 12px 16px;
+      font-size: 1rem;
+    }
+  }
+
+  /* ---------- Phase 5B: Mobile Chat Toggle ---------- */
+  @media (max-width: 1024px) {
+    .chat-toggle {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      width: 100%;
+      min-height: 44px;
+      padding: 8px 16px;
+      border-radius: 12px 12px 0 0;
+      background: var(--bg-panel);
+      border: 1px solid var(--border-color);
+      border-bottom: none;
+      color: var(--text-primary);
+      font-weight: 700;
+      font-size: 0.85rem;
+      cursor: pointer;
+      transition: background 0.2s ease, color 0.2s ease;
+      user-select: none;
+    }
+    .chat-toggle:hover {
+      background: var(--bg-card);
+    }
+    .chat-toggle:focus-visible {
+      outline: 2px solid var(--neon-cyan);
+      outline-offset: 2px;
+    }
+    .chat-toggle-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 20px;
+      height: 20px;
+      padding: 0 6px;
+      border-radius: 999px;
+      background: var(--neon-cyan);
+      color: var(--bg-dark);
+      font-size: 0.7rem;
+      font-weight: 800;
+      line-height: 1;
+    }
+    .chat-toggle-chevron {
+      display: inline-flex;
+      transition: transform 0.2s ease;
+      font-size: 0.7rem;
+      color: var(--text-dim);
+    }
+    .chat-col.collapsed {
+      height: 44px;
+      min-height: 44px;
+    }
+    .chat-col.collapsed .live-chat > div:not(.chat-toggle) {
+      display: none;
+    }
+    .chat-col:not(.collapsed) .chat-toggle {
+      display: none;
+    }
+    .chat-col.collapsed .live-chat .chat-toggle {
+      display: flex;
     }
   }
 
@@ -1048,6 +1171,12 @@
   .badge-lg {
     font-size: 0.82rem;
     padding: 5px 12px;
+  }
+  @media (max-width: 480px) {
+    .badge-lg {
+      font-size: 0.72rem;
+      padding: 4px 8px;
+    }
   }
 
   /* ---------- Game room header ---------- */
@@ -1113,9 +1242,6 @@
   .game-area {
     position: relative;
   }
-  .game-area::before {
-    display: none;
-  }
 
   /* ---------- Lobby / game room shared ---------- */
   .lobby-panel {
@@ -1175,6 +1301,9 @@
     font-size: 1rem;
     font-weight: 600;
     color: var(--text-dim);
+    overflow-wrap: anywhere;
+    word-break: keep-all;
+    hyphens: auto;
   }
   .instruction-hint strong { color: var(--neon-cyan); }
   .instruction-hint-hot {
@@ -1340,6 +1469,11 @@
     background: rgba(255, 255, 255, 0.03);
     color: var(--text-dim);
     white-space: nowrap;
+  }
+  @media (max-width: 640px) {
+    .pp-status {
+      font-size: 0.72rem;
+    }
   }
   .pp-status--playing,
   .pp-status--hiding { color: #8fe9ff; border-color: rgba(0, 240, 255, 0.35); background: rgba(0, 240, 255, 0.07); }
@@ -1528,6 +1662,10 @@
     .rl-podium { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; }
   }
 
+  @media (max-width: 360px) {
+    .room-tab { font-size: 0.72rem; padding: 6px 7px; }
+  }
+
   /* ---------- Trivia ---------- */
   .stat-timer {
     font-family: 'Consolas', 'Courier New', monospace;
@@ -1547,7 +1685,7 @@
   }
   /* Phase 18 — trivia play surface joins the premium glass language */
   .question-card {
-    font-size: clamp(1.15rem, 2vw, 1.45rem);
+    font-size: clamp(1.1rem, 3.5vw, 1.45rem);
     font-weight: 700;
     padding: 26px 22px;
     text-align: center;
@@ -1614,6 +1752,16 @@
 
   .pulse-dot { animation: ff-blink 1.4s ease-in-out infinite; }
 
+  /* ---------- Guessing hint (mobile overflow fix) ---------- */
+  @media (max-width: 480px) {
+    .guessing-hint-display {
+      font-size: clamp(1.5rem, 5vw, 2rem) !important;
+      letter-spacing: 4px !important;
+      overflow-x: auto;
+      width: 100%;
+    }
+  }
+
   /* ---------- Drawing ---------- */
   .drawing-frame {
     display: grid;
@@ -1643,6 +1791,15 @@
     overflow: auto;
     min-height: 0;
   }
+  @media (max-width: 480px) {
+    .zones-grid {
+      gap: 6px;
+    }
+    .zone-cell {
+      padding: 10px 6px;
+      min-width: 60px;
+    }
+  }
   .zone-cell {
     text-align: center;
     padding: 14px 8px;
@@ -1662,7 +1819,7 @@
     color: var(--text-dim);
     margin-top: 4px;
   }
-  .zone-result { font-size: 0.72rem; margin-top: 4px; min-height: 1em; }
+  .zone-result { font-size: 0.72rem; margin-top: 4px; min-height: 1em; overflow-wrap: anywhere; word-break: keep-all; hyphens: auto; }
   .zone-safe {
     border-color: rgba(0, 255, 136, 0.45);
     background: rgba(0, 255, 136, 0.05);
@@ -1781,13 +1938,29 @@
 .game-card.compact { padding: 14px; gap: 10px; }
 
 /* ---------- Description: promoted from quietest to clearly readable ---------- */
-.game-card-desc {
-  margin: 0;
-  font-size: 0.9rem;
-  line-height: 1.7;
-  color: #b6c0cc;
-}
-.game-card.compact .game-card-desc { font-size: 0.84rem; }
+  .game-card-desc {
+    margin: 0;
+    font-size: 0.9rem;
+    line-height: 1.7;
+    color: #b6c0cc;
+  }
+  .game-card.compact .game-card-desc { font-size: 0.84rem; }
+  @media (max-width: 640px) {
+    .game-card:not(.compact) .game-card-desc {
+      font-size: 0.95rem;
+      display: -webkit-box;
+      -webkit-line-clamp: 3;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    .game-card.compact .game-card-desc {
+      font-size: 0.88rem;
+    }
+    .game-card .mt-auto {
+      margin-top: auto;
+      padding-top: 8px;
+    }
+  }
 
 /* ---------- CTA: strong at rest, brighter on hover ---------- */
 .game-card .btn-card-cta {

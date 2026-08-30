@@ -57,7 +57,7 @@ export function GuessingPanel({ gameState }: { gameState: GameState }) {
       </div>
 
       {state.hints.length > 0 && (
-        <div className="card glow-border-yellow" style={{ fontSize: '2rem', letterSpacing: '10px', fontFamily: 'var(--font-mono)', padding: '18px 32px' }}>
+        <div className="card glow-border-yellow guessing-hint-display" style={{ fontSize: '2rem', letterSpacing: '10px', fontFamily: 'var(--font-mono)', padding: '18px 32px' }}>
           {state.hints.map((h, i) => (
             <span key={i}>{i === 0 ? h : '_'} </span>
           ))}
