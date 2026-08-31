@@ -3,7 +3,7 @@ import { PageHeader } from './components/PageHeader';
 import { PageTransition } from './components/PageTransition';
 import { Dashboard } from './components/Dashboard';
 import { GameRenderer } from './components/GameRenderer';
-import { LiveChatPanel } from './components/LiveChatPanel';
+import { ChatPanel } from './components/ChatPanel';
 import { ConnectionStatusPill } from './components/ConnectionStatusPill';
 import { YouTubeConnectPanel } from './components/YouTubeConnectPanel';
 import { PlayersPanel } from './components/game-room/PlayersPanel';
@@ -13,6 +13,7 @@ import { GamesPage } from './pages/GamesPage';
 import { LeaderboardPage } from './pages/LeaderboardPage';
 import { LinksPage } from './pages/LinksPage';
 import { ProfilePage } from './pages/ProfilePage';
+import { TriviaQuestionsPage } from './pages/TriviaQuestionsPage';
 import { GAMES_CATALOG, PHASE_LABELS_AR, resolveGameName } from './data/gamesCatalog';
 import { useGameState } from './hooks/useGameState';
 import { useHashRoute, matchGameRoute, matchProfileRoute } from './hooks/useHashRoute';
@@ -53,6 +54,18 @@ function GamePage({ gameId, game }: { gameId: string; game: ReturnType<typeof us
   // when the route's gameId changes (GamePage is keyed by gameId in App).
   const [roomTab, setRoomTab] = useState<RoomTab>('game');
 
+  // Phase 5B: Mobile chat collapsed state with sessionStorage persistence
+  const storageKey = `chat-collapsed-${gameId}`;
+  const [chatCollapsed, setChatCollapsed] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return true;
+    const stored = sessionStorage.getItem(storageKey);
+    return stored !== 'false';
+  });
+
+  useEffect(() => {
+    sessionStorage.setItem(storageKey, String(chatCollapsed));
+  }, [chatCollapsed, storageKey]);
+
   if (!game.gameList.some((g) => g.id === gameId)) {
     return (
       <main className="page">
@@ -70,14 +83,6 @@ function GamePage({ gameId, game }: { gameId: string; game: ReturnType<typeof us
       className={`page room-theme-${gameId}`}
       style={{ width: 'min(1600px, calc(100% - 24px))', marginTop: '16px', '--room-accent': catalogMeta?.accent } as React.CSSProperties}
     >
-      {!isActive && (
-        <div className="panel" style={{ marginBottom: '12px', borderColor: 'var(--neon-yellow)' }}>
-          <span className="text-neon-yellow text-sm font-bold">
-            ⚠️ هذه اللعبة غير مفعّلة حالياً — فعّلها من لوحة التحكم أو من صفحة الألعاب.
-          </span>
-        </div>
-      )}
-
       <div className="room-header">
         <div className="flex items-center gap-4 min-w-0">
           <span className="game-icon room-icon" style={{ borderColor: isActive ? catalogMeta?.accent : undefined, boxShadow: catalogMeta?.accent ? `0 0 22px ${catalogMeta.accent}30` : undefined }}>
@@ -117,8 +122,8 @@ function GamePage({ gameId, game }: { gameId: string; game: ReturnType<typeof us
           {roomTab === 'game' && (
             <section className="panel game-area flex-1">
               <GameRenderer
-                activeGameId={isActive ? gameId : null}
-                gameState={game.gameState}
+                activeGameId={gameId}
+                gameState={isActive ? game.gameState : null}
               />
             </section>
           )}
@@ -133,7 +138,16 @@ function GamePage({ gameId, game }: { gameId: string; game: ReturnType<typeof us
         </div>
 
         <div className="chat-col" style={{ minHeight: 0 }}>
-          <LiveChatPanel messages={game.chatMessages} status={game.youtubeStatus} />
+          <ChatPanel
+            messages={game.chatMessages}
+            status={game.youtubeStatus}
+            variant="room"
+            showHeader={false}
+            showStatus={false}
+            collapsed={chatCollapsed}
+            onToggle={() => setChatCollapsed((v) => !v)}
+            messageCount={game.chatMessages.length}
+          />
         </div>
       </div>
     </main>
@@ -170,6 +184,7 @@ export default function App() {
         />
       )}
       {path === '/dashboard' && <Dashboard game={game} />}
+      {path === '/dashboard/trivia-questions' && <TriviaQuestionsPage />}
       {!['/', '/games', '/leaderboard', '/links', '/connect', '/dashboard'].includes(path) &&
         !gameRoute &&
         !profileRoute && (

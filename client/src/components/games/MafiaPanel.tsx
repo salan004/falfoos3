@@ -13,18 +13,21 @@ import { MafiaDay } from './mafia/phases/MafiaDay';
 import { MafiaVoting } from './mafia/phases/MafiaVoting';
 import { MafiaVoteResult } from './mafia/phases/MafiaVoteResult';
 import { MafiaGameOver } from './mafia/phases/MafiaGameOver';
+import { usePlayerId } from '../../hooks/useGuestIdentity';
 
 type AnyRoomNotice = MafiaLiveNotice | RoomNotice;
 
 export function MafiaPanel({ gameState }: { gameState: GameState }) {
   const state = gameState as MafiaGameState;
+  const players = state.players ?? [];
   const live = useMafiaLiveEvents();
   const joinNotices = useGameRoomNotices('mafia');
   const subPhase = useMafiaPhase(state, live);
+  const currentPlayerId = usePlayerId();
 
-  const deadCount = state.players.filter((p) => !p.isAlive).length;
+  const deadCount = players.filter((p) => !p.isAlive).length;
   const aliveCount =
-    typeof state.aliveCount === 'number' ? state.aliveCount : state.players.length - deadCount;
+    typeof state.aliveCount === 'number' ? state.aliveCount : players.length - deadCount;
 
   const atmoVars: React.CSSProperties | undefined =
     subPhase === 'voteResult' && live.votingResult
@@ -88,11 +91,11 @@ export function MafiaPanel({ gameState }: { gameState: GameState }) {
       case 'roleReveal':
         return <MafiaRoleReveal rolesSummary={live.rolesSummary} activeWindow={live.activeWindow} />;
       case 'night':
-        return <MafiaNight state={state} timerWindow={windowFor('night')} />;
+        return <MafiaNight state={state} timerWindow={windowFor('night')} currentPlayerId={currentPlayerId} />;
       case 'day':
-        return <MafiaDay state={state} timerWindow={windowFor('day')} />;
+        return <MafiaDay state={state} timerWindow={windowFor('day')} currentPlayerId={currentPlayerId} />;
       case 'voting':
-        return <MafiaVoting state={state} timerWindow={windowFor('voting')} />;
+        return <MafiaVoting state={state} timerWindow={windowFor('voting')} currentPlayerId={currentPlayerId} />;
       case 'voteResult':
         return live.votingResult ? <MafiaVoteResult snapshot={live.votingResult} /> : null;
       case 'gameOver':
@@ -105,18 +108,6 @@ export function MafiaPanel({ gameState }: { gameState: GameState }) {
       className={`mafia-atmo atmo-${subPhase}`}
       style={{ height: '100%', display: 'flex', flexDirection: 'column', gap: '12px', ...atmoVars }}
     >
-      <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
-        <span className="badge badge-cyan badge-lg">🎭 مافيا</span>
-        <span className={`badge ${getPhaseColor(subPhase)} badge-lg`}>{getPhaseText(subPhase)}</span>
-        <span className="badge badge-green badge-lg">👥 {aliveCount} {MAFIA_TEXT.labels.aliveSuffix}</span>
-        {deadCount > 0 && (
-          <span className="badge badge-red badge-lg">💀 {deadCount}</span>
-        )}
-        {state.round > 0 && (
-          <span className="badge badge-purple badge-lg">{MAFIA_TEXT.labels.roundLabel} {state.round}</span>
-        )}
-      </div>
-
       {allNotices.length > 0 && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
           {allNotices.map((n) => (

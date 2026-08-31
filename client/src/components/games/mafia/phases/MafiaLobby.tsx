@@ -1,4 +1,3 @@
-import { GameSettingsDisplay } from '../../../game-settings/GameSettingsDisplay';
 import { getGameSettingsSchema } from '../../../../config/game-settings-registry';
 import { MafiaPlayerCard } from '../components/MafiaPlayerCard';
 import { MAFIA_TEXT } from '../mafia-text';
@@ -28,27 +27,18 @@ export function MafiaLobby({ state }: MafiaLobbyProps) {
   const minPlayers = readNumberSetting(activeSettings, 'minPlayers', 4);
   const maxPlayers = readNumberSetting(activeSettings, 'maxPlayers', 20);
 
-  const alivePlayers = state.players.filter((p) => p.isAlive);
+  const players = state.players ?? [];
+  const alivePlayers = players.filter((p) => p.isAlive);
   const settingsEditable = state.phase === 'idle' || state.phase === 'lobby';
 
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', gap: '16px' }}>
       <div className="flex items-center justify-between flex-wrap gap-4">
-        <div className="flex items-center gap-3">
-          <span className="badge badge-cyan text-lg">🎭 مافيا</span>
-          <span className="badge badge-cyan">{MAFIA_TEXT.phases.lobby}</span>
-        </div>
         <div className="flex items-center gap-2">
           <span className="badge badge-green">{alivePlayers.length} / {maxPlayers} لاعبين</span>
           <span className="badge badge-yellow">{MAFIA_TEXT.labels.minimum}: {minPlayers}</span>
         </div>
       </div>
-
-      <GameSettingsDisplay
-        gameId="mafia"
-        settings={activeSettings}
-        isLocked={!settingsEditable}
-      />
 
       {alivePlayers.length === 0 ? (
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '12px' }}>
@@ -65,7 +55,7 @@ export function MafiaLobby({ state }: MafiaLobbyProps) {
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '8px' }}>
-            {state.players.map((p) => (
+            {players.map((p) => (
               <MafiaPlayerCard key={p.id} player={p} />
             ))}
           </div>

@@ -309,6 +309,12 @@ export class GameManager {
     this.io.emit('game:event', event);
   }
 
+  /** Send an event to a specific socket (for targeted player feedback). */
+  sendToSocket(socketId: string, event: GameEvent): void {
+    if (!this.io) return;
+    this.io.to(socketId).emit('game:event', event);
+  }
+
   private observePlayerJoined(payload: unknown): void {
     const p = payload as { gameId?: string; playerId?: string; displayName?: string; avatarUrl?: string };
     if (!this.currentMatchId || !p?.playerId) return;

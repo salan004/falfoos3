@@ -4,16 +4,20 @@ import {
   ChatMessage,
   GamePhase,
   PlayerIdentity,
+  GameEvent,
 } from '../core/BaseGame';
 import { normalizeChatCommand } from '../core/chatCommands';
 import { calculateSpeedBonus } from '../utils/scoring';
-import questionsData from '../data/trivia-questions.json';
+import { getRandomQuestions, markQuestionAsUsed, TriviaQuestion as DbTriviaQuestion } from './trivia/QuestionPoolService';
 
+/** Internal question format with 1-based correctAnswer for backwards compatibility with existing game logic. */
 interface TriviaQuestion {
+  id: string;
   category: string;
   question: string;
   choices: string[];
-  correctAnswer: string;
+  correctAnswer: string;      // "1" | "2" | "3" | "4" (1-based for external consistency)
+  correct_idx: number;        // 0-3 (0-based internal)
   difficulty: string;
 }
 
@@ -22,6 +26,14 @@ interface AnswerRecord {
   displayName: string;
   answer: string;
   responseTimeMs: number;
+}
+
+export interface PlayerStats {
+  score: number;
+  correctAnswers: number;
+  wrongAnswers: number;
+  totalResponseTimeMs: number;
+  answeredQuestionCount: number;
 }
 
 interface TriviaState {
@@ -38,7 +50,71 @@ interface TriviaState {
   showTimerSeconds: number;
   correctAnswer: string | null;
   roundFinished: boolean;
+  answerWindowOpen: boolean;
   players: { id: string; displayName: string; avatarUrl?: string }[];
+  usedQuestionIds: string[];
+  playerStats: Map<string, PlayerStats>;
+}
+
+export function createInitialPlayerStats(): PlayerStats {
+  return {
+    score: 0,
+    correctAnswers: 0,
+    wrongAnswers: 0,
+    totalResponseTimeMs: 0,
+    answeredQuestionCount: 0,
+  };
+}
+
+export function fisherYatesShuffle<T>(array: T[]): T[] {
+  const shuffled = [...array];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  return shuffled;
+}
+
+export function calculateRanking(
+  players: { id: string; displayName: string; avatarUrl?: string }[],
+  playerStats: Map<string, PlayerStats>
+): { id: string; displayName: string; score: number; correctAnswers: number; wrongAnswers: number; avgResponseTimeMs: number }[] {
+  const ranked = players.map((p) => {
+    const stats = playerStats.get(p.id) ?? createInitialPlayerStats();
+    const avgResponseTime = stats.answeredQuestionCount > 0
+      ? stats.totalResponseTimeMs / stats.answeredQuestionCount
+      : 0;
+    return {
+      id: p.id,
+      displayName: p.displayName,
+      score: stats.score,
+      correctAnswers: stats.correctAnswers,
+      wrongAnswers: stats.wrongAnswers,
+      avgResponseTimeMs: avgResponseTime,
+    };
+  });
+
+  ranked.sort((a, b) => {
+    if (b.score !== a.score) return b.score - a.score;
+    if (a.wrongAnswers !== b.wrongAnswers) return a.wrongAnswers - b.wrongAnswers;
+    if (a.avgResponseTimeMs !== b.avgResponseTimeMs) return a.avgResponseTimeMs - b.avgResponseTimeMs;
+    return 0;
+  });
+
+  return ranked;
+}
+
+/** Converts a database question (0-based correct_idx) to internal format (1-based correctAnswer). */
+function convertDbQuestion(dbQ: DbTriviaQuestion): TriviaQuestion {
+  return {
+    id: dbQ.id,
+    category: dbQ.category,
+    question: dbQ.question,
+    choices: dbQ.choices,
+    correctAnswer: String(dbQ.correct_idx + 1),  // Convert 0-based to 1-based string
+    correct_idx: dbQ.correct_idx,
+    difficulty: dbQ.difficulty,
+  };
 }
 
 export class TriviaGame extends BaseGame {
@@ -52,10 +128,11 @@ export class TriviaGame extends BaseGame {
   state: TriviaState = this.initialState();
   private gameManagerRef: {
     updateScore: (pid: string, name: string, delta: number, avatarUrl?: string, reason?: string) => void;
+    sendToSocket: (socketId: string, event: GameEvent) => void;
   } | null = null;
   private timers: NodeJS.Timeout[] = [];
 
-  constructor(gameManager: { updateScore: (pid: string, name: string, delta: number, avatarUrl?: string, reason?: string) => void }) {
+  constructor(gameManager: { updateScore: (pid: string, name: string, delta: number, avatarUrl?: string, reason?: string) => void; sendToSocket: (socketId: string, event: GameEvent) => void }) {
     super();
     this.gameManagerRef = gameManager;
   }
@@ -75,7 +152,10 @@ export class TriviaGame extends BaseGame {
       showTimerSeconds: 5,
       correctAnswer: null,
       roundFinished: false,
+      answerWindowOpen: false,
       players: [],
+      usedQuestionIds: [],
+      playerStats: new Map(),
     };
   }
 
@@ -89,6 +169,7 @@ export class TriviaGame extends BaseGame {
     if (this.state.phase !== 'idle') return;
     this.state.phase = 'lobby';
     this.state.roundNumber = 0;
+    this.initializePlayerStats();
     this.broadcastGameState();
     this.nextQuestion();
   }
@@ -104,35 +185,95 @@ export class TriviaGame extends BaseGame {
     this.state = this.initialState();
   }
 
-  handleChatMessage(msg: ChatMessage): void {
-    if (this.state.phase !== 'playing') return;
-    if (this.state.roundFinished) return;
-    if (!this.state.currentQuestion) return;
-
-    const match = normalizeChatCommand(msg.message).match(/^!?([1-4])$/);
-    if (!match) return;
-
-    const answerStr = match[1];
-
-    const alreadyAnswered = this.state.answersThisRound.some(
-      (a) => a.playerId === msg.authorId
-    );
-    if (alreadyAnswered) return;
-
-    const responseTime = Date.now() - this.state.questionStartedAt;
-    this.state.answersThisRound.push({
-      playerId: msg.authorId,
-      displayName: msg.author,
-      answer: answerStr,
-      responseTimeMs: responseTime,
-    });
-
-    this.ensureRegistered({ authorId: msg.authorId, displayName: msg.author, avatarUrl: msg.authorImageUrl });
-
-    this.broadcastGameState();
+  private initializePlayerStats(): void {
+    this.state.playerStats.clear();
+    for (const player of this.state.players) {
+      this.state.playerStats.set(player.id, createInitialPlayerStats());
+    }
   }
 
-  /** Registers a viewer into the roster unless already present. */
+  private ensurePlayerStats(playerId: string): PlayerStats {
+    let stats = this.state.playerStats.get(playerId);
+    if (!stats) {
+      stats = createInitialPlayerStats();
+      this.state.playerStats.set(playerId, stats);
+    }
+    return stats;
+  }
+
+  handleChatMessage(msg: ChatMessage): void {
+    if (this.state.phase !== 'playing') return;
+    if (!this.state.currentQuestion) return;
+
+    const normalized = normalizeChatCommand(msg.message);
+
+    const validMatch = normalized.match(/^!?([1-4])$/);
+    if (validMatch) {
+      const answerStr = validMatch[1];
+
+      if (!this.state.answerWindowOpen || this.state.roundFinished) {
+        this.sendRejection(msg.socketId, 'answer_closed', 'انتهى وقت الإجابة');
+        return;
+      }
+
+      const alreadyAnswered = this.state.answersThisRound.some(
+        (a) => a.playerId === msg.authorId
+      );
+      if (alreadyAnswered) {
+        this.sendRejection(msg.socketId, 'already_answered', 'تم تسجيل إجابتك بالفعل');
+        return;
+      }
+
+      const responseTime = Date.now() - this.state.questionStartedAt;
+      this.state.answersThisRound.push({
+        playerId: msg.authorId,
+        displayName: msg.author,
+        answer: answerStr,
+        responseTimeMs: responseTime,
+      });
+
+      this.ensureRegistered({ authorId: msg.authorId, displayName: msg.author, avatarUrl: msg.authorImageUrl });
+      this.ensurePlayerStats(msg.authorId);
+
+      this.sendAcceptance(msg.socketId, {
+        round: this.state.roundNumber,
+        answer: answerStr,
+        responseTimeMs: responseTime,
+      });
+
+      this.broadcastGameState();
+      return;
+    }
+
+    const invalidMatch = normalized.match(/^!?([05-9])$/);
+    if (invalidMatch) {
+      if (!this.state.answerWindowOpen || this.state.roundFinished) {
+        this.sendRejection(msg.socketId, 'answer_closed', 'انتهى وقت الإجابة');
+      } else {
+        this.sendRejection(msg.socketId, 'invalid_answer', 'اختر إجابة من 1 إلى 4');
+      }
+      return;
+    }
+  }
+
+  private sendAcceptance(socketId: string | undefined, payload: { round: number; answer: string; responseTimeMs: number }): void {
+    if (!socketId || !this.gameManagerRef) return;
+    this.gameManagerRef.sendToSocket(socketId, {
+      type: 'game:answerAccepted',
+      payload,
+      timestamp: Date.now(),
+    });
+  }
+
+  private sendRejection(socketId: string | undefined, reason: string, message: string): void {
+    if (!socketId || !this.gameManagerRef) return;
+    this.gameManagerRef.sendToSocket(socketId, {
+      type: 'game:answerRejected',
+      payload: { reason, message },
+      timestamp: Date.now(),
+    });
+  }
+
   private ensureRegistered(identity: PlayerIdentity): void {
     if (this.tryRegisterPlayer(this.state.players, identity, () => ({
       id: identity.authorId,
@@ -150,13 +291,10 @@ export class TriviaGame extends BaseGame {
         },
         timestamp: Date.now(),
       });
+      this.ensurePlayerStats(identity.authorId);
     }
   }
 
-  /**
-   * Global !انضم entry point. Trivia has no lobby gate — viewers can join the
-   * roster at any time except after the game finished.
-   */
   handleJoinCommand(identity: PlayerIdentity): void {
     if (this.state.phase === 'finished') {
       this.broadcast({
@@ -213,15 +351,26 @@ export class TriviaGame extends BaseGame {
       return;
     }
 
-    const pool = this.filterQuestions();
-    if (pool.length === 0) {
+    // Fetch random questions from the database, excluding already used ones
+    const questions = getRandomQuestions(
+      this.state.totalRounds - this.state.roundNumber + 1, // fetch enough for remaining rounds
+      this.state.category === 'all' ? undefined : { category: this.state.category },
+      this.state.usedQuestionIds
+    );
+
+    if (questions.length === 0) {
       this.finishGame();
       return;
     }
 
-    const idx = this.state.currentQuestionIndex % pool.length;
-    this.state.currentQuestion = pool[idx];
-    this.state.currentQuestionIndex++;
+    // Convert first question to internal format
+    this.state.currentQuestion = convertDbQuestion(questions[0]);
+    this.state.usedQuestionIds.push(this.state.currentQuestion.id || '');
+    this.state.currentQuestionIndex = 1; // We'll use the fetched array if we pre-fetch more
+
+    // Mark the question as used for cross-match rotation
+    // Only the actually displayed question gets recorded, not prefetched ones
+    markQuestionAsUsed(this.state.currentQuestion.id, this.sessionId);
 
     this.broadcast({
       type: 'trivia:showingQuestion',
@@ -237,6 +386,7 @@ export class TriviaGame extends BaseGame {
     });
 
     this.state.phase = 'playing';
+    this.state.answerWindowOpen = false;
     this.state.questionStartedAt = Date.now();
     this.state.timeLeft = this.state.showTimerSeconds;
 
@@ -246,7 +396,7 @@ export class TriviaGame extends BaseGame {
       if (this.state.timeLeft <= 0) {
         clearInterval(showTimer);
         this.state.timeLeft = this.state.answerTimerSeconds;
-        this.state.phase = 'playing';
+        this.state.answerWindowOpen = true;
 
         this.broadcast({
           type: 'trivia:answerOpen',
@@ -254,7 +404,6 @@ export class TriviaGame extends BaseGame {
           timestamp: Date.now(),
         });
 
-        // Answer phase counts down live (was a frozen setTimeout before).
         const answerTimer = setInterval(() => {
           this.state.timeLeft--;
           this.broadcastGameState();
@@ -273,17 +422,28 @@ export class TriviaGame extends BaseGame {
     this.clearTimers();
     if (!this.state.currentQuestion) return;
     this.state.roundFinished = true;
+    this.state.answerWindowOpen = false;
     this.state.correctAnswer = this.state.currentQuestion.correctAnswer;
 
+    const correctAnswerStr = this.state.currentQuestion.correctAnswer;
+
     for (const record of this.state.answersThisRound) {
-      if (record.answer === this.state.currentQuestion.correctAnswer) {
+      const stats = this.ensurePlayerStats(record.playerId);
+      stats.answeredQuestionCount++;
+      stats.totalResponseTimeMs += record.responseTimeMs;
+
+      if (record.answer === correctAnswerStr) {
         const points = 100 + Math.floor(calculateSpeedBonus(record.responseTimeMs, 50, 5));
+        stats.score += points;
+        stats.correctAnswers++;
         const rosterAvatar = this.state.players.find((p) => p.id === record.playerId)?.avatarUrl;
         this.gameManagerRef?.updateScore(record.playerId, record.displayName, points, rosterAvatar, 'trivia:correctAnswer');
+      } else {
+        stats.wrongAnswers++;
       }
     }
 
-    const correctIdx = parseInt(this.state.currentQuestion.correctAnswer) - 1;
+    const correctIdx = this.state.currentQuestion.correct_idx;
 
     this.broadcast({
       type: 'trivia:answerRevealed',
@@ -311,18 +471,28 @@ export class TriviaGame extends BaseGame {
 
   private finishGame(): void {
     this.state.phase = 'finished';
+
+    const ranked = calculateRanking(this.state.players, this.state.playerStats);
+
+    let winnerIds: string[] = [];
+    if (ranked.length > 0) {
+      const topScore = ranked[0].score;
+      winnerIds = ranked
+        .filter((p) => p.score === topScore)
+        .map((p) => p.id);
+    }
+
+    this.announceWinners(winnerIds, 'match');
+
     this.broadcast({
       type: 'trivia:finished',
-      payload: {},
+      payload: {
+        ranking: ranked,
+      },
       timestamp: Date.now(),
     });
-    this.broadcastGameState();
-  }
 
-  private filterQuestions(): TriviaQuestion[] {
-    const questions = questionsData as TriviaQuestion[];
-    if (this.state.category === 'all') return questions;
-    return questions.filter((q) => q.category === this.state.category);
+    this.broadcastGameState();
   }
 
   private clearTimers(): void {
@@ -331,9 +501,6 @@ export class TriviaGame extends BaseGame {
   }
 
   getPublicState(): Record<string, unknown> {
-    // Phase 9E: per-player public status. While the round is open everyone is
-    // 'playing' (who answered is not revealed early); after the reveal each
-    // registered player maps to correct/wrong from the round's own records.
     const statusByPlayer = new Map<string, string>();
     if (this.state.roundFinished && this.state.currentQuestion) {
       for (const record of this.state.answersThisRound) {
@@ -343,6 +510,8 @@ export class TriviaGame extends BaseGame {
         );
       }
     }
+
+    const ranked = calculateRanking(this.state.players, this.state.playerStats);
 
     return {
       gameId: this.config.id,
@@ -359,18 +528,26 @@ export class TriviaGame extends BaseGame {
             difficulty: this.state.currentQuestion.difficulty,
           }
         : null,
-      // The raw answer never leaves the server — clients only get it after reveal.
       correctAnswer: this.state.roundFinished ? this.state.correctAnswer : null,
       timeLeft: this.state.timeLeft,
       roundFinished: this.state.roundFinished,
       totalAnswered: this.state.answersThisRound.length,
       playerCount: this.state.players.length,
-      players: this.state.players.map((p) => ({
-        id: p.id,
-        displayName: p.displayName,
-        avatarUrl: p.avatarUrl,
-        status: statusByPlayer.get(p.id) ?? 'playing',
-      })),
+      players: this.state.players.map((p) => {
+        const stats = this.state.playerStats.get(p.id) ?? createInitialPlayerStats();
+        const rankedEntry = ranked.find((r) => r.id === p.id);
+        return {
+          id: p.id,
+          displayName: p.displayName,
+          avatarUrl: p.avatarUrl,
+          status: statusByPlayer.get(p.id) ?? 'playing',
+          score: stats.score,
+          correctAnswers: stats.correctAnswers,
+          wrongAnswers: stats.wrongAnswers,
+          rank: rankedEntry ? ranked.indexOf(rankedEntry) + 1 : null,
+        };
+      }),
+      ranking: this.state.phase === 'finished' ? ranked : undefined,
     };
   }
 

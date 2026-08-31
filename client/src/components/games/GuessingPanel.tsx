@@ -33,7 +33,8 @@ export function GuessingPanel({ gameState }: { gameState: GameState }) {
         accent="var(--neon-yellow)"
         players={participants}
         instruction="اكتب !انضم في البث للانضمام إلى المشاركين"
-        commandHint="حالما يضع المضيف الإجابة، خمّن عبر !guess <إجابتك>"
+        commandHint="حالما يضع المضيف الإجابة، خمّن عبر !تخمين <إجابتك>"
+        hideHeader
       >
         <div className="text-center text-sm text-[var(--text-muted)] mt-4">
           {state.phase === 'playing'
@@ -52,11 +53,11 @@ export function GuessingPanel({ gameState }: { gameState: GameState }) {
       </div>
 
       <div className="instruction-hint">
-        اكتب <strong>!guess</strong> متبوعة بتخمينك في دردشة البث
+        اكتب <strong>!تخمين</strong> متبوعة بتخمينك في دردشة البث
       </div>
 
       {state.hints.length > 0 && (
-        <div className="card glow-border-yellow" style={{ fontSize: '2rem', letterSpacing: '10px', fontFamily: 'var(--font-mono)', padding: '18px 32px' }}>
+        <div className="card glow-border-yellow guessing-hint-display" style={{ fontSize: '2rem', letterSpacing: '10px', fontFamily: 'var(--font-mono)', padding: '18px 32px' }}>
           {state.hints.map((h, i) => (
             <span key={i}>{i === 0 ? h : '_'} </span>
           ))}

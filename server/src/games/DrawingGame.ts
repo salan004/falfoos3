@@ -61,7 +61,7 @@ export class DrawingGame extends BaseGame {
   }
 
   handleChatMessage(msg: ChatMessage): void {
-    const drawMatch = normalizeChatCommand(msg.message).match(/^!\s*draw\s+([A-Za-z]\d+)\s+(#[0-9A-Fa-f]{6}|[a-z]+)/i);
+    const drawMatch = normalizeChatCommand(msg.message).match(/^!\s*(?:draw|رسم)\s+([A-Za-z]\d+)\s+(#[0-9A-Fa-f]{6}|[a-z]+)/i);
     if (drawMatch && this.state.phase === 'playing') {
       const coord = drawMatch[1].toUpperCase();
       const col = coord.charCodeAt(0) - 65;
@@ -76,7 +76,7 @@ export class DrawingGame extends BaseGame {
       return;
     }
     if (this.state.currentWord && !this.state.wordAnswered) {
-      const guessMatch = normalizeChatCommand(msg.message).match(/^!\s*guess\s+(.+)/i);
+      const guessMatch = normalizeChatCommand(msg.message).match(/^!\s*(?:guess|تخمين)\s+(.+)/i);
       if (guessMatch && guessMatch[1].trim().toLowerCase() === this.state.currentWord.toLowerCase()) {
         this.state.wordAnswered = true;
         this.state.wordWinner = msg.author;

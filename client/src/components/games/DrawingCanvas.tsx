@@ -8,6 +8,9 @@ export function DrawingCanvas({ gameState }: { gameState: GameState }) {
   const grid = state.grid ?? [];
   const size = state.gridSize ?? 16;
   const cellSize = Math.min(22, Math.floor(560 / size));
+  const isMobile = typeof window !== 'undefined' && window.innerWidth < 480;
+  const mobileCellSize = isMobile ? Math.min(20, Math.floor(320 / size)) : cellSize;
+  const effectiveCellSize = isMobile ? mobileCellSize : cellSize;
 
   if (state.phase !== 'playing') {
     return (
@@ -17,7 +20,8 @@ export function DrawingCanvas({ gameState }: { gameState: GameState }) {
         accent="var(--neon-green)"
         players={participants}
         instruction="اكتب !انضم في البث للانضمام إلى الرسامين"
-        commandHint="لوّن بكسلة عبر !draw B5 #ff00aa — أو خمّن الكلمة عبر !guess"
+        commandHint="لوّن بكسلة عبر !رسم B5 #ff00aa — أو خمّن الكلمة عبر !تخمين"
+        hideHeader
       >
         <div className="text-center text-sm text-[var(--text-muted)] mt-4">
           اضغط «بدء» من لوحة التحكم لتفعيل اللوحة
@@ -45,7 +49,7 @@ export function DrawingCanvas({ gameState }: { gameState: GameState }) {
         <div
           className="drawing-frame"
           style={{
-            gridTemplateColumns: `repeat(${size}, ${cellSize}px)`,
+            gridTemplateColumns: `repeat(${size}, ${effectiveCellSize}px)`,
           }}
         >
           {grid.map((row, ri) =>
@@ -53,8 +57,8 @@ export function DrawingCanvas({ gameState }: { gameState: GameState }) {
               <div
                 key={`${ri}-${ci}`}
                 style={{
-                  width: cellSize,
-                  height: cellSize,
+                  width: effectiveCellSize,
+                  height: effectiveCellSize,
                   background: color,
                 }}
               />
@@ -66,7 +70,7 @@ export function DrawingCanvas({ gameState }: { gameState: GameState }) {
       )}
 
       <div className="instruction-hint" style={{ fontSize: '0.85rem' }}>
-        لوِّن بكسلة: <strong>!draw B5 #ff00aa</strong>
+        لوِّن بكسلة: <strong>!رسم B5 #ff00aa</strong> — أو خمّن عبر <strong>!تخمين</strong>
       </div>
 
       {participants.length > 0 && (

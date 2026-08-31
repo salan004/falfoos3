@@ -1,6 +1,7 @@
 ﻿import { BaseGame, GameConfig, ChatMessage, GamePhase, GameSettingDefinition, GameSettingsSchema, PlayerIdentity } from '../core/BaseGame';
 import { normalizeChatCommand } from '../core/chatCommands';
-import { Server as SocketIOServer } from "socket.io";
+import { Server as SocketIOServer, Socket } from "socket.io";
+import { SocketIdentity } from '../auth/socketIdentity';
 
 type Role = "mafia" | "doctor" | "detective" | "citizen";
 
@@ -223,15 +224,82 @@ export class MafiaGame extends BaseGame {
   handleChatMessage(msg: ChatMessage): void {
     const player = this.state.players.find(p => p.id === msg.authorId);
 
+    // Block secret Mafia commands from YouTube Chat (no socketId)
+    // YouTube players must use browser UI for secret actions
+    if (!msg.socketId) {
+      // Silently ignore — YouTube players must use browser UI for secret actions
+      return;
+    }
+
     if (this.state.phase !== "playing") return;
     if (!player) return;
     if (!player.isAlive) return;
 
-    if (this.state.nightPhase) {
+if (this.state.nightPhase) {
       this.handleNightAction(msg, player);
     } else {
       this.handleVote(msg, player);
     }
+  }
+
+  /** Handle night action from authenticated Socket.IO connection */
+  handleNightActionSocket(socket: Socket, payload: { action: 'kill' | 'heal' | 'investigate'; targetId: string }): void {
+    const identity = socket.data.identity as SocketIdentity | undefined;
+    if (!identity) return;
+
+    const playerId = identity.canonicalPlayerId;
+    const player = this.state.players.find(p => p.id === playerId);
+
+    // Validate: player exists, alive, night phase active, hasn't acted, target valid
+    if (!player || !player.isAlive || !this.state.nightPhase) return;
+    if (this.state.nightActions.has(playerId)) return;
+
+    const target = this.state.players.find(p => p.id === payload.targetId);
+    if (!target || !target.isAlive || target.id === playerId) return;
+
+    // Role-specific validation
+    if (payload.action === 'kill' && player.role !== 'mafia') return;
+    if (payload.action === 'heal' && player.role !== 'doctor') return;
+    if (payload.action === 'investigate' && player.role !== 'detective') return;
+
+    // Process action (reuse existing logic pattern)
+    const action: NightAction = { type: payload.action, targetId: payload.targetId };
+    this.state.nightActions.set(playerId, action);
+    player.nightAction = action;
+
+    const actionNames: Record<NightAction["type"], string> = {
+      kill: "قتل",
+      heal: "شفاء",
+      investigate: "تحقيق",
+    };
+    this.sendPrivateMessage(playerId, "تم تسجيل إجراءك: " + actionNames[payload.action] + " " + this.getPlayerName(payload.targetId));
+
+    this.checkNightActionsComplete();
+  }
+
+  /** Handle vote from authenticated Socket.IO connection */
+  handleVoteSocket(socket: Socket, payload: { targetId: string }): void {
+    const identity = socket.data.identity as SocketIdentity | undefined;
+    if (!identity) return;
+
+    const playerId = identity.canonicalPlayerId;
+    const player = this.state.players.find(p => p.id === playerId);
+
+    // Validate: player exists, alive, voting phase active, hasn't voted, target valid
+    if (!player || !player.isAlive || !this.isVotingSegmentActive()) return;
+    if (player.hasVoted) return;
+
+    const target = this.state.players.find(p => p.id === payload.targetId);
+    if (!target || !target.isAlive || target.id === playerId) return;
+
+    // Process vote (reuse existing logic)
+    player.hasVoted = true;
+    this.state.votes.push({ voterId: playerId, targetId: payload.targetId });
+
+    this.sendPrivateMessage(playerId, "تم تسجيل تصويتك لـ " + target.displayName + ".");
+    this.broadcastGameState();
+
+    this.checkVotingComplete();
   }
 
   handleAdminCommand(command: string, payload?: unknown): void {
@@ -922,7 +990,7 @@ export class MafiaGame extends BaseGame {
       .map(p => ({ id: p.id, displayName: p.displayName }));
   }
 
-  private sendPrivateMessage(playerId: string, message: string): void {
+private sendPrivateMessage(playerId: string, message: string): void {
     const socketId = this.getPlayerSocketId(playerId);
     if (this.io && socketId) {
       this.io.to(socketId).emit("game:event", {
@@ -930,13 +998,8 @@ export class MafiaGame extends BaseGame {
         payload: { playerId, message },
         timestamp: Date.now(),
       });
-    } else {
-      this.broadcast({
-        type: "mafia:privateMessage",
-        payload: { playerId, message },
-        timestamp: Date.now(),
-      });
     }
+    // YouTube players (no socketId) receive no private message — suppressed safely
   }
 
   /**

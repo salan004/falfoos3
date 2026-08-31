@@ -7,7 +7,7 @@ import { env, isProduction } from '../config/env';
  * Phase 11C — opaque browser sessions backed by the Phase 11B `sessions` table.
  *
  * - cookie value = 256-bit random id; the id IS the credential (no signing secret needed)
- * - httpOnly + SameSite=Lax (+ Secure in production)
+ * - httpOnly + SameSite=None; Secure (cross-site authentication for Vercel + VPS)
  * - sliding idle expiry (30d) clamped by an absolute lifetime (90d from created_at)
  * - revocation via revoked_at, checked on every lookup
  */
@@ -32,6 +32,15 @@ function baseCookieOptions() {
     httpOnly: true,
     sameSite: 'lax' as const,
     secure: isProduction(),
+    path: '/',
+  };
+}
+
+function sessionCookieOptions() {
+  return {
+    httpOnly: true,
+    sameSite: 'none' as const,
+    secure: true,
     path: '/',
   };
 }
@@ -81,11 +90,11 @@ export function clearOAuthFlowCookies(res: Response): void {
 }
 
 export function setSessionCookie(res: Response, sessionId: string): void {
-  res.cookie(COOKIE_NAME, sessionId, { ...baseCookieOptions(), maxAge: ABSOLUTE_MS });
+  res.cookie(COOKIE_NAME, sessionId, { ...sessionCookieOptions(), maxAge: ABSOLUTE_MS });
 }
 
 export function clearSessionCookie(res: Response): void {
-  res.clearCookie(COOKIE_NAME, baseCookieOptions());
+  res.clearCookie(COOKIE_NAME, sessionCookieOptions());
 }
 
 /**

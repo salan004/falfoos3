@@ -16,6 +16,7 @@ import { getGlobalLeaderboard } from './db/stats';
 import { authRoutes } from './routes/authRoutes';
 import { guestRoutes } from './routes/guestRoutes';
 import { playerRoutes } from './routes/playerRoutes';
+import { adminTriviaRoutes } from './routes/adminTriviaRoutes';
 import { setCurrentChatService } from './auth/claiming';
 import {
   attachSocketIdentity,
@@ -111,6 +112,9 @@ app.use('/api/guest', guestRoutes);
 // Phase 12B: player profiles & stats (public read-only + /me resolution).
 app.use('/api', playerRoutes);
 
+// Admin Trivia Question Management (Phase B3.3)
+app.use('/api/admin/trivia', adminTriviaRoutes);
+
 const server = http.createServer(app);
 const io = new SocketIOServer(server, {
   cors: { origin: 'https://falfoos.vercel.app', credentials: true, methods: ['GET', 'POST'] },
@@ -142,6 +146,9 @@ io.use((socket, next) => {
 const gameManager = new GameManager();
 gameManager.setSocketServer(io);
 
+// Expose globally for admin services (e.g., active question check)
+(globalThis as any).__falfoosGameManager = gameManager;
+
 // Phase 11D — leaderboard enrichment: entries gain an optional `userId` when
 // the guest identity has been claimed by a registered user (Option A:
 // claimed history counts for the user immediately, query-time only).
@@ -153,7 +160,10 @@ gameManager.setSocketServer(io);
   });
 }
 
-const triviaGame = new TriviaGame(gameManager);
+const triviaGame = new TriviaGame({
+    updateScore: (pid, name, delta, avatarUrl, reason) => gameManager.updateScore(pid, name, delta, avatarUrl, reason),
+    sendToSocket: (socketId, event) => gameManager.sendToSocket(socketId, event),
+  });
 const musicalChairsGame = new MusicalChairsGame();
 const mafiaGame = new MafiaGame(gameManager, io);
 const guessingGame = new GuessingGame(gameManager);
@@ -463,6 +473,21 @@ io.on('connection', (socket) => {
     cancelReconnect();
     disconnectYouTube();
     broadcastYouTubeStatus(undefined, 'manual');
+  });
+
+  // Mafia secret actions via authenticated socket
+  socket.on('mafia:nightAction', (payload: { action: 'kill' | 'heal' | 'investigate'; targetId: string }) => {
+    const game = gameManager.getActiveGame();
+    if (game && game.config.id === 'mafia') {
+      (game as MafiaGame).handleNightActionSocket(socket, payload);
+    }
+  });
+
+  socket.on('mafia:vote', (payload: { targetId: string }) => {
+    const game = gameManager.getActiveGame();
+    if (game && game.config.id === 'mafia') {
+      (game as MafiaGame).handleVoteSocket(socket, payload);
+    }
   });
 
   socket.on('disconnect', () => {
