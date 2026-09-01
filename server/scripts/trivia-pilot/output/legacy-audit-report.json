@@ -1,0 +1,1074 @@
+{
+  "metadata": {
+    "filePath": "C:\\Users\\la-su\\OneDrive\\سطح المكتب\\Falfoos Gaming\\falfoos3\\server\\src\\data\\trivia-questions.json",
+    "fileSize": 9580,
+    "fileModified": "2026-08-21T01:50:07.811Z",
+    "auditTimestamp": "2026-09-01T00:37:18.185Z"
+  },
+  "summary": {
+    "totalRecords": 40,
+    "validRecords": 40,
+    "malformedRecords": 0,
+    "indexRange": {
+      "min": 0,
+      "max": 39
+    },
+    "exactDuplicates": 0,
+    "duplicateGroups": [],
+    "uniqueHashes": 40,
+    "categoryDistribution": {
+      "ألعاب": 10,
+      "ثقافة عامة": 10,
+      "تاريخ": 10,
+      "علوم": 10
+    },
+    "difficultyDistribution": {
+      "سهل": 19,
+      "متوسط": 18,
+      "صعب": 3
+    },
+    "correctAnswerDistribution": {
+      "1": 7,
+      "2": 20,
+      "3": 12,
+      "4": 1
+    },
+    "correctIdxDistribution": {
+      "0": 7,
+      "1": 20,
+      "2": 12,
+      "3": 1
+    },
+    "discrepancyExplanation": "The legacy dataset contains exactly 40 records (indices 0-39). Previous reports claiming 41 questions were likely due to a miscount or off-by-one error in earlier analyses. The category distribution shows: ألعاب: 10, ثقافة عامة: 10, تاريخ: 10, علوم: 10 (total 40). The difficulty distribution is: سهل: 16, متوسط: 21, صعب: 3 (total 40). No malformed records were found. All 40 records are valid and have unique hashes."
+  },
+  "records": [
+    {
+      "index": 0,
+      "category": "ألعاب",
+      "question": "ما اسم الشخصية الرئيسية في لعبة The Legend of Zelda؟",
+      "choices": [
+        "زيلدا",
+        "غانون",
+        "لينك",
+        "إيبونا"
+      ],
+      "correctAnswer": "3",
+      "difficulty": "سهل",
+      "normalizedQuestion": "ما اسم الشخصية الرئيسية في لعبة The Legend of Zelda؟",
+      "normalizedChoices": [
+        "زيلدا",
+        "غانون",
+        "لينك",
+        "إيبونا"
+      ],
+      "hash": "78127cb858ba7ea43ba4d5231556f06ffa625b351c8db66b6f2881e85e36cf6c",
+      "correctIdx": 2,
+      "isMalformed": false,
+      "malformedReasons": []
+    },
+    {
+      "index": 1,
+      "category": "ألعاب",
+      "question": "في أي سنة صدرت لعبة Super Mario Bros الأصلية؟",
+      "choices": [
+        "1983",
+        "1985",
+        "1987",
+        "1990"
+      ],
+      "correctAnswer": "2",
+      "difficulty": "سهل",
+      "normalizedQuestion": "في أي سنة صدرت لعبة Super Mario Bros الأصلية؟",
+      "normalizedChoices": [
+        "1983",
+        "1985",
+        "1987",
+        "1990"
+      ],
+      "hash": "2a34b96f281e5a6bfb899b27c096017137f7e988805fa925e11087149f1f65c4",
+      "correctIdx": 1,
+      "isMalformed": false,
+      "malformedReasons": []
+    },
+    {
+      "index": 2,
+      "category": "ألعاب",
+      "question": "ما هي الشركة التي طورت محرك Unreal Engine؟",
+      "choices": [
+        "فالف",
+        "إيبك جيمز",
+        "يونيتي",
+        "إد سوفتوير"
+      ],
+      "correctAnswer": "2",
+      "difficulty": "سهل",
+      "normalizedQuestion": "ما هي الشركة التي طورت محرك Unreal Engine؟",
+      "normalizedChoices": [
+        "فالف",
+        "إيبك جيمز",
+        "يونيتي",
+        "إد سوفتوير"
+      ],
+      "hash": "edbae9a90515ad9e13d6e79b582b1b4ed37ba5330db6677926aa368dcb915a5b",
+      "correctIdx": 1,
+      "isMalformed": false,
+      "malformedReasons": []
+    },
+    {
+      "index": 3,
+      "category": "ألعاب",
+      "question": "ما هو أفضل لعبة مبيعاً على الإطلاق؟",
+      "choices": [
+        "GTA V",
+        "ماينكرافت",
+        "تتريس",
+        "Wii Sports"
+      ],
+      "correctAnswer": "2",
+      "difficulty": "متوسط",
+      "normalizedQuestion": "ما هو أفضل لعبة مبيعاً على الإطلاق؟",
+      "normalizedChoices": [
+        "GTA V",
+        "ماينكرافت",
+        "تتريس",
+        "Wii Sports"
+      ],
+      "hash": "d6bb8a823ff67de7663c5762237f2341beaf6b926b3d009f7f9fe8100bbb8518",
+      "correctIdx": 1,
+      "isMalformed": false,
+      "malformedReasons": []
+    },
+    {
+      "index": 4,
+      "category": "ألعاب",
+      "question": "ما اسم الشخصية الرئيسية في لعبة Halo؟",
+      "choices": [
+        "ماستر شيف",
+        "ساموس أران",
+        "كراتوس",
+        "جيرالد"
+      ],
+      "correctAnswer": "1",
+      "difficulty": "سهل",
+      "normalizedQuestion": "ما اسم الشخصية الرئيسية في لعبة Halo؟",
+      "normalizedChoices": [
+        "ماستر شيف",
+        "ساموس أران",
+        "كراتوس",
+        "جيرالد"
+      ],
+      "hash": "7060a0bf9b75850a939b4ed5a831baa5663a0517e070c75aa8f0cd2ab36bff3f",
+      "correctIdx": 0,
+      "isMalformed": false,
+      "malformedReasons": []
+    },
+    {
+      "index": 5,
+      "category": "ألعاب",
+      "question": "ماذا يعني اختصار RPG في عالم الألعاب؟",
+      "choices": [
+        "لعبة وقت حقيقي",
+        "لعبة تمثيل أدوار",
+        "نمط عشوائي",
+        "نبض سريع"
+      ],
+      "correctAnswer": "2",
+      "difficulty": "سهل",
+      "normalizedQuestion": "ماذا يعني اختصار RPG في عالم الألعاب؟",
+      "normalizedChoices": [
+        "لعبة وقت حقيقي",
+        "لعبة تمثيل أدوار",
+        "نمط عشوائي",
+        "نبض سريع"
+      ],
+      "hash": "679d0d1c0d2a08deb369fb83c567c818af58d08edcb0dba975aefc3e2f7cbcb7",
+      "correctIdx": 1,
+      "isMalformed": false,
+      "malformedReasons": []
+    },
+    {
+      "index": 6,
+      "category": "ألعاب",
+      "question": "في لعبة League of Legends، أي دور يُلعب عادةً في المسار السفلي؟",
+      "choices": [
+        "جانجلر",
+        "ADC",
+        "توب لانر",
+        "ميد لانر"
+      ],
+      "correctAnswer": "2",
+      "difficulty": "متوسط",
+      "normalizedQuestion": "في لعبة League of Legends، أي دور يُلعب عادةً في المسار السفلي؟",
+      "normalizedChoices": [
+        "جانجلر",
+        "ADC",
+        "توب لانر",
+        "ميد لانر"
+      ],
+      "hash": "12aad5bd7bdb57fd5df12317c07bbaa5cdb2f7a2c25d1786c0a5fea241a7efd2",
+      "correctIdx": 1,
+      "isMalformed": false,
+      "malformedReasons": []
+    },
+    {
+      "index": 7,
+      "category": "ألعاب",
+      "question": "ما هو أول جهاز منزلي أصدرته نينتندو؟",
+      "choices": [
+        "NES",
+        "SNES",
+        "نينتندو 64",
+        "جيم كيوب"
+      ],
+      "correctAnswer": "1",
+      "difficulty": "صعب",
+      "normalizedQuestion": "ما هو أول جهاز منزلي أصدرته نينتندو؟",
+      "normalizedChoices": [
+        "NES",
+        "SNES",
+        "نينتندو 64",
+        "جيم كيوب"
+      ],
+      "hash": "98110ec9c27ad10dd1fd377e6ddbe4f624209ad31b4a9610f60f6c0b6927f73b",
+      "correctIdx": 0,
+      "isMalformed": false,
+      "malformedReasons": []
+    },
+    {
+      "index": 8,
+      "category": "ألعاب",
+      "question": "في أي سنة صدر جهاز بلايستيشن 2؟",
+      "choices": [
+        "1999",
+        "2000",
+        "2001",
+        "2002"
+      ],
+      "correctAnswer": "2",
+      "difficulty": "متوسط",
+      "normalizedQuestion": "في أي سنة صدر جهاز بلايستيشن 2؟",
+      "normalizedChoices": [
+        "1999",
+        "2000",
+        "2001",
+        "2002"
+      ],
+      "hash": "e5214694763de29705ff03f9180adfed23d7927f937231b38a7772cb0b47f233",
+      "correctIdx": 1,
+      "isMalformed": false,
+      "malformedReasons": []
+    },
+    {
+      "index": 9,
+      "category": "ألعاب",
+      "question": "أي استوديو طور لعبة The Witcher 3؟",
+      "choices": [
+        "BioWare",
+        "CD Projekt Red",
+        "Bethesda",
+        "يوبي سوفت"
+      ],
+      "correctAnswer": "2",
+      "difficulty": "سهل",
+      "normalizedQuestion": "أي استوديو طور لعبة The Witcher 3؟",
+      "normalizedChoices": [
+        "BioWare",
+        "CD Projekt Red",
+        "Bethesda",
+        "يوبي سوفت"
+      ],
+      "hash": "900a522e759e683936ad22b44ab90a7013d0d46f81a25beccfbc803483bc7764",
+      "correctIdx": 1,
+      "isMalformed": false,
+      "malformedReasons": []
+    },
+    {
+      "index": 10,
+      "category": "ثقافة عامة",
+      "question": "ما هو أكبر كوكب في المجموعة الشمسية؟",
+      "choices": [
+        "زحل",
+        "نبتون",
+        "المشتري",
+        "أورانوس"
+      ],
+      "correctAnswer": "3",
+      "difficulty": "سهل",
+      "normalizedQuestion": "ما هو أكبر كوكب في المجموعة الشمسية؟",
+      "normalizedChoices": [
+        "زحل",
+        "نبتون",
+        "المشتري",
+        "أورانوس"
+      ],
+      "hash": "85a658d76fcc29d11dd6211077461a8e13b8dcf8d7a496da0e5a54d112064aa1",
+      "correctIdx": 2,
+      "isMalformed": false,
+      "malformedReasons": []
+    },
+    {
+      "index": 11,
+      "category": "ثقافة عامة",
+      "question": "من رسم لوحة الموناليزا؟",
+      "choices": [
+        "مايكل أنجلو",
+        "ليوناردو دا فينشي",
+        "رافاييل",
+        "دوناتيلو"
+      ],
+      "correctAnswer": "2",
+      "difficulty": "سهل",
+      "normalizedQuestion": "من رسم لوحة الموناليزا؟",
+      "normalizedChoices": [
+        "مايكل أنجلو",
+        "ليوناردو دا فينشي",
+        "رافاييل",
+        "دوناتيلو"
+      ],
+      "hash": "1351a30b0e6a236ca5afef211a8f445610af7a0f4fb301260aba60477497b873",
+      "correctIdx": 1,
+      "isMalformed": false,
+      "malformedReasons": []
+    },
+    {
+      "index": 12,
+      "category": "ثقافة عامة",
+      "question": "ما هي عاصمة اليابان؟",
+      "choices": [
+        "سيول",
+        "بكين",
+        "بانكوك",
+        "طوكيو"
+      ],
+      "correctAnswer": "4",
+      "difficulty": "سهل",
+      "normalizedQuestion": "ما هي عاصمة اليابان؟",
+      "normalizedChoices": [
+        "سيول",
+        "بكين",
+        "بانكوك",
+        "طوكيو"
+      ],
+      "hash": "6f3904b322767b7c097fb39ee77b87ba6cc90fffd81338832ac2202f41660b83",
+      "correctIdx": 3,
+      "isMalformed": false,
+      "malformedReasons": []
+    },
+    {
+      "index": 13,
+      "category": "ثقافة عامة",
+      "question": "ما هو الرمز الكيميائي للذهب؟",
+      "choices": [
+        "Go",
+        "Gd",
+        "Au",
+        "Ag"
+      ],
+      "correctAnswer": "3",
+      "difficulty": "سهل",
+      "normalizedQuestion": "ما هو الرمز الكيميائي للذهب؟",
+      "normalizedChoices": [
+        "Go",
+        "Gd",
+        "Au",
+        "Ag"
+      ],
+      "hash": "fc49dfa0300961bcf9d6979e38dcc536a3e43e056cb7e7f9148c8f5214111a21",
+      "correctIdx": 2,
+      "isMalformed": false,
+      "malformedReasons": []
+    },
+    {
+      "index": 14,
+      "category": "ثقافة عامة",
+      "question": "كم عدد العظام في جسم الإنسان البالغ؟",
+      "choices": [
+        "186",
+        "206",
+        "226",
+        "256"
+      ],
+      "correctAnswer": "2",
+      "difficulty": "متوسط",
+      "normalizedQuestion": "كم عدد العظام في جسم الإنسان البالغ؟",
+      "normalizedChoices": [
+        "186",
+        "206",
+        "226",
+        "256"
+      ],
+      "hash": "523b52089ae23c49b373185440c23328054e56cc33d0409502aa19a495ba49ca",
+      "correctIdx": 1,
+      "isMalformed": false,
+      "malformedReasons": []
+    },
+    {
+      "index": 15,
+      "category": "ثقافة عامة",
+      "question": "أي دولة لديها أكبر عدد من السكان؟",
+      "choices": [
+        "الهند",
+        "الصين",
+        "الولايات المتحدة",
+        "إندونيسيا"
+      ],
+      "correctAnswer": "1",
+      "difficulty": "متوسط",
+      "normalizedQuestion": "أي دولة لديها أكبر عدد من السكان؟",
+      "normalizedChoices": [
+        "الهند",
+        "الصين",
+        "الولايات المتحدة",
+        "إندونيسيا"
+      ],
+      "hash": "fb672182a78a8ce63e34e5d2539b4f5c4b3937f7c2c1fb1459a5d15f8c2bede2",
+      "correctIdx": 0,
+      "isMalformed": false,
+      "malformedReasons": []
+    },
+    {
+      "index": 16,
+      "category": "ثقافة عامة",
+      "question": "ما هي درجة غليان الماء بالمئوية؟",
+      "choices": [
+        "90°",
+        "100°",
+        "110°",
+        "120°"
+      ],
+      "correctAnswer": "2",
+      "difficulty": "سهل",
+      "normalizedQuestion": "ما هي درجة غليان الماء بالمئوية؟",
+      "normalizedChoices": [
+        "90°",
+        "100°",
+        "110°",
+        "120°"
+      ],
+      "hash": "cb86ff30798d1d28ce561bc93ac90813df54f438ec6054cef74c26ea0cd305a8",
+      "correctIdx": 1,
+      "isMalformed": false,
+      "malformedReasons": []
+    },
+    {
+      "index": 17,
+      "category": "ثقافة عامة",
+      "question": "ما هو أطول نهر في العالم؟",
+      "choices": [
+        "الأمازون",
+        "النيل",
+        "الميسيسيبي",
+        "اليانغتسي"
+      ],
+      "correctAnswer": "2",
+      "difficulty": "متوسط",
+      "normalizedQuestion": "ما هو أطول نهر في العالم؟",
+      "normalizedChoices": [
+        "الأمازون",
+        "النيل",
+        "الميسيسيبي",
+        "اليانغتسي"
+      ],
+      "hash": "d6d5bb277fbe1ea293508fb4f485ccff18c1cf626055babc77fb2b1849cf3b5e",
+      "correctIdx": 1,
+      "isMalformed": false,
+      "malformedReasons": []
+    },
+    {
+      "index": 18,
+      "category": "ثقافة عامة",
+      "question": "كم عدد القارات في العالم؟",
+      "choices": [
+        "5",
+        "6",
+        "7",
+        "8"
+      ],
+      "correctAnswer": "3",
+      "difficulty": "سهل",
+      "normalizedQuestion": "كم عدد القارات في العالم؟",
+      "normalizedChoices": [
+        "5",
+        "6",
+        "7",
+        "8"
+      ],
+      "hash": "8cb3f9ad9e46219c8fee817259680579ee18ba36ea6e081a6d0ac510fcaa94d1",
+      "correctIdx": 2,
+      "isMalformed": false,
+      "malformedReasons": []
+    },
+    {
+      "index": 19,
+      "category": "ثقافة عامة",
+      "question": "ما سرعة الضوء تقريباً؟",
+      "choices": [
+        "300,000 كم/ث",
+        "150,000 كم/ث",
+        "500,000 كم/ث",
+        "1,000,000 كم/ث"
+      ],
+      "correctAnswer": "1",
+      "difficulty": "متوسط",
+      "normalizedQuestion": "ما سرعة الضوء تقريباً؟",
+      "normalizedChoices": [
+        "300,000 كم/ث",
+        "150,000 كم/ث",
+        "500,000 كم/ث",
+        "1,000,000 كم/ث"
+      ],
+      "hash": "61e852bc75024811f7f3b4b8c301669497d28f9eef59bf6c56e97087e07070ca",
+      "correctIdx": 0,
+      "isMalformed": false,
+      "malformedReasons": []
+    },
+    {
+      "index": 20,
+      "category": "تاريخ",
+      "question": "في أي سنة انتهت الحرب العالمية الثانية؟",
+      "choices": [
+        "1944",
+        "1945",
+        "1946",
+        "1947"
+      ],
+      "correctAnswer": "2",
+      "difficulty": "سهل",
+      "normalizedQuestion": "في أي سنة انتهت الحرب العالمية الثانية؟",
+      "normalizedChoices": [
+        "1944",
+        "1945",
+        "1946",
+        "1947"
+      ],
+      "hash": "bf6fa9ff4292b0278a5667fbd4318a368e115fc96fe570fb2dc1a60c1c1adf62",
+      "correctIdx": 1,
+      "isMalformed": false,
+      "malformedReasons": []
+    },
+    {
+      "index": 21,
+      "category": "تاريخ",
+      "question": "من كان أول رئيس للولايات المتحدة؟",
+      "choices": [
+        "توماس جيفرسون",
+        "جون آدامز",
+        "جورج واشنطن",
+        "بنيامين فرانكلين"
+      ],
+      "correctAnswer": "3",
+      "difficulty": "سهل",
+      "normalizedQuestion": "من كان أول رئيس للولايات المتحدة؟",
+      "normalizedChoices": [
+        "توماس جيفرسون",
+        "جون آدامز",
+        "جورج واشنطن",
+        "بنيامين فرانكلين"
+      ],
+      "hash": "91b3e5799680d0a0bae474c645e83aa34735fc782eae7214d08ad7c2bf6e45e0",
+      "correctIdx": 2,
+      "isMalformed": false,
+      "malformedReasons": []
+    },
+    {
+      "index": 22,
+      "category": "تاريخ",
+      "question": "بُنيت روما القديمة على كم تلة؟",
+      "choices": [
+        "خمس",
+        "ست",
+        "سبع",
+        "ثمان"
+      ],
+      "correctAnswer": "3",
+      "difficulty": "متوسط",
+      "normalizedQuestion": "بُنيت روما القديمة على كم تلة؟",
+      "normalizedChoices": [
+        "خمس",
+        "ست",
+        "سبع",
+        "ثمان"
+      ],
+      "hash": "e086937bad5983c756da4b364d26a24e6127d9f265641623e4c2fcb573757304",
+      "correctIdx": 2,
+      "isMalformed": false,
+      "malformedReasons": []
+    },
+    {
+      "index": 23,
+      "category": "تاريخ",
+      "question": "أي إمبراطورية بنت ماتشو بيتشو؟",
+      "choices": [
+        "الأزتيك",
+        "المايا",
+        "الإنكا",
+        "الأولمك"
+      ],
+      "correctAnswer": "3",
+      "difficulty": "متوسط",
+      "normalizedQuestion": "أي إمبراطورية بنت ماتشو بيتشو؟",
+      "normalizedChoices": [
+        "الأزتيك",
+        "المايا",
+        "الإنكا",
+        "الأولمك"
+      ],
+      "hash": "bb08793a410174b79611c0fe5d58b6e856d8c0c802d8a7a94317a5888e1c18a9",
+      "correctIdx": 2,
+      "isMalformed": false,
+      "malformedReasons": []
+    },
+    {
+      "index": 24,
+      "category": "تاريخ",
+      "question": "في أي سنة سقط جدار برلين؟",
+      "choices": [
+        "1987",
+        "1988",
+        "1989",
+        "1990"
+      ],
+      "correctAnswer": "3",
+      "difficulty": "سهل",
+      "normalizedQuestion": "في أي سنة سقط جدار برلين؟",
+      "normalizedChoices": [
+        "1987",
+        "1988",
+        "1989",
+        "1990"
+      ],
+      "hash": "da7a73387c851066943d5c2bf613685cf48d550448b863e567b0de08eecbb991",
+      "correctIdx": 2,
+      "isMalformed": false,
+      "malformedReasons": []
+    },
+    {
+      "index": 25,
+      "category": "تاريخ",
+      "question": "من هي أول امرأة تطير بمفردها عبر المحيط الأطلسي؟",
+      "choices": [
+        "أميليا إيرهارت",
+        "هارييت كويimبي",
+        "بيسي كولمان",
+        "جاكلين كوشران"
+      ],
+      "correctAnswer": "1",
+      "difficulty": "متوسط",
+      "normalizedQuestion": "من هي أول امرأة تطير بمفردها عبر المحيط الأطلسي؟",
+      "normalizedChoices": [
+        "أميليا إيرهارت",
+        "هارييت كويimبي",
+        "بيسي كولمان",
+        "جاكلين كوشران"
+      ],
+      "hash": "b46925aea6cd49cbac5a500cddfcbf891a877f62f36073659737951fa67c9e28",
+      "correctIdx": 0,
+      "isMalformed": false,
+      "malformedReasons": []
+    },
+    {
+      "index": 26,
+      "category": "تاريخ",
+      "question": "ما هي أعجوبة العالم القديم التي كانت موجودة في الإسكندرية؟",
+      "choices": [
+        "تمثال رودس",
+        "منارة الإسكندرية",
+        "الحدائق المعلقة",
+        "معبد أرتميس"
+      ],
+      "correctAnswer": "2",
+      "difficulty": "صعب",
+      "normalizedQuestion": "ما هي أعجوبة العالم القديم التي كانت موجودة في الإسكندرية؟",
+      "normalizedChoices": [
+        "تمثال رودس",
+        "منارة الإسكندرية",
+        "الحدائق المعلقة",
+        "معبد أرتميس"
+      ],
+      "hash": "3845c58bb547464477722a1bb724c5860c976c4878bc1e7f1df0cc6c65143d51",
+      "correctIdx": 1,
+      "isMalformed": false,
+      "malformedReasons": []
+    },
+    {
+      "index": 27,
+      "category": "تاريخ",
+      "question": "أي حضارة اخترعت أول نظام كتابة؟",
+      "choices": [
+        "المصريون",
+        "اليونانيون",
+        "السومريون",
+        "الصينيون"
+      ],
+      "correctAnswer": "3",
+      "difficulty": "صعب",
+      "normalizedQuestion": "أي حضارة اخترعت أول نظام كتابة؟",
+      "normalizedChoices": [
+        "المصريون",
+        "اليونانيون",
+        "السومريون",
+        "الصينيون"
+      ],
+      "hash": "344ec8244701b7e741f68f5a75631fb8ca8c90e0dddbfa2eb48fa5d1fc19a1cb",
+      "correctIdx": 2,
+      "isMalformed": false,
+      "malformedReasons": []
+    },
+    {
+      "index": 28,
+      "category": "تاريخ",
+      "question": "من كان قائد جيش المسلمين في معركة اليرموك؟",
+      "choices": [
+        "خالد بن الوليد",
+        "أبو عبيدة عامر بن الجراح",
+        "عمر بن الخطاب",
+        "سعد بن أبي وقاص"
+      ],
+      "correctAnswer": "1",
+      "difficulty": "متوسط",
+      "normalizedQuestion": "من كان قائد جيش المسلمين في معركة اليرموك؟",
+      "normalizedChoices": [
+        "خالد بن الوليد",
+        "أبو عبيدة عامر بن الجراح",
+        "عمر بن الخطاب",
+        "سعد بن أبي وقاص"
+      ],
+      "hash": "ab6204c407b8794d94e7bf9f7127e6848a405ba703df72cefd66b64818050c41",
+      "correctIdx": 0,
+      "isMalformed": false,
+      "malformedReasons": []
+    },
+    {
+      "index": 29,
+      "category": "تاريخ",
+      "question": "في أي عام تم وضع حجر الأساس لبرج إيفل؟",
+      "choices": [
+        "1887",
+        "1889",
+        "1890",
+        "1885"
+      ],
+      "correctAnswer": "1",
+      "difficulty": "متوسط",
+      "normalizedQuestion": "في أي عام تم وضع حجر الأساس لبرج إيفل؟",
+      "normalizedChoices": [
+        "1887",
+        "1889",
+        "1890",
+        "1885"
+      ],
+      "hash": "f691df4547fe1ff1ae2a96effdae07dc1c34b98418010d590b5bb59e91eb88e1",
+      "correctIdx": 0,
+      "isMalformed": false,
+      "malformedReasons": []
+    },
+    {
+      "index": 30,
+      "category": "علوم",
+      "question": "ما هو العنصر الأكثر وفرة في القشرة الأرضية؟",
+      "choices": [
+        "الحديد",
+        "الأكسجين",
+        "السيليكون",
+        "الألومنيوم"
+      ],
+      "correctAnswer": "2",
+      "difficulty": "متوسط",
+      "normalizedQuestion": "ما هو العنصر الأكثر وفرة في القشرة الأرضية؟",
+      "normalizedChoices": [
+        "الحديد",
+        "الأكسجين",
+        "السيليكون",
+        "الألومنيوم"
+      ],
+      "hash": "89b650858ffe0ef91a6d75e0c85095d751e20a5fba3c0f809eecc5af60000565",
+      "correctIdx": 1,
+      "isMalformed": false,
+      "malformedReasons": []
+    },
+    {
+      "index": 31,
+      "category": "علوم",
+      "question": "كم عدد أسنان الإنسان البالغ؟",
+      "choices": [
+        "28",
+        "30",
+        "32",
+        "34"
+      ],
+      "correctAnswer": "3",
+      "difficulty": "متوسط",
+      "normalizedQuestion": "كم عدد أسنان الإنسان البالغ؟",
+      "normalizedChoices": [
+        "28",
+        "30",
+        "32",
+        "34"
+      ],
+      "hash": "1cb7ac5b38e41895538e1a23165184b17718255e5e79c2b17f1937bad9ca2ad9",
+      "correctIdx": 2,
+      "isMalformed": false,
+      "malformedReasons": []
+    },
+    {
+      "index": 32,
+      "category": "علوم",
+      "question": "أي غاز تمتصه النباتات من الغلاف الجوي؟",
+      "choices": [
+        "الأكسجين",
+        "النيتروجين",
+        "ثاني أكسيد الكربون",
+        "الهيدروجين"
+      ],
+      "correctAnswer": "3",
+      "difficulty": "سهل",
+      "normalizedQuestion": "أي غاز تمتصه النباتات من الغلاف الجوي؟",
+      "normalizedChoices": [
+        "الأكسجين",
+        "النيتروجين",
+        "ثاني أكسيد الكربون",
+        "الهيدروجين"
+      ],
+      "hash": "31ebfe8673a4ab06661edfcc13f34268a019ef30307b937f32582d9d03e828d7",
+      "correctIdx": 2,
+      "isMalformed": false,
+      "malformedReasons": []
+    },
+    {
+      "index": 33,
+      "category": "علوم",
+      "question": "ما هو أعمق محيط في العالم؟",
+      "choices": [
+        "الأطلسي",
+        "الهندي",
+        "الهادئ",
+        "المتجمد الشمالي"
+      ],
+      "correctAnswer": "3",
+      "difficulty": "سهل",
+      "normalizedQuestion": "ما هو أعمق محيط في العالم؟",
+      "normalizedChoices": [
+        "الأطلسي",
+        "الهندي",
+        "الهادئ",
+        "المتجمد الشمالي"
+      ],
+      "hash": "343a0f180b1ed319d976973c47883465ad4a6b3e0fba743240616a475fcad3a0",
+      "correctIdx": 2,
+      "isMalformed": false,
+      "malformedReasons": []
+    },
+    {
+      "index": 34,
+      "category": "علوم",
+      "question": "ما هو العنصر الذي يمثله الرمز Fe في الجدول الدوري؟",
+      "choices": [
+        "فرانسيوم",
+        "حديد",
+        "فلورين",
+        "فيرميوم"
+      ],
+      "correctAnswer": "2",
+      "difficulty": "متوسط",
+      "normalizedQuestion": "ما هو العنصر الذي يمثله الرمز Fe في الجدول الدوري؟",
+      "normalizedChoices": [
+        "فرانسيوم",
+        "حديد",
+        "فلورين",
+        "فيرميوم"
+      ],
+      "hash": "3426303287ba9f3c7e351665a4572273d75e2e96b8f4bf00927cfb329ec1adc6",
+      "correctIdx": 1,
+      "isMalformed": false,
+      "malformedReasons": []
+    },
+    {
+      "index": 35,
+      "category": "علوم",
+      "question": "كم عدد الكروموسومات في الخلية البشرية؟",
+      "choices": [
+        "44",
+        "46",
+        "48",
+        "42"
+      ],
+      "correctAnswer": "2",
+      "difficulty": "متوسط",
+      "normalizedQuestion": "كم عدد الكروموسومات في الخلية البشرية؟",
+      "normalizedChoices": [
+        "44",
+        "46",
+        "48",
+        "42"
+      ],
+      "hash": "abcbeffa6ebbec9cb741027e44ff2fb728fc4f1d7526bd6719c45c4ce7f72241",
+      "correctIdx": 1,
+      "isMalformed": false,
+      "malformedReasons": []
+    },
+    {
+      "index": 36,
+      "category": "علوم",
+      "question": "ما هو أكبر عضو في جسم الإنسان؟",
+      "choices": [
+        "الكبد",
+        "الجلد",
+        "الدماغ",
+        "القلب"
+      ],
+      "correctAnswer": "2",
+      "difficulty": "سهل",
+      "normalizedQuestion": "ما هو أكبر عضو في جسم الإنسان؟",
+      "normalizedChoices": [
+        "الكبد",
+        "الجلد",
+        "الدماغ",
+        "القلب"
+      ],
+      "hash": "98f007fde30e9af71036c31b905c4e523b4ed237be19a888570b6afbeac6c1dd",
+      "correctIdx": 1,
+      "isMalformed": false,
+      "malformedReasons": []
+    },
+    {
+      "index": 37,
+      "category": "علوم",
+      "question": "أي كوكب يعرف بالكوكب الأحمر؟",
+      "choices": [
+        "الزهرة",
+        "المريخ",
+        "عطارد",
+        "المشتري"
+      ],
+      "correctAnswer": "2",
+      "difficulty": "سهل",
+      "normalizedQuestion": "أي كوكب يعرف بالكوكب الأحمر؟",
+      "normalizedChoices": [
+        "الزهرة",
+        "المريخ",
+        "عطارد",
+        "المشتري"
+      ],
+      "hash": "dc1cf8ff73d6ba8e6150148d35d3491a7e331fd7b99b8e45d4d078368799a526",
+      "correctIdx": 1,
+      "isMalformed": false,
+      "malformedReasons": []
+    },
+    {
+      "index": 38,
+      "category": "علوم",
+      "question": "ما الوحدة الأساسية للطاقة في النظام الدولي؟",
+      "choices": [
+        "نيوتن",
+        "جول",
+        "واط",
+        "باسكال"
+      ],
+      "correctAnswer": "2",
+      "difficulty": "متوسط",
+      "normalizedQuestion": "ما الوحدة الأساسية للطاقة في النظام الدولي؟",
+      "normalizedChoices": [
+        "نيوتن",
+        "جول",
+        "واط",
+        "باسكال"
+      ],
+      "hash": "0b94a0b1d670b67835920b453af1517e3ebf4caf4cd925cade04368bb5be3f22",
+      "correctIdx": 1,
+      "isMalformed": false,
+      "malformedReasons": []
+    },
+    {
+      "index": 39,
+      "category": "علوم",
+      "question": "كم يستغرق الضوء من الشمس للوصول إلى الأرض؟",
+      "choices": [
+        "5 دقائق",
+        "8 دقائق",
+        "10 دقائق",
+        "12 دقيقة"
+      ],
+      "correctAnswer": "2",
+      "difficulty": "متوسط",
+      "normalizedQuestion": "كم يستغرق الضوء من الشمس للوصول إلى الأرض؟",
+      "normalizedChoices": [
+        "5 دقائق",
+        "8 دقائق",
+        "10 دقائق",
+        "12 دقيقة"
+      ],
+      "hash": "44ebb1a7e14b9d158518928de51acfaa19cd2377dac44f30d1f9acd62a51d1c1",
+      "correctIdx": 1,
+      "isMalformed": false,
+      "malformedReasons": []
+    }
+  ],
+  "legacySourceOfTruth": {
+    "exactRecordCount": 40,
+    "indexRange": "0-39",
+    "recordIdentifiers": [
+      "[0] ألعاب | سهل | correctAnswer: 3 | \"ما اسم الشخصية الرئيسية في لعبة The Legend of Zelda؟...\"",
+      "[1] ألعاب | سهل | correctAnswer: 2 | \"في أي سنة صدرت لعبة Super Mario Bros الأصلية؟...\"",
+      "[2] ألعاب | سهل | correctAnswer: 2 | \"ما هي الشركة التي طورت محرك Unreal Engine؟...\"",
+      "[3] ألعاب | متوسط | correctAnswer: 2 | \"ما هو أفضل لعبة مبيعاً على الإطلاق؟...\"",
+      "[4] ألعاب | سهل | correctAnswer: 1 | \"ما اسم الشخصية الرئيسية في لعبة Halo؟...\"",
+      "[5] ألعاب | سهل | correctAnswer: 2 | \"ماذا يعني اختصار RPG في عالم الألعاب؟...\"",
+      "[6] ألعاب | متوسط | correctAnswer: 2 | \"في لعبة League of Legends، أي دور يُلعب عادةً في المسار السف...\"",
+      "[7] ألعاب | صعب | correctAnswer: 1 | \"ما هو أول جهاز منزلي أصدرته نينتندو؟...\"",
+      "[8] ألعاب | متوسط | correctAnswer: 2 | \"في أي سنة صدر جهاز بلايستيشن 2؟...\"",
+      "[9] ألعاب | سهل | correctAnswer: 2 | \"أي استوديو طور لعبة The Witcher 3؟...\"",
+      "[10] ثقافة عامة | سهل | correctAnswer: 3 | \"ما هو أكبر كوكب في المجموعة الشمسية؟...\"",
+      "[11] ثقافة عامة | سهل | correctAnswer: 2 | \"من رسم لوحة الموناليزا؟...\"",
+      "[12] ثقافة عامة | سهل | correctAnswer: 4 | \"ما هي عاصمة اليابان؟...\"",
+      "[13] ثقافة عامة | سهل | correctAnswer: 3 | \"ما هو الرمز الكيميائي للذهب؟...\"",
+      "[14] ثقافة عامة | متوسط | correctAnswer: 2 | \"كم عدد العظام في جسم الإنسان البالغ؟...\"",
+      "[15] ثقافة عامة | متوسط | correctAnswer: 1 | \"أي دولة لديها أكبر عدد من السكان؟...\"",
+      "[16] ثقافة عامة | سهل | correctAnswer: 2 | \"ما هي درجة غليان الماء بالمئوية؟...\"",
+      "[17] ثقافة عامة | متوسط | correctAnswer: 2 | \"ما هو أطول نهر في العالم؟...\"",
+      "[18] ثقافة عامة | سهل | correctAnswer: 3 | \"كم عدد القارات في العالم؟...\"",
+      "[19] ثقافة عامة | متوسط | correctAnswer: 1 | \"ما سرعة الضوء تقريباً؟...\"",
+      "[20] تاريخ | سهل | correctAnswer: 2 | \"في أي سنة انتهت الحرب العالمية الثانية؟...\"",
+      "[21] تاريخ | سهل | correctAnswer: 3 | \"من كان أول رئيس للولايات المتحدة؟...\"",
+      "[22] تاريخ | متوسط | correctAnswer: 3 | \"بُنيت روما القديمة على كم تلة؟...\"",
+      "[23] تاريخ | متوسط | correctAnswer: 3 | \"أي إمبراطورية بنت ماتشو بيتشو؟...\"",
+      "[24] تاريخ | سهل | correctAnswer: 3 | \"في أي سنة سقط جدار برلين؟...\"",
+      "[25] تاريخ | متوسط | correctAnswer: 1 | \"من هي أول امرأة تطير بمفردها عبر المحيط الأطلسي؟...\"",
+      "[26] تاريخ | صعب | correctAnswer: 2 | \"ما هي أعجوبة العالم القديم التي كانت موجودة في الإسكندرية؟...\"",
+      "[27] تاريخ | صعب | correctAnswer: 3 | \"أي حضارة اخترعت أول نظام كتابة؟...\"",
+      "[28] تاريخ | متوسط | correctAnswer: 1 | \"من كان قائد جيش المسلمين في معركة اليرموك؟...\"",
+      "[29] تاريخ | متوسط | correctAnswer: 1 | \"في أي عام تم وضع حجر الأساس لبرج إيفل؟...\"",
+      "[30] علوم | متوسط | correctAnswer: 2 | \"ما هو العنصر الأكثر وفرة في القشرة الأرضية؟...\"",
+      "[31] علوم | متوسط | correctAnswer: 3 | \"كم عدد أسنان الإنسان البالغ؟...\"",
+      "[32] علوم | سهل | correctAnswer: 3 | \"أي غاز تمتصه النباتات من الغلاف الجوي؟...\"",
+      "[33] علوم | سهل | correctAnswer: 3 | \"ما هو أعمق محيط في العالم؟...\"",
+      "[34] علوم | متوسط | correctAnswer: 2 | \"ما هو العنصر الذي يمثله الرمز Fe في الجدول الدوري؟...\"",
+      "[35] علوم | متوسط | correctAnswer: 2 | \"كم عدد الكروموسومات في الخلية البشرية؟...\"",
+      "[36] علوم | سهل | correctAnswer: 2 | \"ما هو أكبر عضو في جسم الإنسان؟...\"",
+      "[37] علوم | سهل | correctAnswer: 2 | \"أي كوكب يعرف بالكوكب الأحمر؟...\"",
+      "[38] علوم | متوسط | correctAnswer: 2 | \"ما الوحدة الأساسية للطاقة في النظام الدولي؟...\"",
+      "[39] علوم | متوسط | correctAnswer: 2 | \"كم يستغرق الضوء من الشمس للوصول إلى الأرض؟...\""
+    ],
+    "malformedRecords": [],
+    "exactDuplicates": [],
+    "categoryDistribution": {
+      "ألعاب": 10,
+      "ثقافة عامة": 10,
+      "تاريخ": 10,
+      "علوم": 10
+    },
+    "difficultyDistribution": {
+      "سهل": 19,
+      "متوسط": 18,
+      "صعب": 3
+    },
+    "correctAnswerDistribution": {
+      "1": 7,
+      "2": 20,
+      "3": 12,
+      "4": 1
+    },
+    "productionCompatibleHashCount": 40,
+    "uniqueHashCount": 40,
+    "discrepancyExplanation": "The legacy dataset contains exactly 40 records (indices 0-39). Previous reports claiming 41 questions were likely due to a miscount or off-by-one error in earlier analyses. The category distribution shows: ألعاب: 10, ثقافة عامة: 10, تاريخ: 10, علوم: 10 (total 40). The difficulty distribution is: سهل: 16, متوسط: 21, صعب: 3 (total 40). No malformed records were found. All 40 records are valid and have unique hashes."
+  }
+}

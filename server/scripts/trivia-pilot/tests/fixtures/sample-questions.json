@@ -1,0 +1,82 @@
+[
+  {
+    "question": "ما هي عاصمة المملكة العربية السعودية؟",
+    "choices": [
+      "الرياض",
+      "جدة",
+      "مكة المكرمة",
+      "المدينة المنورة"
+    ],
+    "correct_idx": 0,
+    "category": "جغرافيا",
+    "difficulty": "سهل",
+    "language": "ar",
+    "tags": ["capital", "saudi-arabia"],
+    "source": "fixture",
+    "verified": true
+  },
+  {
+    "question": "كم عدد الكواكب في المجموعة الشمسية؟",
+    "choices": [
+      "7",
+      "8",
+      "9",
+      "10"
+    ],
+    "correct_idx": 1,
+    "category": "علوم",
+    "difficulty": "سهل",
+    "language": "ar",
+    "tags": ["astronomy", "planets"],
+    "source": "fixture",
+    "verified": true
+  },
+  {
+    "question": "من هو مؤلف رواية 'البؤساء'؟",
+    "choices": [
+      "فيكتور هوجو",
+      "ألكسندر دوما",
+      "غوستاف فلوبير",
+      "إميل زولا"
+    ],
+    "correct_idx": 0,
+    "category": "ثقافة عامة",
+    "difficulty": "متوسط",
+    "language": "ar",
+    "tags": ["literature", "novel"],
+    "source": "fixture",
+    "verified": true
+  },
+  {
+    "question": "في أي عام تم إطلاق أول لعبة فيديو تجارية 'بونغ'؟",
+    "choices": [
+      "1970",
+      "1972",
+      "1975",
+      "1978"
+    ],
+    "correct_idx": 1,
+    "category": "ألعاب فيديو",
+    "difficulty": "متوسط",
+    "language": "ar",
+    "tags": ["video-games", "history"],
+    "source": "fixture",
+    "verified": true
+  },
+  {
+    "question": "ما هي معركة اليرموك وما العام الذي وقعت فيه؟",
+    "choices": [
+      "634 م - انتصار المسلمين على الروم",
+      "636 م - انتصار المسلمين على الروم",
+      "638 م - انتصار الروم على المسلمين",
+      "640 م - انتصار المسلمين على الفرس"
+    ],
+    "correct_idx": 1,
+    "category": "تاريخ",
+    "difficulty": "صعب",
+    "language": "ar",
+    "tags": ["islamic-history", "battle"],
+    "source": "fixture",
+    "verified": true
+  }
+]
