@@ -5,6 +5,7 @@ import {
   importQuestions as importQuestionsBatch,
   TriviaQuestion,
 } from './QuestionPoolService';
+import { getBatch, getBatchQuestions, TriviaBatch } from './BatchService';
 
 export interface ImportRowInput {
   question: string;
@@ -53,8 +54,18 @@ export interface ImportCommitResult {
   rejected: number;
 }
 
+export interface BatchImportPreviewResult extends ImportPreviewResult {
+  batchId?: string;
+  batchName?: string;
+}
+
+export interface BatchImportCommitResult extends ImportCommitResult {
+  batchId: string;
+  batchName: string;
+}
+
 const MAX_FILE_SIZE = 1024 * 1024;
-const MAX_ROWS = 1000;
+// MAX_ROWS removed - batch processing handles any reasonable size
 
 function parseJsonContent(content: string): ImportRowInput[] {
   const data = JSON.parse(content);
@@ -152,36 +163,10 @@ function normalizeCsvRow(row: Record<string, string>, index: number): ImportRowI
   };
 }
 
-export function previewImport(fileContent: string, mimeType: string): ImportPreviewResult {
-  let rows: ImportRowInput[];
-
-  if (mimeType === 'application/json' || mimeType === 'text/json') {
-    rows = parseJsonContent(fileContent);
-  } else if (mimeType === 'text/csv' || mimeType === 'application/csv') {
-    rows = parseCsvContent(fileContent);
-  } else {
-    throw new Error('Unsupported file format. Use JSON or CSV.');
-  }
-
-  if (rows.length > MAX_ROWS) {
-    throw new Error(`Too many rows. Maximum is ${MAX_ROWS}.`);
-  }
-
-  const db = getDb();
-  const validRows = rows.filter(r => {
-    const v = validateQuestion(r.question, r.choices, r.correct_idx, r.category, r.difficulty, r.language);
-    return v.valid;
-  });
-  const hashes = validRows.map(r => computeQuestionHash(r.question, r.choices, r.category, r.difficulty));
-  const uniqueHashes = [...new Set(hashes)];
-
-  let existingHashes = new Set<string>();
-  if (uniqueHashes.length > 0) {
-    const placeholders = uniqueHashes.map(() => '?').join(',');
-    const existing = db.prepare(`SELECT hash FROM trivia_questions WHERE hash IN (${placeholders})`).all(...uniqueHashes) as { hash: string }[];
-    existingHashes = new Set(existing.map(e => e.hash));
-  }
-
+function buildPreview(
+  rows: ImportRowInput[],
+  existingHashes: Set<string>
+): ImportPreviewResult {
   const inFileHashes = new Map<string, number>();
   const previews: ImportRowPreview[] = [];
 
@@ -198,7 +183,7 @@ export function previewImport(fileContent: string, mimeType: string): ImportPrev
       errors = validation.errors;
     } else if (existingHashes.has(hash)) {
       status = 'duplicate';
-      const existing = db.prepare('SELECT id FROM trivia_questions WHERE hash = ?').get(hash) as { id: string } | undefined;
+      const existing = getDb().prepare('SELECT id FROM trivia_questions WHERE hash = ?').get(hash) as { id: string } | undefined;
       if (existing) existingId = existing.id;
     } else if (inFileHashes.has(hash)) {
       status = 'duplicate';
@@ -234,6 +219,77 @@ export function previewImport(fileContent: string, mimeType: string): ImportPrev
   return { rows: previews, summary };
 }
 
+export function previewImport(fileContent: string, mimeType: string): ImportPreviewResult {
+  let rows: ImportRowInput[];
+
+  if (mimeType === 'application/json' || mimeType === 'text/json') {
+    rows = parseJsonContent(fileContent);
+  } else if (mimeType === 'text/csv' || mimeType === 'application/csv') {
+    rows = parseCsvContent(fileContent);
+  } else {
+    throw new Error('Unsupported file format. Use JSON or CSV.');
+  }
+
+  const db = getDb();
+  const validRows = rows.filter(r => {
+    const v = validateQuestion(r.question, r.choices, r.correct_idx, r.category, r.difficulty, r.language);
+    return v.valid;
+  });
+  const hashes = validRows.map(r => computeQuestionHash(r.question, r.choices, r.category, r.difficulty));
+  const uniqueHashes = [...new Set(hashes)];
+
+  let existingHashes = new Set<string>();
+  if (uniqueHashes.length > 0) {
+    const placeholders = uniqueHashes.map(() => '?').join(',');
+    const existing = db.prepare(`SELECT hash FROM trivia_questions WHERE hash IN (${placeholders})`).all(...uniqueHashes) as { hash: string }[];
+    existingHashes = new Set(existing.map(e => e.hash));
+  }
+
+  return buildPreview(rows, existingHashes);
+}
+
+export function previewBatchImport(batchId: string): BatchImportPreviewResult {
+  const batch = getBatch(batchId);
+  if (!batch) {
+    throw new Error(`Batch not found: ${batchId}`);
+  }
+
+  const questions = getBatchQuestions(batchId);
+  const rows: ImportRowInput[] = questions.map(q => ({
+    question: q.question,
+    choices: JSON.parse(q.choices),
+    correct_idx: q.correct_idx,
+    category: q.category,
+    difficulty: q.difficulty,
+    tags: JSON.parse(q.tags),
+    source: q.source ?? undefined,
+    verified: q.verified,
+    language: q.language,
+  }));
+
+  const db = getDb();
+  const validRows = rows.filter(r => {
+    const v = validateQuestion(r.question, r.choices, r.correct_idx, r.category, r.difficulty, r.language);
+    return v.valid;
+  });
+  const hashes = validRows.map(r => computeQuestionHash(r.question, r.choices, r.category, r.difficulty));
+  const uniqueHashes = [...new Set(hashes)];
+
+  let existingHashes = new Set<string>();
+  if (uniqueHashes.length > 0) {
+    const placeholders = uniqueHashes.map(() => '?').join(',');
+    const existing = db.prepare(`SELECT hash FROM trivia_questions WHERE hash IN (${placeholders})`).all(...uniqueHashes) as { hash: string }[];
+    existingHashes = new Set(existing.map(e => e.hash));
+  }
+
+  const preview = buildPreview(rows, existingHashes);
+  return {
+    ...preview,
+    batchId: batch.id,
+    batchName: batch.name,
+  };
+}
+
 export function commitImport(rows: ImportRowPreview[]): ImportCommitResult {
   const validRows = rows
     .filter(p => p.status === 'valid_new')
@@ -250,4 +306,57 @@ export function commitImport(rows: ImportRowPreview[]): ImportCommitResult {
     }));
 
   return importQuestionsBatch(validRows);
+}
+
+export function commitBatchImport(batchId: string): BatchImportCommitResult {
+  const batch = getBatch(batchId);
+  if (!batch) {
+    throw new Error(`Batch not found: ${batchId}`);
+  }
+
+  const questions = getBatchQuestions(batchId);
+  const importRows = questions.map(q => ({
+    question: q.question,
+    choices: JSON.parse(q.choices),
+    correct_idx: q.correct_idx,
+    category: q.category,
+    difficulty: q.difficulty,
+    tags: JSON.parse(q.tags),
+    source: q.source,
+    verified: q.verified,
+    language: q.language,
+    id: q.id,
+  }));
+
+  const result = importQuestionsBatch(importRows);
+
+  return {
+    ...result,
+    batchId: batch.id,
+    batchName: batch.name,
+  };
+}
+
+export function previewImportFromBatchFile(filePath: string): BatchImportPreviewResult {
+  const fs = require('fs');
+  const path = require('path');
+  
+  if (!fs.existsSync(filePath)) {
+    throw new Error(`File not found: ${filePath}`);
+  }
+
+  const content = fs.readFileSync(filePath, 'utf-8');
+  const mimeType = path.extname(filePath).toLowerCase() === '.csv' ? 'text/csv' : 'application/json';
+  
+  const preview = previewImport(content, mimeType);
+  
+  // Try to extract batch info from filename
+  const fileName = path.basename(filePath, path.extname(filePath));
+  const batchMatch = fileName.match(/batch[_-]?(\d+)/i);
+  
+  return {
+    ...preview,
+    batchName: fileName,
+    batchId: batchMatch ? batchMatch[1] : undefined,
+  };
 }

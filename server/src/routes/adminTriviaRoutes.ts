@@ -10,10 +10,110 @@ import {
   ListQuestionsParams,
 } from '../games/trivia/QuestionAdminService';
 import { previewImport, commitImport, ImportRowPreview, ImportCommitResult } from '../games/trivia/TriviaImportService';
+import {
+  getAllCategories,
+  getCategoryById,
+  createCategory,
+  updateCategory,
+  deactivateCategory,
+  TriviaCategory,
+} from '../games/trivia/CategoryService';
 
 export const adminTriviaRoutes = Router();
 
 adminTriviaRoutes.use(requireAdmin);
+
+// Category endpoints
+adminTriviaRoutes.get('/categories', (req: Request, res: Response) => {
+  try {
+    const categories = getAllCategories();
+    res.json({ categories });
+  } catch (err) {
+    console.error('[AdminTrivia] List categories error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+adminTriviaRoutes.get('/categories/:id', (req: Request, res: Response) => {
+  try {
+    const category = getCategoryById(req.params.id);
+    if (!category) {
+      res.status(404).json({ error: 'Category not found' });
+      return;
+    }
+    res.json({ category });
+  } catch (err) {
+    console.error('[AdminTrivia] Get category error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+adminTriviaRoutes.post('/categories', (req: Request, res: Response) => {
+  try {
+    const input = req.body as {
+      slug: string;
+      name_ar: string;
+      description?: string;
+      sort_order?: number;
+      is_active?: number;
+    };
+
+    if (!input || typeof input !== 'object') {
+      res.status(400).json({ error: 'Invalid request body' });
+      return;
+    }
+
+    const category = createCategory(input);
+    res.status(201).json({ category });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Internal server error';
+    console.error('[AdminTrivia] Create category error:', err);
+    res.status(400).json({ error: message });
+  }
+});
+
+adminTriviaRoutes.patch('/categories/:id', (req: Request, res: Response) => {
+  try {
+    const input = req.body as {
+      name_ar?: string;
+      description?: string;
+      sort_order?: number;
+      is_active?: number;
+    };
+
+    if (!input || typeof input !== 'object') {
+      res.status(400).json({ error: 'Invalid request body' });
+      return;
+    }
+
+    const category = updateCategory(req.params.id, input);
+    if (!category) {
+      res.status(404).json({ error: 'Category not found' });
+      return;
+    }
+
+    res.json({ category });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Internal server error';
+    console.error('[AdminTrivia] Update category error:', err);
+    res.status(400).json({ error: message });
+  }
+});
+
+adminTriviaRoutes.post('/categories/:id/deactivate', (req: Request, res: Response) => {
+  try {
+    const category = deactivateCategory(req.params.id);
+    if (!category) {
+      res.status(404).json({ error: 'Category not found' });
+      return;
+    }
+    res.json({ category });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Internal server error';
+    console.error('[AdminTrivia] Deactivate category error:', err);
+    res.status(400).json({ error: message });
+  }
+});
 
 adminTriviaRoutes.get('/questions', (req: Request, res: Response) => {
   try {

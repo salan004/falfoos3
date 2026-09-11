@@ -1,0 +1,201 @@
+[
+  {
+    "question": "ما هي عاصمة فرنسا؟",
+    "choices": [
+      "باريس",
+      "ليون",
+      "مرسيليا",
+      "نيس"
+    ],
+    "correct_idx": 0,
+    "correct_answer": "باريس",
+    "category": "جغرافيا",
+    "difficulty": "سهل",
+    "language": "ar",
+    "tags": [
+      "عواصم",
+      "فرنسا"
+    ],
+    "source": "اختبار T2.2",
+    "verified": true
+  },
+  {
+    "question": "ما هو أكبر كوكب في المجموعة الشمسية؟",
+    "choices": [
+      "الأرض",
+      "المريخ",
+      "المشتري",
+      "زحل"
+    ],
+    "correct_idx": 2,
+    "correct_answer": "المشتري",
+    "category": "علوم",
+    "difficulty": "سهل",
+    "language": "ar",
+    "tags": [
+      "الكواكب",
+      "المشتري"
+    ],
+    "source": "اختبار T2.2",
+    "verified": true
+  },
+  {
+    "question": "من كتب رواية \"مائة عام من العزلة\"؟",
+    "choices": [
+      "ماريو بارغاس يوسا",
+      "خوان رولفو",
+      "خورخي لويس بورخيس",
+      "غابرييل غارسيا ماركيز"
+    ],
+    "correct_idx": 3,
+    "correct_answer": "غابرييل غارسيا ماركيز",
+    "category": "فنون وآداب",
+    "difficulty": "متوسط",
+    "language": "ar",
+    "tags": [
+      "أدب",
+      "رواية"
+    ],
+    "source": "اختبار T2.2",
+    "verified": true
+  },
+  {
+    "question": "في أي سنة أقيمت أول بطولة كأس عالم لكرة القدم؟",
+    "choices": [
+      "1930",
+      "1934",
+      "1938",
+      "1950"
+    ],
+    "correct_idx": 0,
+    "correct_answer": "1930",
+    "category": "رياضة",
+    "difficulty": "متوسط",
+    "language": "ar",
+    "tags": [
+      "كرة القدم",
+      "كأس العالم"
+    ],
+    "source": "اختبار T2.2",
+    "verified": true
+  },
+  {
+    "question": "ما هي لغة البرمجة التي طورت بها لعبة Minecraft الأصلية؟",
+    "choices": [
+      "C++",
+      "Java",
+      "Python",
+      "C#"
+    ],
+    "correct_idx": 1,
+    "correct_answer": "Java",
+    "category": "ألعاب فيديو",
+    "difficulty": "سهل",
+    "language": "ar",
+    "tags": [
+      "ماينكرافت",
+      "برمجة"
+    ],
+    "source": "اختبار T2.2",
+    "verified": true
+  },
+  {
+    "question": "ما هو العنصر الكيميائي الذي يرمز له بالرمز Au؟",
+    "choices": [
+      "الفضة",
+      "الذهب",
+      "النحاس",
+      "الحديد"
+    ],
+    "correct_idx": 1,
+    "correct_answer": "الذهب",
+    "category": "علوم",
+    "difficulty": "سهل",
+    "language": "ar",
+    "tags": [
+      "الكيمياء",
+      "الذهب"
+    ],
+    "source": "اختبار T2.2",
+    "verified": true
+  },
+  {
+    "question": "أي من التالي ليس من عجائب الدنيا السبع الجديدة؟",
+    "choices": [
+      "سور الصين العظيم",
+      "بترا",
+      "الكولوسيوم",
+      "برج إيفل"
+    ],
+    "correct_idx": 3,
+    "correct_answer": "برج إيفل",
+    "category": "ثقافة عامة",
+    "difficulty": "سهل",
+    "language": "ar",
+    "tags": [
+      "عجائب الدنيا"
+    ],
+    "source": "اختبار T2.2",
+    "verified": true
+  },
+  {
+    "question": "ما هي الشركة التي طورت محرك Unreal Engine؟",
+    "choices": [
+      "Unity Technologies",
+      "Epic Games",
+      "Valve",
+      "Crytek"
+    ],
+    "correct_idx": 1,
+    "correct_answer": "Epic Games",
+    "category": "تقنية وفضاء",
+    "difficulty": "متوسط",
+    "language": "ar",
+    "tags": [
+      "محركات الألعاب",
+      "Unreal Engine"
+    ],
+    "source": "اختبار T2.2",
+    "verified": true
+  },
+  {
+    "question": "من رسم لوحة الموناليزا؟",
+    "choices": [
+      "فنسنت فان جوخ",
+      "بابلو بيكاسو",
+      "ليوناردو دافنشي",
+      "سلفادور دالي"
+    ],
+    "correct_idx": 2,
+    "correct_answer": "ليوناردو دافنشي",
+    "category": "فنون وآداب",
+    "difficulty": "سهل",
+    "language": "ar",
+    "tags": [
+      "الفن",
+      "الموناليزا"
+    ],
+    "source": "اختبار T2.2",
+    "verified": true
+  },
+  {
+    "question": "ما هو أطول نهر في العالم؟",
+    "choices": [
+      "نهر الأمازون",
+      "نهر النيل",
+      "نهر المسيسيبي",
+      "نهر اليانغتسي"
+    ],
+    "correct_idx": 1,
+    "correct_answer": "نهر النيل",
+    "category": "جغرافيا",
+    "difficulty": "سهل",
+    "language": "ar",
+    "tags": [
+      "الأنهار",
+      "النيل"
+    ],
+    "source": "اختبار T2.2",
+    "verified": true
+  }
+]

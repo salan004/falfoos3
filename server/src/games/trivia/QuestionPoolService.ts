@@ -1,5 +1,6 @@
 import { getDb } from '../../db/db';
 import crypto from 'crypto';
+import { getActiveCategories, getCategoryByTextCategory } from './CategoryService';
 
 /**
  * Phase B3.1 — Trivia Question Pool Service.
@@ -15,6 +16,7 @@ interface DbRow {
   question: string;
   choices: string;       // JSON string
   correct_idx: number;   // 0-3
+  correct_answer: string | null; // The actual correct answer text (for validation safety)
   category: string;
   difficulty: string;
   tags: string;          // JSON string
@@ -22,6 +24,7 @@ interface DbRow {
   verified: number;      // 0 or 1
   language: string;
   hash: string;
+  batch_id: string | null;
   created_at: number;
   updated_at: number;
 }
@@ -31,13 +34,16 @@ export interface TriviaQuestion {
   question: string;
   choices: string[];
   correct_idx: number;   // 0-3
+  correct_answer: string | null; // The actual correct answer text (for validation safety)
   category: string;
+  category_meta?: CategoryMeta | null;
   difficulty: string;
   tags: string[];
   source: string | null;
   verified: number;      // 0 or 1
   language: string;
   hash: string;
+  batch_id: string | null;
   created_at: number;
   updated_at: number;
 }
@@ -55,6 +61,12 @@ export interface ValidationResult {
   hash?: string;
 }
 
+export interface CategoryMeta {
+  id: string;
+  slug: string;
+  name_ar: string;
+}
+
 export const VALID_DIFFICULTIES = ['سهل', 'متوسط', 'صعب'] as const;
 export const VALID_LANGUAGES = ['ar'] as const;
 
@@ -62,7 +74,7 @@ export const VALID_LANGUAGES = ['ar'] as const;
  * Normalizes text for hash computation.
  * Trims whitespace, collapses internal whitespace, preserves Arabic text meaning.
  */
-function normalizeForHash(text: string): string {
+export function normalizeForHash(text: string): string {
   return text
     .trim()
     .replace(/\s+/g, ' ')
@@ -85,6 +97,7 @@ export function computeQuestionHash(question: string, choices: string[], categor
 
 /**
  * Validates a question before insertion.
+ * Uses canonical categories from CategoryService for validation.
  */
 export function validateQuestion(
   question: string,
@@ -116,6 +129,14 @@ export function validateQuestion(
 
   if (!category || !category.trim()) {
     errors.push('Category is required');
+  } else {
+    // Validate against canonical categories
+    const canonicalCategory = getCategoryByTextCategory(category);
+    if (!canonicalCategory) {
+      errors.push(`Category '${category}' is not a recognized canonical category`);
+    } else if (!canonicalCategory.is_active) {
+      errors.push(`Category '${category}' is not active`);
+    }
   }
 
   if (!VALID_DIFFICULTIES.includes(difficulty as typeof VALID_DIFFICULTIES[number])) {
@@ -151,6 +172,8 @@ export function importQuestion(
     verified?: number;
     language?: string;
     id?: string;
+    correct_answer?: string;
+    batch_id?: string;
   } = {}
 ): { id: string | null; hash: string } {
   const validation = validateQuestion(question, choices, correct_idx, category, difficulty, options.language);
@@ -164,15 +187,17 @@ export function importQuestion(
   const tags = options.tags ?? [];
   const source = options.source ?? null;
   const verified = options.verified ?? 0;
+  const correct_answer = options.correct_answer ?? choices[correct_idx];
+  const batch_id = options.batch_id ?? null;
 
   const db = getDb();
 
   try {
     const stmt = db.prepare(`
       INSERT INTO trivia_questions (
-        id, question, choices, correct_idx, category, difficulty,
-        tags, source, verified, language, hash, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        id, question, choices, correct_idx, correct_answer, category, difficulty,
+        tags, source, verified, language, hash, batch_id, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
     
     stmt.run(
@@ -180,6 +205,7 @@ export function importQuestion(
       question,
       JSON.stringify(choices),
       correct_idx,
+      correct_answer,
       category,
       difficulty,
       JSON.stringify(tags),
@@ -187,6 +213,7 @@ export function importQuestion(
       verified,
       options.language ?? 'ar',
       hash,
+      batch_id,
       now,
       now
     );
@@ -217,6 +244,8 @@ export function importQuestions(
     verified?: number;
     language?: string;
     id?: string;
+    correct_answer?: string;
+    batch_id?: string;
   }>
 ): { imported: number; skipped: number; rejected: number } {
   const db = getDb();
@@ -240,6 +269,8 @@ export function importQuestions(
           verified: q.verified,
           language: q.language,
           id: q.id,
+          correct_answer: q.correct_answer,
+          batch_id: q.batch_id,
         });
         if (result.id) {
           imported++;
@@ -263,7 +294,7 @@ export function importQuestions(
 export function getQuestionById(id: string): TriviaQuestion | null {
   const db = getDb();
   const row = db.prepare('SELECT * FROM trivia_questions WHERE id = ?').get(id) as
-    | { id: string; question: string; choices: string; correct_idx: number; category: string; difficulty: string; tags: string; source: string | null; verified: number; language: string; hash: string; created_at: number; updated_at: number }
+    | { id: string; question: string; choices: string; correct_idx: number; correct_answer: string | null; category: string; difficulty: string; tags: string; source: string | null; verified: number; language: string; hash: string; batch_id: string | null; created_at: number; updated_at: number }
     | undefined;
   
   if (!row) return null;
@@ -371,6 +402,7 @@ export function getRandomQuestions(
     question: string;
     choices: string;
     correct_idx: number;
+    correct_answer: string | null;
     category: string;
     difficulty: string;
     tags: string;
@@ -378,11 +410,12 @@ export function getRandomQuestions(
     verified: number;
     language: string;
     hash: string;
+    batch_id: string | null;
     created_at: number;
     updated_at: number;
   }
 
-  const rows = db.prepare(sql).all(...params) as Array<{ id: string; question: string; choices: string; correct_idx: number; category: string; difficulty: string; tags: string; source: string | null; verified: number; language: string; hash: string; created_at: number; updated_at: number }>;
+  const rows = db.prepare(sql).all(...params) as Array<{ id: string; question: string; choices: string; correct_idx: number; correct_answer: string | null; category: string; difficulty: string; tags: string; source: string | null; verified: number; language: string; hash: string; batch_id: string | null; created_at: number; updated_at: number }>;
   
   return rows.map(row => ({
     ...row,
@@ -418,12 +451,11 @@ export function markQuestionAsUsed(questionId: string, matchId: string): void {
 }
 
 /**
- * Gets all distinct categories present in the question bank.
+ * Gets all canonical active categories from the category registry.
  */
 export function getCategories(): string[] {
-  const db = getDb();
-  const rows = db.prepare('SELECT DISTINCT category FROM trivia_questions ORDER BY category').all() as { category: string }[];
-  return rows.map(r => r.category);
+  const categories = getActiveCategories();
+  return categories.map(c => c.name_ar);
 }
 
 /**
@@ -440,6 +472,7 @@ export interface TriviaQuestion {
   question: string;
   choices: string[];
   correct_idx: number;   // 0-3
+  correct_answer: string | null;
   category: string;
   difficulty: string;
   tags: string[];
@@ -447,6 +480,7 @@ export interface TriviaQuestion {
   verified: number;      // 0 or 1
   language: string;
   hash: string;
+  batch_id: string | null;
   created_at: number;
   updated_at: number;
 }

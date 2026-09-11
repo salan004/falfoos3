@@ -247,7 +247,7 @@ function createTestQuestion(overrides: Partial<{ category: string; difficulty: s
     question: `Test question ${id}?`,
     choices: ['A', 'B', 'C', 'D'],
     correct_idx: 0,
-    category: overrides.category ?? 'general',
+    category: overrides.category ?? 'ثقافة عامة',
     difficulty: overrides.difficulty ?? 'سهل',
   };
 }
@@ -258,7 +258,7 @@ async function clearTestQuestions(): Promise<void> {
   db.prepare("DELETE FROM trivia_questions WHERE question LIKE 'Test question%'").run();
 }
 
-async function seedQuestions(count: number, baseCategory = 'general', baseDifficulty = 'سهل'): Promise<string[]> {
+async function seedQuestions(count: number, baseCategory = 'ثقافة عامة', baseDifficulty = 'سهل'): Promise<string[]> {
   const ids: string[] = [];
   for (let i = 0; i < count; i++) {
     const q = createTestQuestion({ category: baseCategory, difficulty: baseDifficulty });
@@ -281,7 +281,7 @@ async function runB32Tests(): Promise<void> {
       db.prepare('INSERT INTO trivia_question_usage (question_id, usage_count, last_used_at, last_match_id, created_at, updated_at) VALUES (?, 1, ?, ?, ?, ?)')
         .run(id, now, 'match-1', now, now);
     }
-    const questions = getRandomQuestions(5, { category: 'general', verifiedOnly: true }, []);
+    const questions = getRandomQuestions(5, { category: 'ثقافة عامة', verifiedOnly: true }, []);
     const neverUsedCount = questions.filter(q => neverUsedIds.includes(q.id)).length;
     console.log(`  Selected ${questions.length} questions, ${neverUsedCount} were never-used`);
     console.log('PASS:', neverUsedCount >= Math.min(5, neverUsedIds.length) ? 'YES' : 'NO');
@@ -306,7 +306,7 @@ async function runB32Tests(): Promise<void> {
       db.prepare('INSERT INTO trivia_question_usage (question_id, usage_count, last_used_at, last_match_id, created_at, updated_at) VALUES (?, 1, ?, ?, ?, ?)')
         .run(id, now - 1000, 'match-recent', now - 1000, now - 1000); // 1 sec ago
     }
-    const questions = getRandomQuestions(3, { category: 'general', verifiedOnly: true }, []);
+    const questions = getRandomQuestions(3, { category: 'ثقافة عامة', verifiedOnly: true }, []);
     const oldCount = questions.filter(q => oldIds.includes(q.id)).length;
     console.log(`  Selected ${questions.length} questions, ${oldCount} were older-used`);
     console.log('PASS:', oldCount >= Math.min(3, oldIds.length) ? 'YES' : 'NO');
@@ -321,7 +321,7 @@ async function runB32Tests(): Promise<void> {
     await clearTestQuestions();
     const ids = await seedQuestions(5);
     const excludeIds = ids.slice(0, 2);
-    const questions = getRandomQuestions(5, { category: 'general', verifiedOnly: true }, excludeIds);
+    const questions = getRandomQuestions(5, { category: 'ثقافة عامة', verifiedOnly: true }, excludeIds);
     const excludedFound = questions.some(q => excludeIds.includes(q.id));
     console.log(`  Selected ${questions.length} questions, excluded found: ${excludedFound}`);
     console.log('PASS:', !excludedFound ? 'YES' : 'NO');
@@ -334,10 +334,10 @@ async function runB32Tests(): Promise<void> {
   console.log('B3.2 Test 4: Category filtering works with rotation');
   try {
     await clearTestQuestions();
-    await seedQuestions(3, 'science');
-    await seedQuestions(3, 'history');
-    const questions = getRandomQuestions(5, { category: 'science', verifiedOnly: true }, []);
-    const allScience = questions.every(q => q.category === 'science');
+    await seedQuestions(3, 'علوم');
+    await seedQuestions(3, 'تاريخ');
+    const questions = getRandomQuestions(5, { category: 'علوم', verifiedOnly: true }, []);
+    const allScience = questions.every(q => q.category === 'علوم');
     console.log(`  Selected ${questions.length} questions, all science: ${allScience}`);
     console.log('PASS:', allScience && questions.length > 0 ? 'YES' : 'NO');
   } catch (e) {
@@ -349,9 +349,9 @@ async function runB32Tests(): Promise<void> {
   console.log('B3.2 Test 5: Difficulty filtering works with rotation');
   try {
     await clearTestQuestions();
-    await seedQuestions(3, 'general', 'سهل');
-    await seedQuestions(3, 'general', 'صعب');
-    const questions = getRandomQuestions(5, { category: 'general', difficulty: 'سهل', verifiedOnly: true }, []);
+    await seedQuestions(3, 'ثقافة عامة', 'سهل');
+    await seedQuestions(3, 'ثقافة عامة', 'صعب');
+    const questions = getRandomQuestions(5, { category: 'ثقافة عامة', difficulty: 'سهل', verifiedOnly: true }, []);
     const allEasy = questions.every(q => q.difficulty === 'سهل');
     console.log(`  Selected ${questions.length} questions, all easy: ${allEasy}`);
     console.log('PASS:', allEasy && questions.length > 0 ? 'YES' : 'NO');
@@ -365,7 +365,7 @@ async function runB32Tests(): Promise<void> {
   try {
     await clearTestQuestions();
     await seedQuestions(2);
-    const questions = getRandomQuestions(10, { category: 'general', verifiedOnly: true }, []);
+    const questions = getRandomQuestions(10, { category: 'ثقافة عامة', verifiedOnly: true }, []);
     console.log(`  Requested 10, got ${questions.length}`);
     console.log('PASS:', questions.length === 2 ? 'YES' : 'NO');
   } catch (e) {
@@ -379,10 +379,10 @@ async function runB32Tests(): Promise<void> {
     await clearTestQuestions();
     await seedQuestions(10);
     // First match
-    const match1 = getRandomQuestions(3, { category: 'general', verifiedOnly: true }, []);
+    const match1 = getRandomQuestions(3, { category: 'ثقافة عامة', verifiedOnly: true }, []);
     for (const q of match1) markQuestionAsUsed(q.id, 'match-1');
     // Second match
-    const match2 = getRandomQuestions(3, { category: 'general', verifiedOnly: true }, []);
+    const match2 = getRandomQuestions(3, { category: 'ثقافة عامة', verifiedOnly: true }, []);
     const overlap = match1.filter(q1 => match2.some(q2 => q2.id === q1.id)).length;
     console.log(`  Match 1: ${match1.map(q => q.id.slice(0,8)).join(', ')}`);
     console.log(`  Match 2: ${match2.map(q => q.id.slice(0,8)).join(', ')}`);
@@ -405,7 +405,7 @@ async function runB32Tests(): Promise<void> {
     }
     // Simulate 12 rounds (2 full cycles through 6 questions)
     for (let round = 0; round < 12; round++) {
-      const questions = getRandomQuestions(1, { category: 'general', verifiedOnly: true }, []);
+      const questions = getRandomQuestions(1, { category: 'ثقافة عامة', verifiedOnly: true }, []);
       if (questions.length > 0) {
         markQuestionAsUsed(questions[0].id, `match-${round}`);
         usageBefore[questions[0].id]++;
@@ -428,7 +428,7 @@ async function runB32Tests(): Promise<void> {
     await seedQuestions(10);
     const results = new Set<string>();
     for (let i = 0; i < 20; i++) {
-      const questions = getRandomQuestions(1, { category: 'general', verifiedOnly: true }, []);
+      const questions = getRandomQuestions(1, { category: 'ثقافة عامة', verifiedOnly: true }, []);
       if (questions.length > 0) results.add(questions[0].id);
     }
     console.log(`  Unique questions selected in 20 trials: ${results.size}/10`);

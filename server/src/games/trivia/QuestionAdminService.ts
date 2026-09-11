@@ -9,6 +9,7 @@ import {
   VALID_DIFFICULTIES,
   VALID_LANGUAGES,
 } from './QuestionPoolService';
+import { getCategoryByTextCategory } from './CategoryService';
 
 export interface ListQuestionsParams {
   page: number;
@@ -22,8 +23,18 @@ export interface ListQuestionsParams {
   order?: 'asc' | 'desc';
 }
 
+export interface CategoryMeta {
+  id: string;
+  slug: string;
+  name_ar: string;
+}
+
+export interface TriviaQuestionWithCategoryMeta extends TriviaQuestion {
+  category_meta?: CategoryMeta | null;
+}
+
 export interface ListQuestionsResult {
-  questions: TriviaQuestion[];
+  questions: TriviaQuestionWithCategoryMeta[];
   total: number;
   page: number;
   pageSize: number;
@@ -162,6 +173,7 @@ export function listQuestions(params: ListQuestionsParams): ListQuestionsResult 
     question: string;
     choices: string;
     correct_idx: number;
+    correct_answer: string | null;
     category: string;
     difficulty: string;
     tags: string;
@@ -169,6 +181,7 @@ export function listQuestions(params: ListQuestionsParams): ListQuestionsResult 
     verified: number;
     language: string;
     hash: string;
+    batch_id: string | null;
     created_at: number;
     updated_at: number;
     usage_count: number;
@@ -178,21 +191,27 @@ export function listQuestions(params: ListQuestionsParams): ListQuestionsResult 
 
   const rows = db.prepare(selectSql).all(...selectParams) as RowWithUsage[];
 
-  const questions = rows.map(row => ({
-    id: row.id,
-    question: row.question,
-    choices: JSON.parse(row.choices),
-    correct_idx: row.correct_idx,
-    category: row.category,
-    difficulty: row.difficulty,
-    tags: JSON.parse(row.tags),
-    source: row.source,
-    verified: row.verified,
-    language: row.language,
-    hash: row.hash,
-    created_at: row.created_at,
-    updated_at: row.updated_at,
-  }));
+  const questions = rows.map(row => {
+    const canonicalCategory = getCategoryByTextCategory(row.category);
+    return {
+      id: row.id,
+      question: row.question,
+      choices: JSON.parse(row.choices),
+      correct_idx: row.correct_idx,
+      correct_answer: row.correct_answer,
+      category: row.category,
+      category_meta: canonicalCategory ? { id: canonicalCategory.id, slug: canonicalCategory.slug, name_ar: canonicalCategory.name_ar } : null,
+      difficulty: row.difficulty,
+      tags: JSON.parse(row.tags),
+      source: row.source,
+      verified: row.verified,
+      language: row.language,
+      hash: row.hash,
+      batch_id: row.batch_id,
+      created_at: row.created_at,
+      updated_at: row.updated_at,
+    };
+  });
 
   return { questions, total, page, pageSize };
 }
@@ -214,6 +233,7 @@ export function getQuestion(id: string): TriviaQuestion | null {
         question: string;
         choices: string;
         correct_idx: number;
+        correct_answer: string | null;
         category: string;
         difficulty: string;
         tags: string;
@@ -221,6 +241,7 @@ export function getQuestion(id: string): TriviaQuestion | null {
         verified: number;
         language: string;
         hash: string;
+        batch_id: string | null;
         created_at: number;
         updated_at: number;
         usage_count: number;
@@ -231,18 +252,22 @@ export function getQuestion(id: string): TriviaQuestion | null {
 
   if (!row) return null;
 
+  const canonicalCategory = getCategoryByTextCategory(row.category);
   return {
     id: row.id,
     question: row.question,
     choices: JSON.parse(row.choices),
     correct_idx: row.correct_idx,
+    correct_answer: row.correct_answer,
     category: row.category,
+    category_meta: canonicalCategory ? { id: canonicalCategory.id, slug: canonicalCategory.slug, name_ar: canonicalCategory.name_ar } : null,
     difficulty: row.difficulty,
     tags: JSON.parse(row.tags),
     source: row.source,
     verified: row.verified,
     language: row.language,
     hash: row.hash,
+    batch_id: row.batch_id,
     created_at: row.created_at,
     updated_at: row.updated_at,
   };
@@ -273,6 +298,7 @@ export function createQuestion(input: CreateQuestionInput): { question: TriviaQu
       source: input.source,
       verified: input.verified ?? 0,
       language: input.language,
+      correct_answer: input.choices[input.correct_idx],
     }
   );
 
@@ -345,10 +371,11 @@ export function updateQuestion(id: string, input: UpdateQuestionInput): { questi
     }
   }
 
+  const mergedCorrectAnswer = mergedChoices[mergedCorrectIdx];
   const now = Date.now();
   const stmt = db.prepare(`
     UPDATE trivia_questions
-    SET question = ?, choices = ?, correct_idx = ?, category = ?, difficulty = ?,
+    SET question = ?, choices = ?, correct_idx = ?, correct_answer = ?, category = ?, difficulty = ?,
         tags = ?, source = ?, verified = ?, language = ?, hash = ?, updated_at = ?
     WHERE id = ?
   `);
@@ -357,6 +384,7 @@ export function updateQuestion(id: string, input: UpdateQuestionInput): { questi
     mergedQuestion,
     JSON.stringify(mergedChoices),
     mergedCorrectIdx,
+    mergedCorrectAnswer,
     mergedCategory,
     mergedDifficulty,
     JSON.stringify(mergedTags),
