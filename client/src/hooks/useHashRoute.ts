@@ -45,7 +45,7 @@ export function matchTournamentRoute(path: string): { tournamentId: string } | n
 }
 
 export function matchGameTournamentsRoute(path: string): { gameId: string } | null {
-  const m = path.match(/^\/games\/([a-z_]+)$/i);
+  const m = path.match(/^\/games\/([A-Za-z0-9-]+)$/i);
   return m ? { gameId: m[1] } : null;
 }
 

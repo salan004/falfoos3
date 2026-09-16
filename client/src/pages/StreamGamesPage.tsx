@@ -54,7 +54,7 @@ export function StreamGamesPage() {
   }, [loadGames]);
 
   const openGame = (id: string) => {
-    navigate(`/stream-games/${id}`);
+    navigate(`/games/${id}`);
   };
 
   // Visual placeholders fill the remaining slots; never more than the target
