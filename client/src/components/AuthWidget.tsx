@@ -1,4 +1,4 @@
-import { apiFetch } from '../utils/api';
+import { apiFetch, apiUrl } from '../utils/api';
 import { useState } from 'react';
 import { useAuthSession } from '../hooks/useAuthSession';
 import { useGuestIdentity } from '../hooks/useGuestIdentity';
@@ -86,7 +86,7 @@ export function AuthWidget() {
     return (
       <a
         className="nav-link auth-signin"
-        href="/api/auth/google"
+        href={apiUrl('/api/auth/google')}
         title="تسجيل الدخول عبر Google"
       >
         تسجيل الدخول
