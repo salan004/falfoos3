@@ -15,42 +15,38 @@ import { getTournamentById } from '../games/TournamentService';
 /**
  * Phase 3 — Bot purchase event webhook endpoint.
  *
- * Receives tournament ticket purchase events from the FalFoos bot
- * (`event: "purchase.completed"`), verifies the HMAC signature, resolves the
- * tournament player by YouTube channel id, validates the tournament, and
- * registers the participant transactionally.
+ * Receives tournament ticket purchase events from the deployed FalFoos bot,
+ * verifies the HMAC signature, resolves the tournament player by YouTube
+ * channel id, validates the tournament, and registers the participant
+ * transactionally.
  *
- * The external contract is owned by the bot and MUST NOT change:
+ * The external contract is owned by the DEPLOYED bot and MUST be accepted
+ * exactly as sent:
  *
  * {
- *   "event": "purchase.completed",
- *   "event_id": "evt_<tx_id>",
- *   "timestamp": "<ISO timestamp>",
- *   "purchase": {
- *     "tx_id": "...",
- *     "discord_user_id": "...",
- *     "youtube_channel_id": "UC...",
- *     "youtube_name": "...",
- *     "product_id": 123,
- *     "product_name": "...",
- *     "product_type": "tournament_ticket",
- *     "product_metadata": { "tournamentId": "...", "gameId": "...", "ticketType": "standard" },
- *     "price": 500,
- *     "balance_after": 1250
+ *   "event_id": "evt_<transaction_id>",
+ *   "event_type": "ticket_purchase",
+ *   "payload": {
+ *     "tournament_id": "<tournament_uuid>",
+ *     "game_id": "<game_uuid>",
+ *     "youtube_channel_id": "<youtube_channel_id>",
+ *     "youtube_name": "<youtube_name>",
+ *     "transaction_id": "<transaction_id>"
  *   }
  * }
  *
  * Headers:
  * - X-FalFoos-Signature: t=<timestamp>,v1=<hex_signature>
  * - Idempotency-Key: <event_id>
+ *
+ * The older `purchase.completed` / `purchase.product_metadata` envelope is NOT
+ * accepted.
  */
 
 export const botRoutes = Router();
 
-const SUPPORTED_EVENT = 'purchase.completed';
-const SUPPORTED_PRODUCT_TYPE = 'tournament_ticket';
-/** Stored in bot_webhook_events.event_type for audit clarity. */
-const WEBHOOK_EVENT_TYPE = 'tournament_ticket_purchase';
+/** The only accepted event type; also stored in bot_webhook_events.event_type. */
+const SUPPORTED_EVENT_TYPE = 'ticket_purchase';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -62,6 +58,12 @@ function readIdempotencyKey(req: Request): string | undefined {
   return typeof value === 'string' && value.trim().length > 0 ? value.trim() : undefined;
 }
 
+function readRequiredString(source: Record<string, unknown>, key: string): string | null {
+  const value = source[key];
+  if (typeof value !== 'string' || value.trim().length === 0) return null;
+  return value.trim();
+}
+
 botRoutes.post('/purchase-event', verifyBotWebhook, async (req: Request, res: Response) => {
   try {
     const body = req.body as unknown;
@@ -71,62 +73,46 @@ botRoutes.post('/purchase-event', verifyBotWebhook, async (req: Request, res: Re
       return;
     }
 
-    if (body.event !== SUPPORTED_EVENT) {
-      res.status(400).json({
-        error: 'unsupported_event',
-        message: `Unsupported event: ${String(body.event)}`,
-      });
-      return;
-    }
-
-    const rawEventId = body.event_id;
-    if (typeof rawEventId !== 'string' || rawEventId.trim().length === 0) {
+    const eventId = readRequiredString(body, 'event_id');
+    if (!eventId) {
       res.status(400).json({ error: 'invalid_event_id', message: 'Missing or invalid event_id' });
       return;
     }
-    const eventId = rawEventId.trim();
 
-    const purchase = body.purchase;
-    if (!isRecord(purchase)) {
-      res.status(400).json({ error: 'invalid_purchase', message: 'Missing or invalid purchase' });
-      return;
-    }
-
-    const rawYoutubeChannelId = purchase.youtube_channel_id;
-    if (typeof rawYoutubeChannelId !== 'string' || rawYoutubeChannelId.trim().length === 0) {
-      res.status(400).json({ error: 'missing_youtube_channel_id', message: 'youtube_channel_id is required' });
-      return;
-    }
-    const youtubeChannelId = rawYoutubeChannelId.trim();
-
-    const metadata = purchase.product_metadata;
-    if (!isRecord(metadata)) {
-      res.status(400).json({ error: 'missing_product_metadata', message: 'product_metadata is required' });
-      return;
-    }
-
-    const rawTournamentId = metadata.tournamentId;
-    if (typeof rawTournamentId !== 'string' || rawTournamentId.trim().length === 0) {
-      res.status(400).json({ error: 'missing_tournament_id', message: 'product_metadata.tournamentId is required' });
-      return;
-    }
-    const tournamentId = rawTournamentId.trim();
-
-    const rawGameId = metadata.gameId;
-    if (typeof rawGameId !== 'string' || rawGameId.trim().length === 0) {
-      res.status(400).json({ error: 'missing_game_id', message: 'product_metadata.gameId is required' });
-      return;
-    }
-    const gameId = rawGameId.trim();
-
-    const productType = typeof purchase.product_type === 'string' ? purchase.product_type : '';
-    if (productType !== SUPPORTED_PRODUCT_TYPE) {
+    if (body.event_type !== SUPPORTED_EVENT_TYPE) {
       res.status(400).json({
-        error: 'unsupported_product_type',
-        message: `Expected product_type "${SUPPORTED_PRODUCT_TYPE}", received "${productType}"`,
+        error: 'unsupported_event_type',
+        message: `Unsupported event_type: ${String(body.event_type)}`,
       });
       return;
     }
+
+    const payload = body.payload;
+    if (!isRecord(payload)) {
+      res.status(400).json({ error: 'missing_payload', message: 'Missing or invalid payload' });
+      return;
+    }
+
+    const tournamentId = readRequiredString(payload, 'tournament_id');
+    if (!tournamentId) {
+      res.status(400).json({ error: 'missing_tournament_id', message: 'payload.tournament_id is required' });
+      return;
+    }
+
+    const gameId = readRequiredString(payload, 'game_id');
+    if (!gameId) {
+      res.status(400).json({ error: 'missing_game_id', message: 'payload.game_id is required' });
+      return;
+    }
+
+    const youtubeChannelId = readRequiredString(payload, 'youtube_channel_id');
+    if (!youtubeChannelId) {
+      res.status(400).json({ error: 'missing_youtube_channel_id', message: 'payload.youtube_channel_id is required' });
+      return;
+    }
+
+    const youtubeName = typeof payload.youtube_name === 'string' ? payload.youtube_name : null;
+    const transactionId = typeof payload.transaction_id === 'string' ? payload.transaction_id : null;
 
     // Duplicate protection: the bot sends Idempotency-Key = event_id. Prefer the
     // header when present, but always fall back to the validated body event_id.
@@ -140,35 +126,26 @@ botRoutes.post('/purchase-event', verifyBotWebhook, async (req: Request, res: Re
       return;
     }
 
-    // Canonical audit payload (discord_user_id retained as audit metadata only).
+    // Canonical audit payload, mirroring the deployed bot contract exactly.
     const auditPayload = {
-      event: SUPPORTED_EVENT,
       event_id: eventId,
-      timestamp: body.timestamp ?? null,
-      purchase: {
-        tx_id: purchase.tx_id ?? null,
-        discord_user_id: purchase.discord_user_id ?? null,
+      event_type: SUPPORTED_EVENT_TYPE,
+      payload: {
+        tournament_id: tournamentId,
+        game_id: gameId,
         youtube_channel_id: youtubeChannelId,
-        youtube_name: purchase.youtube_name ?? null,
-        product_id: purchase.product_id ?? null,
-        product_name: purchase.product_name ?? null,
-        product_type: productType,
-        product_metadata: {
-          tournamentId,
-          gameId,
-          ticketType: metadata.ticketType ?? null,
-        },
-        price: purchase.price ?? null,
-        balance_after: purchase.balance_after ?? null,
+        youtube_name: youtubeName,
+        transaction_id: transactionId,
       },
     };
 
     const fail = (statusCode: number, error: string, message: string): void => {
       // Never mark failures as success — keep the event retryable.
-      recordBotWebhookEventError(dedupeKey, WEBHOOK_EVENT_TYPE, auditPayload, error);
+      recordBotWebhookEventError(dedupeKey, SUPPORTED_EVENT_TYPE, auditPayload, error);
       res.status(statusCode).json({ error, message });
     };
 
+    // Tournament validation: exists → game matches → open for registration.
     const tournament = getTournamentById(tournamentId);
     if (!tournament) {
       fail(404, 'tournament_not_found', 'Tournament not found');
@@ -208,7 +185,7 @@ botRoutes.post('/purchase-event', verifyBotWebhook, async (req: Request, res: Re
         // existing row, treat the redelivery as an idempotent success.
         const existingParticipant = getParticipant(tournamentId, player.player_id);
         if (existingParticipant && existingParticipant.ticket_ref === eventId) {
-          recordBotWebhookEventSuccess(dedupeKey, WEBHOOK_EVENT_TYPE, auditPayload);
+          recordBotWebhookEventSuccess(dedupeKey, SUPPORTED_EVENT_TYPE, auditPayload);
           res.json({
             success: true,
             idempotent: true,
@@ -230,7 +207,7 @@ botRoutes.post('/purchase-event', verifyBotWebhook, async (req: Request, res: Re
     }
 
     // Record success only AFTER the participant transaction committed.
-    recordBotWebhookEventSuccess(dedupeKey, WEBHOOK_EVENT_TYPE, auditPayload);
+    recordBotWebhookEventSuccess(dedupeKey, SUPPORTED_EVENT_TYPE, auditPayload);
 
     console.log(
       `[BotWebhook] Registered player ${result.participant?.player_id} for tournament ${tournamentId} via event ${eventId}`

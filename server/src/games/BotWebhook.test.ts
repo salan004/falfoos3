@@ -2,7 +2,14 @@
  * Phase 3D — bot purchase-event webhook integration tests.
  *
  * Exercises the REAL Express route, HMAC middleware, tournament/participant
- * services and SQLite database against the bot's `purchase.completed` contract.
+ * services and SQLite database against the DEPLOYED bot contract:
+ *
+ * {
+ *   "event_id": "evt_<transaction_id>",
+ *   "event_type": "ticket_purchase",
+ *   "payload": { "tournament_id", "game_id", "youtube_channel_id", "youtube_name", "transaction_id" }
+ * }
+ *
  * Run: `ts-node src/games/BotWebhook.test.ts` (wired into `npm run test`).
  */
 
@@ -53,11 +60,11 @@ interface PostResult {
 
 async function postEvent(
   payload: unknown,
-  opts: { idempotencyKey?: string; badSignature?: boolean } = {}
+  opts: { idempotencyKey?: string; badSignature?: boolean; timestamp?: number } = {}
 ): Promise<PostResult> {
   const raw = JSON.stringify(payload);
-  // Match the bot's contract: X-FalFoos-Signature timestamp is Unix seconds.
-  const timestamp = Math.floor(Date.now() / 1000);
+  // Match the deployed bot's contract: X-FalFoos-Signature timestamp is Unix seconds.
+  const timestamp = opts.timestamp ?? Math.floor(Date.now() / 1000);
   const signature = opts.badSignature ? 'deadbeef' : sign(raw, timestamp);
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -82,38 +89,30 @@ async function postEvent(
   return { status: res.status, body };
 }
 
-function purchasePayload(opts: {
-  eventId: string;
+/** Builds the deployed bot contract; tests may mutate/delete fields as needed. */
+function ticketPayload(opts: {
+  eventId?: string;
+  eventType?: string;
   channelId?: string;
   tournamentId?: string;
   gameId?: string;
-  productType?: string;
-  includeMetadata?: boolean;
-}): Record<string, unknown> {
-  const purchase: Record<string, unknown> = {
-    tx_id: `tx-${opts.eventId}`,
-    discord_user_id: 'discord-user-999',
-    youtube_channel_id: opts.channelId ?? CHANNEL,
-    youtube_name: 'Test Channel',
-    product_id: 123,
-    product_name: 'Tournament Ticket',
-    product_type: opts.productType ?? 'tournament_ticket',
-    price: 500,
-    balance_after: 1250,
+  includePayload?: boolean;
+} = {}): Record<string, unknown> {
+  const eventId = opts.eventId ?? 'evt_default';
+  const body: Record<string, unknown> = {
+    event_id: eventId,
+    event_type: opts.eventType ?? 'ticket_purchase',
   };
-  if (opts.includeMetadata !== false) {
-    purchase.product_metadata = {
-      tournamentId: opts.tournamentId ?? TOURNAMENT,
-      gameId: opts.gameId ?? GAME,
-      ticketType: 'standard',
+  if (opts.includePayload !== false) {
+    body.payload = {
+      tournament_id: opts.tournamentId ?? TOURNAMENT,
+      game_id: opts.gameId ?? GAME,
+      youtube_channel_id: opts.channelId ?? CHANNEL,
+      youtube_name: 'Test Channel',
+      transaction_id: `tx-${eventId}`,
     };
   }
-  return {
-    event: 'purchase.completed',
-    event_id: opts.eventId,
-    timestamp: new Date().toISOString(),
-    purchase,
-  };
+  return body;
 }
 
 function seedYouTubePlayer(playerId: string, channelId: string, name = 'YT Player'): void {
@@ -164,10 +163,10 @@ async function main(): Promise<void> {
 
   await startApi();
 
-  await testAsync('Test 1 — valid purchase registers participant and marks event success', async () => {
+  await testAsync('Test 1 — valid ticket_purchase reaches tournament validation and registers', async () => {
     reset();
     openTournament();
-    const res = await postEvent(purchasePayload({ eventId: 'evt_valid_1' }), { idempotencyKey: 'evt_valid_1' });
+    const res = await postEvent(ticketPayload({ eventId: 'evt_valid_1' }), { idempotencyKey: 'evt_valid_1' });
     assertEqual(res.status, 200, 'http status');
     assertEqual(res.body.success, true, 'success flag');
     const participant = getDb()
@@ -179,79 +178,159 @@ async function main(): Promise<void> {
     assertEqual(eventStatus('evt_valid_1'), 'success', 'event marked success');
   });
 
-  await testAsync('Test 2 — unknown YouTube player is rejected and not marked success', async () => {
+  await testAsync('Test 2 — missing event_id returns 400', async () => {
     reset();
     openTournament();
-    const res = await postEvent(
-      purchasePayload({ eventId: 'evt_unknown_1', channelId: UNKNOWN_CHANNEL }),
-      { idempotencyKey: 'evt_unknown_1' }
-    );
-    assertEqual(res.status, 404, 'http status');
-    assertEqual(res.body.error, 'unknown_youtube_player', 'error code');
+    const body = ticketPayload({ eventId: 'evt_missing_id_1' });
+    delete body.event_id;
+    const res = await postEvent(body, { idempotencyKey: 'evt_missing_id_1' });
+    assertEqual(res.status, 400, 'http status');
+    assertEqual(res.body.error, 'invalid_event_id', 'error code');
     assertEqual(participantCount(), 0, 'no participant created');
-    assertTrue(eventStatus('evt_unknown_1') !== 'success', 'event not marked success');
   });
 
-  await testAsync('Test 3 — missing tournament returns 404 and stays retryable', async () => {
+  await testAsync('Test 3 — wrong event_type returns 400 (old contract not accepted)', async () => {
     reset();
-    const res = await postEvent(
-      purchasePayload({ eventId: 'evt_notour_1', tournamentId: 'does-not-exist' }),
-      { idempotencyKey: 'evt_notour_1' }
-    );
+    openTournament();
+    const res = await postEvent(ticketPayload({ eventId: 'evt_wrong_type_1', eventType: 'purchase.completed' }), {
+      idempotencyKey: 'evt_wrong_type_1',
+    });
+    assertEqual(res.status, 400, 'http status');
+    assertEqual(res.body.error, 'unsupported_event_type', 'error code');
+    assertEqual(participantCount(), 0, 'no participant created');
+  });
+
+  await testAsync('Test 4 — missing payload returns 400', async () => {
+    reset();
+    openTournament();
+    const res = await postEvent(ticketPayload({ eventId: 'evt_no_payload_1', includePayload: false }), {
+      idempotencyKey: 'evt_no_payload_1',
+    });
+    assertEqual(res.status, 400, 'http status');
+    assertEqual(res.body.error, 'missing_payload', 'error code');
+    assertEqual(participantCount(), 0, 'no participant created');
+  });
+
+  await testAsync('Test 5 — missing payload.tournament_id returns 400', async () => {
+    reset();
+    openTournament();
+    const body = ticketPayload({ eventId: 'evt_missing_tour_1' });
+    delete (body.payload as Record<string, unknown>).tournament_id;
+    const res = await postEvent(body, { idempotencyKey: 'evt_missing_tour_1' });
+    assertEqual(res.status, 400, 'http status');
+    assertEqual(res.body.error, 'missing_tournament_id', 'error code');
+    assertEqual(participantCount(), 0, 'no participant created');
+  });
+
+  await testAsync('Test 6 — missing payload.game_id returns 400', async () => {
+    reset();
+    openTournament();
+    const body = ticketPayload({ eventId: 'evt_missing_game_1' });
+    delete (body.payload as Record<string, unknown>).game_id;
+    const res = await postEvent(body, { idempotencyKey: 'evt_missing_game_1' });
+    assertEqual(res.status, 400, 'http status');
+    assertEqual(res.body.error, 'missing_game_id', 'error code');
+    assertEqual(participantCount(), 0, 'no participant created');
+  });
+
+  await testAsync('Test 7 — missing payload.youtube_channel_id returns 400', async () => {
+    reset();
+    openTournament();
+    const body = ticketPayload({ eventId: 'evt_missing_channel_1' });
+    delete (body.payload as Record<string, unknown>).youtube_channel_id;
+    const res = await postEvent(body, { idempotencyKey: 'evt_missing_channel_1' });
+    assertEqual(res.status, 400, 'http status');
+    assertEqual(res.body.error, 'missing_youtube_channel_id', 'error code');
+    assertEqual(participantCount(), 0, 'no participant created');
+  });
+
+  await testAsync('Test 8 — unknown tournament returns 404 and is not marked success', async () => {
+    reset();
+    const res = await postEvent(ticketPayload({ eventId: 'evt_notour_1', tournamentId: 'does-not-exist' }), {
+      idempotencyKey: 'evt_notour_1',
+    });
     assertEqual(res.status, 404, 'http status');
     assertEqual(res.body.error, 'tournament_not_found', 'error code');
     assertEqual(participantCount(), 0, 'no participant created');
-    assertEqual(eventStatus('evt_notour_1'), 'error', 'event marked error (retryable)');
+    assertEqual(eventStatus('evt_notour_1'), 'error', 'failed delivery recorded as error (retryable)');
   });
 
-  await testAsync('Test 4 — game mismatch returns 409 and is not marked success', async () => {
+  await testAsync('Test 9 — game mismatch returns 409 and is not marked success', async () => {
     reset();
     openTournament();
-    const res = await postEvent(
-      purchasePayload({ eventId: 'evt_game_1', gameId: OTHER_GAME }),
-      { idempotencyKey: 'evt_game_1' }
-    );
+    const res = await postEvent(ticketPayload({ eventId: 'evt_game_1', gameId: OTHER_GAME }), {
+      idempotencyKey: 'evt_game_1',
+    });
     assertEqual(res.status, 409, 'http status');
     assertEqual(res.body.error, 'game_mismatch', 'error code');
     assertEqual(participantCount(), 0, 'no participant created');
     assertTrue(eventStatus('evt_game_1') !== 'success', 'event not marked success');
   });
 
-  await testAsync('Test 5 — tournament not open returns 409 and is not marked success', async () => {
+  await testAsync('Test 10 — tournament not open returns 409 and is not marked success', async () => {
     reset();
     seedTournament({ id: TOURNAMENT, gameId: GAME, status: 'draft', createdBy: ADMIN });
-    const res = await postEvent(purchasePayload({ eventId: 'evt_closed_1' }), { idempotencyKey: 'evt_closed_1' });
+    const res = await postEvent(ticketPayload({ eventId: 'evt_closed_1' }), { idempotencyKey: 'evt_closed_1' });
     assertEqual(res.status, 409, 'http status');
     assertEqual(res.body.error, 'tournament_not_open', 'error code');
     assertEqual(participantCount(), 0, 'no participant created');
     assertTrue(eventStatus('evt_closed_1') !== 'success', 'event not marked success');
   });
 
-  await testAsync('Test 6 — duplicate event is idempotent (one participant)', async () => {
+  await testAsync('Test 11 — unknown YouTube player returns 404 and is not marked success', async () => {
     reset();
     openTournament();
-    const first = await postEvent(purchasePayload({ eventId: 'evt_dup_1' }), { idempotencyKey: 'evt_dup_1' });
-    const second = await postEvent(purchasePayload({ eventId: 'evt_dup_1' }), { idempotencyKey: 'evt_dup_1' });
+    const res = await postEvent(ticketPayload({ eventId: 'evt_unknown_1', channelId: UNKNOWN_CHANNEL }), {
+      idempotencyKey: 'evt_unknown_1',
+    });
+    assertEqual(res.status, 404, 'http status');
+    assertEqual(res.body.error, 'unknown_youtube_player', 'error code');
+    assertEqual(participantCount(), 0, 'no participant created');
+    assertTrue(eventStatus('evt_unknown_1') !== 'success', 'event not marked success');
+  });
+
+  await testAsync('Test 12 — duplicate event is idempotent (one participant)', async () => {
+    reset();
+    openTournament();
+    const first = await postEvent(ticketPayload({ eventId: 'evt_dup_1' }), { idempotencyKey: 'evt_dup_1' });
+    const second = await postEvent(ticketPayload({ eventId: 'evt_dup_1' }), { idempotencyKey: 'evt_dup_1' });
     assertEqual(first.status, 200, 'first status');
     assertEqual(second.status, 200, 'second status');
     assertEqual(second.body.idempotent, true, 'second is idempotent');
     assertEqual(participantCount(), 1, 'only one participant');
+    assertEqual(eventStatus('evt_dup_1'), 'success', 'event marked success');
   });
 
-  await testAsync('Test 7 — duplicate player with a different event is blocked (one participant)', async () => {
+  await testAsync('Test 13 — duplicate player with a different event is blocked (one participant)', async () => {
     reset();
     openTournament();
-    const first = await postEvent(purchasePayload({ eventId: 'evt_a' }), { idempotencyKey: 'evt_a' });
-    const second = await postEvent(purchasePayload({ eventId: 'evt_b' }), { idempotencyKey: 'evt_b' });
+    const first = await postEvent(ticketPayload({ eventId: 'evt_a' }), { idempotencyKey: 'evt_a' });
+    const second = await postEvent(ticketPayload({ eventId: 'evt_b' }), { idempotencyKey: 'evt_b' });
     assertEqual(first.status, 200, 'first status');
     assertEqual(second.status, 409, 'second status');
     assertEqual(participantCount(), 1, 'still only one participant');
   });
 
-  await testAsync('Test 8 — invalid HMAC returns 401 with no database changes', async () => {
+  await testAsync('Test 14 — failed delivery is never recorded as successful', async () => {
     reset();
     openTournament();
-    const res = await postEvent(purchasePayload({ eventId: 'evt_badsig_1' }), {
+    const gameMismatch = await postEvent(ticketPayload({ eventId: 'evt_fail_game', gameId: OTHER_GAME }), {
+      idempotencyKey: 'evt_fail_game',
+    });
+    const unknownPlayer = await postEvent(ticketPayload({ eventId: 'evt_fail_player', channelId: UNKNOWN_CHANNEL }), {
+      idempotencyKey: 'evt_fail_player',
+    });
+    assertEqual(gameMismatch.status, 409, 'game mismatch status');
+    assertEqual(unknownPlayer.status, 404, 'unknown player status');
+    assertEqual(eventStatus('evt_fail_game'), 'error', 'game mismatch recorded as error');
+    assertEqual(eventStatus('evt_fail_player'), 'error', 'unknown player recorded as error');
+    assertEqual(participantCount(), 0, 'no participant created');
+  });
+
+  await testAsync('Test 15 — invalid HMAC returns 401 with no database changes', async () => {
+    reset();
+    openTournament();
+    const res = await postEvent(ticketPayload({ eventId: 'evt_badsig_1' }), {
       idempotencyKey: 'evt_badsig_1',
       badSignature: true,
     });
@@ -261,16 +340,42 @@ async function main(): Promise<void> {
     assertNull(eventStatus('evt_badsig_1'), 'no event row written');
   });
 
-  await testAsync('Test 9 — malformed payload returns 4xx with no participant/success record', async () => {
+  await testAsync('Test 16 — Unix-seconds timestamp (within window) is accepted', async () => {
     reset();
     openTournament();
-    const res = await postEvent(
-      purchasePayload({ eventId: 'evt_malformed_1', includeMetadata: false }),
-      { idempotencyKey: 'evt_malformed_1' }
-    );
-    assertTrue(res.status >= 400 && res.status < 500, 'is 4xx');
+    const oneMinuteAgoSeconds = Math.floor(Date.now() / 1000) - 60;
+    const res = await postEvent(ticketPayload({ eventId: 'evt_seconds_ok_1' }), {
+      idempotencyKey: 'evt_seconds_ok_1',
+      timestamp: oneMinuteAgoSeconds,
+    });
+    assertEqual(res.status, 200, 'http status');
+    assertEqual(res.body.success, true, 'success flag');
+    assertEqual(participantCount(), 1, 'participant created');
+  });
+
+  await testAsync('Test 17 — Unix-seconds timestamp outside 5-minute window is rejected', async () => {
+    reset();
+    openTournament();
+    const tenMinutesAgoSeconds = Math.floor(Date.now() / 1000) - 600;
+    const res = await postEvent(ticketPayload({ eventId: 'evt_stale_1' }), {
+      idempotencyKey: 'evt_stale_1',
+      timestamp: tenMinutesAgoSeconds,
+    });
+    assertEqual(res.status, 400, 'http status');
+    assertEqual(res.body.error, 'stale_timestamp', 'error code');
     assertEqual(participantCount(), 0, 'no participant created');
-    assertTrue(eventStatus('evt_malformed_1') !== 'success', 'no successful event record');
+  });
+
+  await testAsync('Test 18 — milliseconds timestamp is rejected as stale (contract is seconds)', async () => {
+    reset();
+    openTournament();
+    const res = await postEvent(ticketPayload({ eventId: 'evt_ms_1' }), {
+      idempotencyKey: 'evt_ms_1',
+      timestamp: Date.now(),
+    });
+    assertEqual(res.status, 400, 'http status');
+    assertEqual(res.body.error, 'stale_timestamp', 'error code');
+    assertEqual(participantCount(), 0, 'no participant created');
   });
 
   await new Promise<void>((resolve) => server.close(() => resolve()));
