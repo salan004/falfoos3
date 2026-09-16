@@ -265,7 +265,7 @@ export function TournamentDetailPage({ tournamentId }: TournamentDetailPageProps
 
       {/* ---------- Champion ---------- */}
       {summary.championPlayerId && (
-        <section className="panel tournament-champion-panel reveal">
+        <section className="panel tournament-champion-panel">
           <div className="tournament-champion-crown" aria-hidden="true">🏆</div>
           <div className="tournament-champion-label">البطل</div>
           <PlayerAvatar
@@ -286,7 +286,7 @@ export function TournamentDetailPage({ tournamentId }: TournamentDetailPageProps
       )}
 
       {/* ---------- Stats ---------- */}
-      <div className="reveal panel tournament-stats-panel">
+      <div className="panel tournament-stats-panel">
         <div className="tournament-stats-row">
           <div className="tournament-stat">
             <div className="tournament-stat-value">
@@ -322,7 +322,7 @@ export function TournamentDetailPage({ tournamentId }: TournamentDetailPageProps
 
       {/* ---------- Admin bracket generation ---------- */}
       {canGenerate && (
-        <div className="panel tournament-admin-bar reveal">
+        <div className="panel tournament-admin-bar">
           <span className="text-sm text-[var(--text-dim)]">التسجيل مفتوح — يمكنك توليد جدول البطولة الآن.</span>
           <button
             className="btn-neon"
@@ -337,7 +337,7 @@ export function TournamentDetailPage({ tournamentId }: TournamentDetailPageProps
       {isAdmin && adminError && <div className="panel text-[var(--neon-red)] mb-4">{adminError}</div>}
 
       {/* ---------- Participants ---------- */}
-      <section className="reveal mb-10">
+      <section className="mb-10">
         <h2 className="section-title" style={{ textAlign: 'center', marginBottom: '16px' }}>
           المشاركون ({roster.length.toLocaleString('ar')})
         </h2>
@@ -366,7 +366,7 @@ export function TournamentDetailPage({ tournamentId }: TournamentDetailPageProps
       </section>
 
       {/* ---------- Bracket ---------- */}
-      <section className="reveal mb-10">
+      <section className="mb-10">
         <h2 className="section-title" style={{ textAlign: 'center', marginBottom: '16px' }}>جدول البطولة</h2>
         {bracket ? (
           <BracketView bracket={bracket} players={playerMeta} championPlayerId={summary.championPlayerId} />
@@ -376,7 +376,7 @@ export function TournamentDetailPage({ tournamentId }: TournamentDetailPageProps
       </section>
 
       {/* ---------- Matches ---------- */}
-      <section className="reveal mb-16">
+      <section className="mb-16">
         <h2 className="section-title" style={{ textAlign: 'center', marginBottom: '16px' }}>المباريات</h2>
         {matches.length === 0 ? (
           <div className="panel text-center py-12 text-[var(--text-dim)]">لا توجد مباريات بعد</div>
