@@ -190,7 +190,7 @@ const gameRoute = matchGameRoute(path);
       {path === '/links' && <LinksPage />}
       {path === '/connect' && <ConnectPage game={game} />}
       {gameRoute && <GamePage key={gameRoute.gameId} gameId={gameRoute.gameId} game={game} />}
-      {gameTournamentsRoute && <GameTournamentsPage key={gameTournamentsRoute.gameId} gameId={gameTournamentsRoute.gameId} />}
+      {gameTournamentsRoute && <GameHubPage key={gameTournamentsRoute.gameId} gameId={gameTournamentsRoute.gameId} />}
       {tournamentRoute && <TournamentDetailPage key={tournamentRoute.tournamentId} tournamentId={tournamentRoute.tournamentId} />}
       {profileRoute && (
         <ProfilePage
