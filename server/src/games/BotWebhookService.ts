@@ -1,11 +1,17 @@
 import { getDb } from '../db/db';
-import crypto from 'crypto';
 
 /**
  * Phase 3 — Bot Webhook Events idempotency.
  *
  * Records processed bot events to prevent duplicate processing.
  * The event_id from the bot (evt_<tx_id>) is the canonical deduplication key.
+ *
+ * Safety contract (Phase 3D fix):
+ *   - An event is only ever recorded as `success` AFTER participant registration
+ *     has actually succeeded.
+ *   - Failures are recorded as `error` (retryable) so a later delivery can retry.
+ *   - Recording uses an UPSERT so a previously-failed event can later be marked
+ *     successful once it finally succeeds.
  */
 
 export interface BotWebhookEventRow {
@@ -14,68 +20,72 @@ export interface BotWebhookEventRow {
   payload_json: string;
   processed_at: number;
   status: 'success' | 'error';
-  error_message?: string;
+  error_message?: string | null;
 }
 
-/**
- * Atomically check if event was processed and record it if not.
- * Returns { processed: true, status, error_message } if already processed
- * Returns { processed: false } if this is the first time and it was recorded
- */
-export function tryRecordEvent(
+/** Reads a single recorded bot event, or null when it has never been seen. */
+export function getBotWebhookEvent(eventId: string): BotWebhookEventRow | null {
+  const db = getDb();
+  const row = db
+    .prepare('SELECT * FROM bot_webhook_events WHERE event_id = ?')
+    .get(eventId) as BotWebhookEventRow | undefined;
+  return row ?? null;
+}
+
+/** True when the event has been delivered and the registration succeeded. */
+export function isEventProcessedSuccessfully(eventId: string): boolean {
+  const row = getBotWebhookEvent(eventId);
+  return row?.status === 'success';
+}
+
+function upsertEvent(
   eventId: string,
   eventType: string,
   payload: object,
-  status: 'success' | 'error' = 'success',
-  errorMessage?: string
-): { processed: boolean; existingStatus?: string; existingError?: string } {
-  const db = getDb();
-  const now = Date.now();
-
-  const result = db.transaction(() => {
-    // Try to insert the event - if it already exists, this will fail due to PK constraint
-    const insertResult = db.prepare(`
-      INSERT OR IGNORE INTO bot_webhook_events (event_id, event_type, payload_json, processed_at, status, error_message)
-      VALUES (?, ?, ?, ?, ?, ?)
-    `).run(eventId, eventType, JSON.stringify(payload), now, status, errorMessage ?? null);
-
-    if (insertResult.changes > 0) {
-      // We successfully inserted - this is the first processing
-      return { processed: false };
-    }
-
-    // Event already exists - get its current status
-    const existing = db.prepare('SELECT status, error_message FROM bot_webhook_events WHERE event_id = ?').get(eventId) as
-      | { status: string; error_message: string | null }
-      | undefined;
-
-    return {
-      processed: true,
-      existingStatus: existing?.status,
-      existingError: existing?.error_message ?? undefined,
-    };
-  })();
-
-  return result;
-}
-
-export function recordBotWebhookEvent(eventId: string, eventType: string, payload: object): void {
+  status: 'success' | 'error',
+  errorMessage: string | null
+): void {
   const db = getDb();
   const now = Date.now();
   db.prepare(`
-    INSERT OR IGNORE INTO bot_webhook_events (event_id, event_type, payload_json, processed_at, status)
-    VALUES (?, ?, ?, ?, 'success')
-  `).run(eventId, eventType, JSON.stringify(payload), now);
+    INSERT INTO bot_webhook_events (event_id, event_type, payload_json, processed_at, status, error_message)
+    VALUES (?, ?, ?, ?, ?, ?)
+    ON CONFLICT(event_id) DO UPDATE SET
+      event_type    = excluded.event_type,
+      payload_json  = excluded.payload_json,
+      processed_at  = excluded.processed_at,
+      status        = excluded.status,
+      error_message = excluded.error_message
+  `).run(eventId, eventType, JSON.stringify(payload), now, status, errorMessage);
 }
 
+/**
+ * Marks an event as successfully processed. Must only be called after the
+ * participant registration for this event has committed.
+ */
+export function recordBotWebhookEventSuccess(eventId: string, eventType: string, payload: object): void {
+  upsertEvent(eventId, eventType, payload, 'success', null);
+}
+
+/**
+ * Marks an event as failed. The row stays retryable: a subsequent delivery of
+ * the same event_id is allowed to attempt processing again.
+ */
+export function recordBotWebhookEventError(
+  eventId: string,
+  eventType: string,
+  payload: object,
+  errorMessage: string
+): void {
+  upsertEvent(eventId, eventType, payload, 'error', errorMessage);
+}
+
+/** Backwards-compatible helper: true once an event row exists (any status). */
 export function isEventProcessed(eventId: string): boolean {
-  const db = getDb();
-  const row = db.prepare('SELECT event_id FROM bot_webhook_events WHERE event_id = ?').get(eventId);
-  return !!row;
+  return getBotWebhookEvent(eventId) !== null;
 }
 
-export function getBotWebhookEvent(eventId: string): BotWebhookEventRow | null {
-  const db = getDb();
-  const row = db.prepare('SELECT * FROM bot_webhook_events WHERE event_id = ?').get(eventId) as BotWebhookEventRow | undefined;
-  return row ?? null;
+/** @deprecated Retained for compatibility; prefer the explicit success/error writers. */
+export function recordBotWebhookEvent(eventId: string, eventType: string, payload: object): void {
+  recordBotWebhookEventSuccess(eventId, eventType, payload);
 }

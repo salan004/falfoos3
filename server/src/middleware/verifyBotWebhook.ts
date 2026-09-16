@@ -47,7 +47,10 @@ export function verifyHmacSignature(rawBody: Buffer | string, timestamp: number,
 
 export function isTimestampFresh(timestamp: number, maxAgeMs = 300000): boolean {
   const now = Date.now();
-  return Math.abs(now - timestamp) <= maxAgeMs;
+  // The bot sends the timestamp in Unix seconds; convert to milliseconds before
+  // comparing against Date.now(). The HMAC itself is computed over the exact
+  // value sent by the bot, so this only affects the replay window.
+  return Math.abs(now - timestamp * 1000) <= maxAgeMs;
 }
 
 /**
