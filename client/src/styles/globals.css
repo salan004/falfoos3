@@ -5530,5 +5530,75 @@ body::before {
 /* Tables — dark surface, clear hierarchy, restrained hover. */
 .competitive-table tbody tr:hover { background: rgba(124, 58, 237, 0.06); }
 
+/* ---------- Tournament detail — vertical section flow (UI only) ---------- */
+.tournament-detail-page .tournament-section {
+  margin-top: 44px;
+  padding-top: 34px;
+  border-top: 1px solid color-mix(in srgb, var(--border-color) 70%, transparent);
+}
+.tournament-detail-page .tournament-section-title {
+  text-align: center;
+  font-size: 1.35rem;
+  margin-bottom: 20px;
+}
+.tournament-detail-page .tournament-section-title::after {
+  content: '';
+  display: block;
+  width: 56px;
+  height: 3px;
+  margin: 10px auto 0;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--neon-cyan), var(--neon-purple));
+  opacity: 0.7;
+}
+
+.tournament-podium {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+  align-items: stretch;
+}
+@media (min-width: 640px) {
+  .tournament-podium {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    align-items: end;
+  }
+}
+.tournament-podium-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  text-align: center;
+  padding: 22px 16px;
+  min-height: 196px;
+}
+.tournament-podium-card.is-first {
+  border-color: rgba(255, 215, 0, 0.5);
+  background: radial-gradient(circle at 50% 0%, rgba(255, 215, 0, 0.12), rgba(21, 24, 29, 0.9) 72%);
+  box-shadow: 0 0 26px rgba(255, 215, 0, 0.12);
+}
+@media (min-width: 640px) {
+  .tournament-podium-card.is-first { transform: translateY(-10px); }
+}
+.tournament-podium-medal { font-size: 1.6rem; line-height: 1; }
+.tournament-podium-card.is-first .tournament-podium-medal { font-size: 2rem; }
+.tournament-podium-name { font-weight: 800; font-size: 1rem; }
+.tournament-podium-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: center;
+  color: var(--text-dim);
+  font-size: 0.82rem;
+}
+
+@media (max-width: 639px) {
+  .tournament-detail-page .tournament-section {
+    margin-top: 34px;
+    padding-top: 26px;
+  }
+}
+
 
 

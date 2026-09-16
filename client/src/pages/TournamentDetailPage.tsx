@@ -4,6 +4,7 @@ import { useScrollReveal } from '../hooks/useScrollReveal';
 import { useAuthSession } from '../hooks/useAuthSession';
 import { onCompetitiveEvent } from '../utils/socket';
 import { BracketView, type BracketPlayerMeta } from '../components/BracketView';
+import { CompetitiveLeaderboard } from '../components/CompetitiveLeaderboard';
 import { CompetitiveParticipantCard } from '../components/CompetitiveParticipantCard';
 import { PlayerAvatar } from '../components/PlayerAvatar';
 import type {
@@ -83,6 +84,8 @@ export function TournamentDetailPage({ tournamentId }: TournamentDetailPageProps
   const [bracket, setBracket] = useState<BracketDto | null>(null);
   const [matches, setMatches] = useState<MatchDto[]>([]);
   const [profiles, setProfiles] = useState<Map<string, GameLeaderboardEntry>>(new Map());
+  const [leaderboard, setLeaderboard] = useState<GameLeaderboardEntry[]>([]);
+  const [leaderboardError, setLeaderboardError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [adminError, setAdminError] = useState<string | null>(null);
@@ -115,6 +118,8 @@ export function TournamentDetailPage({ tournamentId }: TournamentDetailPageProps
       map.set(entry.playerId, entry);
     }
     setProfiles(map);
+    setLeaderboard(leaderboardRes.data?.leaderboard.players ?? []);
+    setLeaderboardError(leaderboardRes.ok ? null : leaderboardRes.error || 'فشل تحميل المتصدرين');
     setLoading(false);
   }, [tournamentId]);
 
@@ -336,10 +341,48 @@ export function TournamentDetailPage({ tournamentId }: TournamentDetailPageProps
 
       {isAdmin && adminError && <div className="panel text-[var(--neon-red)] mb-4">{adminError}</div>}
 
-      {/* ---------- Participants ---------- */}
-      <section className="mb-10">
-        <h2 className="section-title" style={{ textAlign: 'center', marginBottom: '16px' }}>
-          المشاركون ({roster.length.toLocaleString('ar')})
+      {/* ---------- 🏆 المتصدرون ---------- */}
+      <section className="tournament-section" aria-label="المتصدرون">
+        <h2 className="section-title tournament-section-title">🏆 المتصدرون</h2>
+        {leaderboard.length === 0 ? (
+          <div className="panel text-center py-12 text-[var(--text-dim)]">
+            لا يوجد لاعبون مصنفون لهذه اللعبة حاليًا
+          </div>
+        ) : (
+          <div className="tournament-podium">
+            {leaderboard.slice(0, 3).map((p, i) => (
+              <article key={p.playerId} className={`card tournament-podium-card ${i === 0 ? 'is-first' : ''}`}>
+                <div className="tournament-podium-medal" aria-hidden="true">
+                  {['🥇', '🥈', '🥉'][i] ?? `#${(i + 1).toLocaleString('ar')}`}
+                </div>
+                <PlayerAvatar
+                  id={p.playerId}
+                  name={p.displayName ?? 'لاعب'}
+                  avatarUrl={p.avatarUrl ?? undefined}
+                  size={i === 0 ? 72 : 56}
+                />
+                <div className="tournament-podium-name">{p.displayName ?? 'لاعب'}</div>
+                <span className="badge badge-cyan">{p.rank.rankName}</span>
+                <div className="tournament-podium-stats">
+                  <span>{p.lp.toLocaleString('ar')} LP</span>
+                  <span>{p.elo.toLocaleString('ar')} Elo</span>
+                </div>
+              </article>
+            ))}
+          </div>
+        )}
+      </section>
+
+      {/* ---------- 📊 التصنيف ---------- */}
+      <section className="tournament-section" aria-label="التصنيف">
+        <h2 className="section-title tournament-section-title">📊 التصنيف</h2>
+        <CompetitiveLeaderboard players={leaderboard} error={leaderboardError} />
+      </section>
+
+      {/* ---------- 👥 اللاعبون ---------- */}
+      <section className="tournament-section" aria-label="اللاعبون">
+        <h2 className="section-title tournament-section-title">
+          👥 اللاعبون ({roster.length.toLocaleString('ar')})
         </h2>
         {roster.length === 0 ? (
           <div className="panel text-center py-12 text-[var(--text-dim)]">
@@ -365,9 +408,9 @@ export function TournamentDetailPage({ tournamentId }: TournamentDetailPageProps
         )}
       </section>
 
-      {/* ---------- Bracket ---------- */}
-      <section className="mb-10">
-        <h2 className="section-title" style={{ textAlign: 'center', marginBottom: '16px' }}>جدول البطولة</h2>
+      {/* ---------- 🏆 جدول البطولة ---------- */}
+      <section className="tournament-section" aria-label="جدول البطولة">
+        <h2 className="section-title tournament-section-title">🏆 جدول البطولة</h2>
         {bracket ? (
           <BracketView bracket={bracket} players={playerMeta} championPlayerId={summary.championPlayerId} />
         ) : (
@@ -375,9 +418,9 @@ export function TournamentDetailPage({ tournamentId }: TournamentDetailPageProps
         )}
       </section>
 
-      {/* ---------- Matches ---------- */}
-      <section className="mb-16">
-        <h2 className="section-title" style={{ textAlign: 'center', marginBottom: '16px' }}>المباريات</h2>
+      {/* ---------- ⚔️ المباريات ---------- */}
+      <section className="tournament-section" aria-label="المباريات">
+        <h2 className="section-title tournament-section-title">⚔️ المباريات</h2>
         {matches.length === 0 ? (
           <div className="panel text-center py-12 text-[var(--text-dim)]">لا توجد مباريات بعد</div>
         ) : (
