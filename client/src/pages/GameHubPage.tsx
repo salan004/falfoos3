@@ -146,7 +146,7 @@ export function GameHubPage({ gameId }: GameHubPageProps) {
       </div>
 
       {activeTab === 'tournaments' && (
-        <section className="reveal" aria-label="بطولات اللعبة">
+        <section aria-label="بطولات اللعبة">
           <div className="game-hub-section-head">
             <h2 className="section-title">🏆 البطولات</h2>
             {isAdmin && (
@@ -180,21 +180,21 @@ export function GameHubPage({ gameId }: GameHubPageProps) {
       )}
 
       {activeTab === 'leaderboard' && (
-        <section className="reveal" aria-label="متصدرو اللعبة">
+        <section aria-label="متصدرو اللعبة">
           <h2 className="section-title" style={{ marginBottom: 16 }}>🥇 المتصدرين</h2>
           <CompetitiveLeaderboard players={players} loading={competitiveLoading} error={competitiveError} />
         </section>
       )}
 
       {activeTab === 'rankings' && (
-        <section className="reveal" aria-label="تصنيف اللعبة">
+        <section aria-label="تصنيف اللعبة">
           <h2 className="section-title" style={{ marginBottom: 16 }}>📊 التصنيف</h2>
           <CompetitiveRankings players={players} loading={competitiveLoading} error={competitiveError} />
         </section>
       )}
 
       {activeTab === 'players' && (
-        <section className="reveal" aria-label="لاعبو اللعبة">
+        <section aria-label="لاعبو اللعبة">
           <h2 className="section-title" style={{ marginBottom: 16 }}>👥 اللاعبين</h2>
           <CompetitivePlayers players={players} loading={competitiveLoading} error={competitiveError} />
         </section>
