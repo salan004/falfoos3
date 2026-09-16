@@ -216,6 +216,101 @@ export function findPlayerByYouTubeChannelId(youtubeChannelId: string): { player
   return row ?? null;
 }
 
+/**
+ * Phase 3E — resolve a tournament player by YouTube channel id, creating an
+ * unclaimed Guest when the channel is not yet known.
+ *
+ * Safety:
+ * - `guests.youtube_channel_id` is guarded by the existing UNIQUE partial index
+ *   (`idx_guests_yt_channel`), so concurrent deliveries for the same channel
+ *   cannot create two rows: the losing INSERT OR IGNORE is a no-op and it
+ *   re-reads the winner's player_id.
+ * - `claimed_user_id` is always NULL — the webhook proves a channel made a
+ *   purchase, NOT ownership of a website account. The normal live-chat claiming
+ *   flow can claim this exact Guest later via youtube_channel_id.
+ */
+export function findOrCreatePlayerByYouTubeChannelId(
+  youtubeChannelId: string,
+  displayName: string
+): { player_id: string; created: boolean } {
+  const db = getDb();
+  return db.transaction((): { player_id: string; created: boolean } => {
+    const existing = findPlayerByYouTubeChannelId(youtubeChannelId);
+    if (existing) return { player_id: existing.player_id, created: false };
+
+    const playerId = crypto.randomUUID();
+    const now = Date.now();
+    const inserted = db.prepare(`
+      INSERT OR IGNORE INTO guests
+        (player_id, display_name, avatar_url, first_seen, last_seen, claimed_user_id, youtube_channel_id)
+      VALUES (?, ?, NULL, ?, ?, NULL, ?)
+    `).run(playerId, displayName, now, now, youtubeChannelId);
+
+    if (inserted.changes > 0) return { player_id: playerId, created: true };
+
+    // Lost a concurrent race for this channel — reuse the winning row.
+    const raced = findPlayerByYouTubeChannelId(youtubeChannelId);
+    if (raced) return { player_id: raced.player_id, created: false };
+    throw new Error('Failed to resolve or create guest for YouTube channel');
+  })();
+}
+
+/** Internal marker so registration failures trigger an outer rollback. */
+class ParticipantRegistrationError extends Error {}
+
+export interface TicketPurchaseRegistrationResult {
+  success: boolean;
+  idempotent?: boolean;
+  error?: string;
+  participant?: ParticipantRow;
+}
+
+/**
+ * Phase 3E — atomic ticket-purchase registration.
+ *
+ * Resolves/creates the Guest and registers the participant in ONE transaction.
+ * It reuses `registerParticipantTransactional` unchanged; when that fails for a
+ * non-idempotent reason (full / not open) the whole transaction rolls back, so
+ * a Guest created moments earlier is not left behind as an orphan.
+ *
+ * A redelivery whose participant row carries this exact `ticket_ref` is
+ * reported as an idempotent success, matching the previous webhook behavior.
+ */
+export function registerTicketPurchaseParticipant(
+  tournamentId: string,
+  youtubeChannelId: string,
+  displayName: string,
+  eventId: string
+): TicketPurchaseRegistrationResult {
+  const db = getDb();
+  try {
+    return db.transaction((): TicketPurchaseRegistrationResult => {
+      const { player_id } = findOrCreatePlayerByYouTubeChannelId(youtubeChannelId, displayName);
+      const result = registerParticipantTransactional(tournamentId, player_id, 'purchase', eventId);
+
+      if (result.success) {
+        return { success: true, participant: result.participant };
+      }
+
+      const errorMsg = result.error || 'registration_failed';
+
+      if (errorMsg.includes('already registered')) {
+        const existing = getParticipant(tournamentId, player_id);
+        if (existing && existing.ticket_ref === eventId) {
+          return { success: true, idempotent: true, participant: existing };
+        }
+      }
+
+      throw new ParticipantRegistrationError(errorMsg);
+    })();
+  } catch (err) {
+    if (err instanceof ParticipantRegistrationError) {
+      return { success: false, error: err.message };
+    }
+    throw err;
+  }
+}
+
 export function updateParticipantStatus(tournamentId: string, playerId: string, status: ParticipantRow['status']): boolean {
   const db = getDb();
   const result = db.prepare('UPDATE tournament_participants SET status = ? WHERE tournament_id = ? AND player_id = ?').run(status, tournamentId, playerId);

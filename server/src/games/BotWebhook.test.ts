@@ -1,5 +1,5 @@
 /**
- * Phase 3D — bot purchase-event webhook integration tests.
+ * Phase 3D/3E — bot purchase-event webhook integration tests.
  *
  * Exercises the REAL Express route, HMAC middleware, tournament/participant
  * services and SQLite database against the DEPLOYED bot contract:
@@ -10,6 +10,7 @@
  *   "payload": { "tournament_id", "game_id", "youtube_channel_id", "youtube_name", "transaction_id" }
  * }
  *
+ * Includes Phase 3E auto-Guest creation for channels not yet in `guests`.
  * Run: `ts-node src/games/BotWebhook.test.ts` (wired into `npm run test`).
  */
 
@@ -28,7 +29,6 @@ const GAME = 'bot-game-1';
 const OTHER_GAME = 'bot-game-2';
 const ADMIN = 'bot-admin-1';
 const CHANNEL = 'UC_bot_test_channel_1';
-const UNKNOWN_CHANNEL = 'UC_bot_unknown_channel';
 const PLAYER = 'bot-player-1';
 const TOURNAMENT = 'bot-tournament-1';
 
@@ -94,6 +94,7 @@ function ticketPayload(opts: {
   eventId?: string;
   eventType?: string;
   channelId?: string;
+  youtubeName?: string;
   tournamentId?: string;
   gameId?: string;
   includePayload?: boolean;
@@ -108,7 +109,7 @@ function ticketPayload(opts: {
       tournament_id: opts.tournamentId ?? TOURNAMENT,
       game_id: opts.gameId ?? GAME,
       youtube_channel_id: opts.channelId ?? CHANNEL,
-      youtube_name: 'Test Channel',
+      youtube_name: opts.youtubeName ?? 'Test Channel',
       transaction_id: `tx-${eventId}`,
     };
   }
@@ -125,13 +126,32 @@ function seedYouTubePlayer(playerId: string, channelId: string, name = 'YT Playe
     .run(playerId, name, now, now, channelId);
 }
 
+function seedClaimedYouTubePlayer(
+  playerId: string,
+  channelId: string,
+  claimerUserId: string,
+  name = 'Claimed Player'
+): void {
+  const now = Date.now();
+  getDb()
+    .prepare(
+      `INSERT OR IGNORE INTO guests
+         (player_id, display_name, avatar_url, first_seen, last_seen, claimed_user_id, youtube_channel_id)
+       VALUES (?, ?, NULL, ?, ?, ?, ?)`
+    )
+    .run(playerId, name, now, now, claimerUserId, channelId);
+}
+
+/** Clears all test state and re-seeds the canonical known player. */
 function reset(): void {
   const db = getDb();
   db.transaction(() => {
     db.prepare('DELETE FROM tournament_participants').run();
     db.prepare('DELETE FROM tournaments').run();
     db.prepare('DELETE FROM bot_webhook_events').run();
+    db.prepare('DELETE FROM guests').run();
   })();
+  seedYouTubePlayer(PLAYER, CHANNEL, 'Linked YouTube Player');
 }
 
 function participantCount(): number {
@@ -141,11 +161,38 @@ function participantCount(): number {
   return row.n;
 }
 
+function guestRowByChannel(channelId: string): any {
+  const row = getDb()
+    .prepare('SELECT * FROM guests WHERE youtube_channel_id = ?')
+    .get(channelId);
+  return row ?? null;
+}
+
+function guestCountForChannel(channelId: string): number {
+  const row = getDb()
+    .prepare('SELECT COUNT(*) AS n FROM guests WHERE youtube_channel_id = ?')
+    .get(channelId) as { n: number };
+  return row.n;
+}
+
+function tournamentParticipantCount(tournamentId: string): number {
+  const row = getDb()
+    .prepare('SELECT participant_count FROM tournaments WHERE id = ?')
+    .get(tournamentId) as { participant_count: number } | undefined;
+  return row?.participant_count ?? 0;
+}
+
 function eventStatus(eventId: string): string | null {
   const row = getDb()
     .prepare('SELECT status FROM bot_webhook_events WHERE event_id = ?')
     .get(eventId) as { status: string } | undefined;
   return row?.status ?? null;
+}
+
+function getParticipantRow(tournamentId: string, playerId: string): any {
+  return getDb()
+    .prepare('SELECT * FROM tournament_participants WHERE tournament_id = ? AND player_id = ?')
+    .get(tournamentId, playerId);
 }
 
 function openTournament(): void {
@@ -163,16 +210,15 @@ async function main(): Promise<void> {
 
   await startApi();
 
-  await testAsync('Test 1 — valid ticket_purchase reaches tournament validation and registers', async () => {
+  await testAsync('Test 1 — existing Guest is reused and participant registers', async () => {
     reset();
     openTournament();
     const res = await postEvent(ticketPayload({ eventId: 'evt_valid_1' }), { idempotencyKey: 'evt_valid_1' });
     assertEqual(res.status, 200, 'http status');
     assertEqual(res.body.success, true, 'success flag');
-    const participant = getDb()
-      .prepare('SELECT * FROM tournament_participants WHERE tournament_id = ? AND player_id = ?')
-      .get(TOURNAMENT, PLAYER) as any;
-    assertTrue(!!participant, 'participant row exists');
+    assertEqual(guestCountForChannel(CHANNEL), 1, 'no duplicate Guest');
+    const participant = getParticipantRow(TOURNAMENT, PLAYER);
+    assertTrue(!!participant, 'participant row exists for existing player');
     assertEqual(participant.source, 'purchase', 'source');
     assertEqual(participant.ticket_ref, 'evt_valid_1', 'ticket_ref = event_id');
     assertEqual(eventStatus('evt_valid_1'), 'success', 'event marked success');
@@ -277,31 +323,95 @@ async function main(): Promise<void> {
     assertTrue(eventStatus('evt_closed_1') !== 'success', 'event not marked success');
   });
 
-  await testAsync('Test 11 — unknown YouTube player returns 404 and is not marked success', async () => {
+  await testAsync('Test 11 — new YouTube channel creates an unclaimed Guest and registers', async () => {
     reset();
     openTournament();
-    const res = await postEvent(ticketPayload({ eventId: 'evt_unknown_1', channelId: UNKNOWN_CHANNEL }), {
-      idempotencyKey: 'evt_unknown_1',
-    });
-    assertEqual(res.status, 404, 'http status');
-    assertEqual(res.body.error, 'unknown_youtube_player', 'error code');
-    assertEqual(participantCount(), 0, 'no participant created');
-    assertTrue(eventStatus('evt_unknown_1') !== 'success', 'event not marked success');
+    const newChannel = 'UC_bot_brand_new_channel';
+    const res = await postEvent(
+      ticketPayload({ eventId: 'evt_new_guest_1', channelId: newChannel, youtubeName: 'Brand New Player' }),
+      { idempotencyKey: 'evt_new_guest_1' }
+    );
+    assertEqual(res.status, 200, 'http status');
+    assertEqual(res.body.success, true, 'success flag');
+    const guest = guestRowByChannel(newChannel);
+    assertTrue(!!guest, 'guest row created');
+    assertNull(guest.claimed_user_id, 'claimed_user_id is NULL');
+    assertEqual(guest.youtube_channel_id, newChannel, 'youtube_channel_id stored correctly');
+    assertEqual(guest.display_name, 'Brand New Player', 'display_name = youtube_name');
+    const participant = getParticipantRow(TOURNAMENT, guest.player_id);
+    assertTrue(!!participant, 'participant registered with new player_id');
+    assertEqual(participant.ticket_ref, 'evt_new_guest_1', 'ticket_ref = event_id');
+    assertEqual(participant.source, 'purchase', 'source');
   });
 
-  await testAsync('Test 12 — duplicate event is idempotent (one participant)', async () => {
+  await testAsync('Test 12 — existing claimed Guest is reused and claim is untouched', async () => {
     reset();
     openTournament();
-    const first = await postEvent(ticketPayload({ eventId: 'evt_dup_1' }), { idempotencyKey: 'evt_dup_1' });
-    const second = await postEvent(ticketPayload({ eventId: 'evt_dup_1' }), { idempotencyKey: 'evt_dup_1' });
+    const claimedChannel = 'UC_bot_claimed_channel';
+    seedClaimedYouTubePlayer('bot-claimed-player', claimedChannel, ADMIN, 'Claimed Player');
+    const res = await postEvent(
+      ticketPayload({ eventId: 'evt_claimed_1', channelId: claimedChannel }),
+      { idempotencyKey: 'evt_claimed_1' }
+    );
+    assertEqual(res.status, 200, 'http status');
+    const guest = guestRowByChannel(claimedChannel);
+    assertEqual(guest.player_id, 'bot-claimed-player', 'same Guest reused');
+    assertEqual(guest.claimed_user_id, ADMIN, 'claimed_user_id unchanged');
+    const participant = getParticipantRow(TOURNAMENT, 'bot-claimed-player');
+    assertTrue(!!participant, 'participant registered');
+  });
+
+  await testAsync('Test 13 — duplicate delivery for a new channel: one Guest, one participant', async () => {
+    reset();
+    openTournament();
+    const newChannel = 'UC_bot_dup_new_channel';
+    const first = await postEvent(ticketPayload({ eventId: 'evt_newdup_1', channelId: newChannel }), {
+      idempotencyKey: 'evt_newdup_1',
+    });
+    const second = await postEvent(ticketPayload({ eventId: 'evt_newdup_1', channelId: newChannel }), {
+      idempotencyKey: 'evt_newdup_1',
+    });
     assertEqual(first.status, 200, 'first status');
     assertEqual(second.status, 200, 'second status');
     assertEqual(second.body.idempotent, true, 'second is idempotent');
+    assertEqual(guestCountForChannel(newChannel), 1, 'only one Guest');
     assertEqual(participantCount(), 1, 'only one participant');
-    assertEqual(eventStatus('evt_dup_1'), 'success', 'event marked success');
+    assertEqual(tournamentParticipantCount(TOURNAMENT), 1, 'participant_count incremented once');
   });
 
-  await testAsync('Test 13 — duplicate player with a different event is blocked (one participant)', async () => {
+  await testAsync('Test 14 — different events for the same new channel reuse one Guest', async () => {
+    reset();
+    openTournament();
+    const newChannel = 'UC_bot_same_channel_two_events';
+    const first = await postEvent(ticketPayload({ eventId: 'evt_same_a', channelId: newChannel }), {
+      idempotencyKey: 'evt_same_a',
+    });
+    const second = await postEvent(ticketPayload({ eventId: 'evt_same_b', channelId: newChannel }), {
+      idempotencyKey: 'evt_same_b',
+    });
+    assertEqual(first.status, 200, 'first status');
+    assertEqual(second.status, 409, 'second status (different purchase, same player)');
+    assertEqual(guestCountForChannel(newChannel), 1, 'only one Guest for the channel');
+    assertEqual(participantCount(), 1, 'only one participant');
+  });
+
+  await testAsync('Test 15 — full tournament rolls back the newly created Guest', async () => {
+    reset();
+    seedTournament({ id: TOURNAMENT, gameId: GAME, status: 'open', createdBy: ADMIN, maxParticipants: 1 });
+    getDb().prepare('UPDATE tournaments SET participant_count = 1 WHERE id = ?').run(TOURNAMENT);
+    const newChannel = 'UC_bot_full_channel';
+    const res = await postEvent(ticketPayload({ eventId: 'evt_full_1', channelId: newChannel }), {
+      idempotencyKey: 'evt_full_1',
+    });
+    assertEqual(res.status, 409, 'http status');
+    assertEqual(res.body.error, 'tournament_full', 'error code');
+    assertNull(guestRowByChannel(newChannel), 'newly created Guest rolled back');
+    assertEqual(participantCount(), 0, 'no participant created');
+    assertEqual(tournamentParticipantCount(TOURNAMENT), 1, 'participant_count unchanged');
+    assertEqual(eventStatus('evt_full_1'), 'error', 'event recorded as error');
+  });
+
+  await testAsync('Test 16 — duplicate player with a different event is blocked (one participant)', async () => {
     reset();
     openTournament();
     const first = await postEvent(ticketPayload({ eventId: 'evt_a' }), { idempotencyKey: 'evt_a' });
@@ -311,23 +421,24 @@ async function main(): Promise<void> {
     assertEqual(participantCount(), 1, 'still only one participant');
   });
 
-  await testAsync('Test 14 — failed delivery is never recorded as successful', async () => {
+  await testAsync('Test 17 — failed delivery is never recorded as successful', async () => {
     reset();
     openTournament();
     const gameMismatch = await postEvent(ticketPayload({ eventId: 'evt_fail_game', gameId: OTHER_GAME }), {
       idempotencyKey: 'evt_fail_game',
     });
-    const unknownPlayer = await postEvent(ticketPayload({ eventId: 'evt_fail_player', channelId: UNKNOWN_CHANNEL }), {
-      idempotencyKey: 'evt_fail_player',
-    });
+    const notFound = await postEvent(
+      ticketPayload({ eventId: 'evt_fail_notour', tournamentId: 'does-not-exist' }),
+      { idempotencyKey: 'evt_fail_notour' }
+    );
     assertEqual(gameMismatch.status, 409, 'game mismatch status');
-    assertEqual(unknownPlayer.status, 404, 'unknown player status');
+    assertEqual(notFound.status, 404, 'not found status');
     assertEqual(eventStatus('evt_fail_game'), 'error', 'game mismatch recorded as error');
-    assertEqual(eventStatus('evt_fail_player'), 'error', 'unknown player recorded as error');
+    assertEqual(eventStatus('evt_fail_notour'), 'error', 'not found recorded as error');
     assertEqual(participantCount(), 0, 'no participant created');
   });
 
-  await testAsync('Test 15 — invalid HMAC returns 401 with no database changes', async () => {
+  await testAsync('Test 18 — invalid HMAC returns 401 with no database changes', async () => {
     reset();
     openTournament();
     const res = await postEvent(ticketPayload({ eventId: 'evt_badsig_1' }), {
@@ -340,7 +451,7 @@ async function main(): Promise<void> {
     assertNull(eventStatus('evt_badsig_1'), 'no event row written');
   });
 
-  await testAsync('Test 16 — Unix-seconds timestamp (within window) is accepted', async () => {
+  await testAsync('Test 19 — Unix-seconds timestamp (within window) is accepted', async () => {
     reset();
     openTournament();
     const oneMinuteAgoSeconds = Math.floor(Date.now() / 1000) - 60;
@@ -353,7 +464,7 @@ async function main(): Promise<void> {
     assertEqual(participantCount(), 1, 'participant created');
   });
 
-  await testAsync('Test 17 — Unix-seconds timestamp outside 5-minute window is rejected', async () => {
+  await testAsync('Test 20 — Unix-seconds timestamp outside 5-minute window is rejected', async () => {
     reset();
     openTournament();
     const tenMinutesAgoSeconds = Math.floor(Date.now() / 1000) - 600;
@@ -366,7 +477,7 @@ async function main(): Promise<void> {
     assertEqual(participantCount(), 0, 'no participant created');
   });
 
-  await testAsync('Test 18 — milliseconds timestamp is rejected as stale (contract is seconds)', async () => {
+  await testAsync('Test 21 — milliseconds timestamp is rejected as stale (contract is seconds)', async () => {
     reset();
     openTournament();
     const res = await postEvent(ticketPayload({ eventId: 'evt_ms_1' }), {

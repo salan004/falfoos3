@@ -5,11 +5,7 @@ import {
   recordBotWebhookEventSuccess,
   recordBotWebhookEventError,
 } from '../games/BotWebhookService';
-import {
-  findPlayerByYouTubeChannelId,
-  getParticipant,
-  registerParticipantTransactional,
-} from '../games/ParticipantService';
+import { registerTicketPurchaseParticipant } from '../games/ParticipantService';
 import { getTournamentById } from '../games/TournamentService';
 
 /**
@@ -162,41 +158,22 @@ botRoutes.post('/purchase-event', verifyBotWebhook, async (req: Request, res: Re
       return;
     }
 
-    const player = findPlayerByYouTubeChannelId(youtubeChannelId);
-    if (!player) {
-      console.warn(`[BotWebhook] Unknown YouTube channel ID: ${youtubeChannelId} for event ${eventId}`);
-      fail(404, 'unknown_youtube_player', 'YouTube channel not linked to any player');
-      return;
-    }
+    // Resolve the YouTube channel to a canonical player_id. A channel that has
+    // never been seen before now gets an unclaimed Guest created for it, so a
+    // valid ticket purchase is no longer rejected as `unknown_youtube_player`.
+    const displayName = youtubeName && youtubeName.trim().length > 0 ? youtubeName.trim() : youtubeChannelId;
 
-    const result = registerParticipantTransactional(
+    const registration = registerTicketPurchaseParticipant(
       tournamentId,
-      player.player_id,
-      'purchase',
+      youtubeChannelId,
+      displayName,
       eventId
     );
 
-    if (!result.success) {
-      const errorMsg = result.error || 'registration_failed';
+    if (!registration.success) {
+      const errorMsg = registration.error || 'registration_failed';
 
       if (errorMsg.includes('already registered')) {
-        // The same event may have committed the registration before a crash
-        // prevented the success record. If this exact event produced the
-        // existing row, treat the redelivery as an idempotent success.
-        const existingParticipant = getParticipant(tournamentId, player.player_id);
-        if (existingParticipant && existingParticipant.ticket_ref === eventId) {
-          recordBotWebhookEventSuccess(dedupeKey, SUPPORTED_EVENT_TYPE, auditPayload);
-          res.json({
-            success: true,
-            idempotent: true,
-            participant: {
-              player_id: existingParticipant.player_id,
-              tournament_id: existingParticipant.tournament_id,
-              registered_at: existingParticipant.registered_at,
-            },
-          });
-          return;
-        }
         fail(409, 'already_registered', errorMsg);
         return;
       }
@@ -209,17 +186,21 @@ botRoutes.post('/purchase-event', verifyBotWebhook, async (req: Request, res: Re
     // Record success only AFTER the participant transaction committed.
     recordBotWebhookEventSuccess(dedupeKey, SUPPORTED_EVENT_TYPE, auditPayload);
 
+    const participant = registration.participant;
     console.log(
-      `[BotWebhook] Registered player ${result.participant?.player_id} for tournament ${tournamentId} via event ${eventId}`
+      `[BotWebhook] Registered player ${participant?.player_id} for tournament ${tournamentId} via event ${eventId}`
     );
 
     res.json({
       success: true,
-      participant: {
-        player_id: result.participant?.player_id,
-        tournament_id: result.participant?.tournament_id,
-        registered_at: result.participant?.registered_at,
-      },
+      ...(registration.idempotent ? { idempotent: true } : {}),
+      participant: participant
+        ? {
+            player_id: participant.player_id,
+            tournament_id: participant.tournament_id,
+            registered_at: participant.registered_at,
+          }
+        : undefined,
     });
   } catch (err) {
     console.error('[BotWebhook] Unexpected error:', err);
