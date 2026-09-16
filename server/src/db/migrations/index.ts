@@ -8,6 +8,18 @@ export { migration0007TriviaBatches } from './0007_trivia_batches';
 export { migration0008TriviaQuestionsBatch } from './0008_trivia_questions_batch';
 export { migration0009TriviaCategories } from './0009_trivia_categories';
 export { migration0010TriviaQuestionsCategoryId } from './0010_trivia_questions_category_id';
+export { migration0011Games } from './0011_games';
+export { migration0012Tournaments } from './0012_tournaments';
+export { migration0013TournamentParticipants } from './0013_tournament_participants';
+export { migration0014BotWebhookEvents } from './0014_bot_webhook_events';
+export { migration0015TournamentsParticipantCount } from './0015_tournaments_participant_count';
+export { migration0016BotWebhookEventsStatus } from './0016_bot_webhook_events_status';
+export { migration0017CompetitiveProfiles } from './0017_competitive_profiles';
+export { migration0018LpTransactions } from './0018_lp_transactions';
+export { migration0019EloTransactions } from './0019_elo_transactions';
+export { migration0020TournamentMatches } from './0020_tournament_matches';
+export { migration0021TournamentMatchParticipants } from './0021_tournament_match_participants';
+export { migration0022MatchResultCorrections } from './0022_match_result_corrections';
 
 import { migration0001Init } from './0001_init';
 import { migration0002GuestChannel } from './0002_guest_channel';
@@ -19,6 +31,18 @@ import { migration0007TriviaBatches } from './0007_trivia_batches';
 import { migration0008TriviaQuestionsBatch } from './0008_trivia_questions_batch';
 import { migration0009TriviaCategories } from './0009_trivia_categories';
 import { migration0010TriviaQuestionsCategoryId } from './0010_trivia_questions_category_id';
+import { migration0011Games } from './0011_games';
+import { migration0012Tournaments } from './0012_tournaments';
+import { migration0013TournamentParticipants } from './0013_tournament_participants';
+import { migration0014BotWebhookEvents } from './0014_bot_webhook_events';
+import { migration0015TournamentsParticipantCount } from './0015_tournaments_participant_count';
+import { migration0016BotWebhookEventsStatus } from './0016_bot_webhook_events_status';
+import { migration0017CompetitiveProfiles } from './0017_competitive_profiles';
+import { migration0018LpTransactions } from './0018_lp_transactions';
+import { migration0019EloTransactions } from './0019_elo_transactions';
+import { migration0020TournamentMatches } from './0020_tournament_matches';
+import { migration0021TournamentMatchParticipants } from './0021_tournament_match_participants';
+import { migration0022MatchResultCorrections } from './0022_match_result_corrections';
 
 /**
  * Ordered migration registry. New migrations are appended here in order —
@@ -35,4 +59,16 @@ export const migrations: { id: string; sql: string }[] = [
   migration0008TriviaQuestionsBatch,
   migration0009TriviaCategories,
   migration0010TriviaQuestionsCategoryId,
+  migration0011Games,
+  migration0012Tournaments,
+  migration0013TournamentParticipants,
+  migration0014BotWebhookEvents,
+  migration0015TournamentsParticipantCount,
+  migration0016BotWebhookEventsStatus,
+  migration0017CompetitiveProfiles,
+  migration0018LpTransactions,
+  migration0019EloTransactions,
+  migration0020TournamentMatches,
+  migration0021TournamentMatchParticipants,
+  migration0022MatchResultCorrections,
 ];

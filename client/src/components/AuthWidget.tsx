@@ -86,7 +86,7 @@ export function AuthWidget() {
     return (
       <a
         className="nav-link auth-signin"
-        href="https://api-falfoos.duckdns.org/api/auth/google"
+        href="/api/auth/google"
         title="تسجيل الدخول عبر Google"
       >
         تسجيل الدخول

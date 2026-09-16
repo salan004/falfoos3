@@ -9,6 +9,7 @@ import { isSoundMuted, setSoundMuted } from '../utils/soundService';
 const PAGE_TITLES: Record<string, string> = {
   '/': 'الرئيسية',
   '/games': 'الألعاب',
+  '/stream-games': 'ساحة الألعاب والبطولات',
   '/leaderboard': 'المتصدرين',
   '/links': 'الروابط',
   '/connect': 'ربط البث',
@@ -32,7 +33,14 @@ export function PageHeader({ youtubeStatus }: PageHeaderProps) {
   const [soundOff, setSoundOff] = useState<boolean>(() => isSoundMuted());
 
   const pageTitle =
-    PAGE_TITLES[path] ?? (path.startsWith('/game/') ? 'غرفة اللعبة' : 'FalFoos');
+    PAGE_TITLES[path] ??
+    (path.startsWith('/game/')
+      ? 'غرفة اللعبة'
+      : path.startsWith('/stream-games/')
+        ? 'مركز اللعبة'
+        : path.startsWith('/tournaments/')
+          ? 'البطولة'
+          : 'FalFoos');
 
   // Phase 12F FINAL — header YouTube controls exist ONLY on /games; the 📡
   // opens the dedicated connection interface at /connect.

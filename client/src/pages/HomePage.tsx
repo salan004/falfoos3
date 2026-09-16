@@ -10,24 +10,29 @@ import { useHubTethers } from '../hooks/useHubTethers';
  *
  *   [ الألعاب ]
  * [ المتصدرين ] LOGO [ الروابط ]
- *   [ تحت التطوير ]  ← full-size circle, intentionally quiet (non-clickable)
+ *   [ العاب البث ]  ← same slot as the former «تحت التطوير» circle
  *
  * Phase 12F v2 — each orb carries an inline SVG tether (BEFORE the ring, so
  * the glass paints over its inner end) connecting it visually to the logo
  * edge. Activation is pure CSS (:hover / :focus-visible on button.hub-orb);
- * the inert soon orb renders a permanent gray dashed tether with no pulse.
+ * the bottom orb keeps the original «تحت التطوير» slot geometry but is now a
+ * live navigation entry to the Stream Games section.
  */
 
 const HUB_POSITIONS = [
-  { to: '/games', icon: '🎮', label: 'الألعاب', pos: 'games' },
-  { to: '/leaderboard', icon: '🏆', label: 'المتصدرين', pos: 'leaderboard' },
-  { to: '/links', icon: '🔗', label: 'الروابط', pos: 'links' },
+  { to: '/games', icon: '🎮', label: 'الألعاب', pos: 'games', locked: true },
+  { to: '/stream-games', icon: '🕹️', label: 'ساحة الألعاب والبطولات', pos: 'stream-games', locked: false },
+  { to: '/leaderboard', icon: '🏆', label: 'المتصدرين', pos: 'leaderboard', locked: true },
+  { to: '/links', icon: '🔗', label: 'الروابط', pos: 'links', locked: false },
 ] as const;
+
+type DevBubble = { x: number; y: number; variant: 'below' | 'above' };
 
 export function HomePage() {
   const { navigate } = useHashRoute();
   useHubTethers();
   const [aboutOpen, setAboutOpen] = useState(false);
+  const [devBubble, setDevBubble] = useState<DevBubble | null>(null);
   const logoBtnRef = useRef<HTMLButtonElement>(null);
   const closeBtnRef = useRef<HTMLButtonElement>(null);
 
@@ -47,9 +52,58 @@ export function HomePage() {
     };
   }, [aboutOpen]);
 
+  // Development bubble lifecycle: auto-dismiss after a short delay, dismiss on
+  // an outside click, and allow Escape. Clicks on a locked orb reposition it.
+  useEffect(() => {
+    if (!devBubble) return;
+    const timer = window.setTimeout(() => setDevBubble(null), 3000);
+    const onDocClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (target?.closest('.hub-orb-locked') || target?.closest('.hub-dev-bubble')) return;
+      setDevBubble(null);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setDevBubble(null);
+    };
+    document.addEventListener('click', onDocClick);
+    window.addEventListener('keydown', onKey);
+    return () => {
+      window.clearTimeout(timer);
+      document.removeEventListener('click', onDocClick);
+      window.removeEventListener('keydown', onKey);
+    };
+  }, [devBubble]);
+
   const closeAbout = () => {
     setAboutOpen(false);
     logoBtnRef.current?.focus();
+  };
+
+  const handleOrbClick = (
+    item: (typeof HUB_POSITIONS)[number],
+    e: React.MouseEvent<HTMLButtonElement>
+  ) => {
+    // Locked sections stay visible but do not navigate — they surface the
+    // development bubble instead.
+    if (item.locked) {
+      const ring = e.currentTarget.querySelector<HTMLElement>('.hub-ring');
+      const rect = (ring ?? e.currentTarget).getBoundingClientRect();
+      // Keep the bubble horizontally on-screen (estimated half-width clamp).
+      const halfWidth = 130;
+      const x = Math.min(
+        Math.max(rect.left + rect.width / 2, halfWidth + 8),
+        window.innerWidth - halfWidth - 8
+      );
+      if (item.pos === 'games') {
+        // Below the top orb (its label sits above, so this stays clear).
+        setDevBubble({ x, y: rect.bottom + 12, variant: 'below' });
+      } else {
+        // Above the left orb (its label sits below, so this stays clear).
+        setDevBubble({ x, y: rect.top - 12, variant: 'above' });
+      }
+      return;
+    }
+    navigate(item.to);
   };
 
   return (
@@ -73,7 +127,12 @@ export function HomePage() {
         </div>
 
         {HUB_POSITIONS.map((item) => (
-          <button key={item.to} className={`hub-orb hub-orb-${item.pos}`} onClick={() => navigate(item.to)}>
+          <button
+            key={item.to}
+            className={`hub-orb hub-orb-${item.pos}${item.locked ? ' hub-orb-locked' : ''}`}
+            onClick={(e) => handleOrbClick(item, e)}
+            aria-disabled={item.locked || undefined}
+          >
             <svg
               className="hub-tether"
               data-to={item.pos}
@@ -94,18 +153,21 @@ export function HomePage() {
             <span className="hub-label">{item.label}</span>
           </button>
         ))}
-
-        {/* Quiet future section — full-size circle, deliberately inert */}
-        <div className="hub-orb hub-orb-soon" aria-disabled="true">
-          <svg className="hub-tether" data-to="soon" aria-hidden="true" focusable="false">
-            <path className="hub-tether-line hub-tether-soon" />
-          </svg>
-          <span className="hub-ring" aria-hidden>
-            🛠️
-          </span>
-          <span className="hub-label">تحت التطوير</span>
-        </div>
       </div>
+
+      {/* Development notification — a premium thought bubble anchored to the
+          clicked locked orb. Never navigates; auto-dismisses. */}
+      {devBubble && (
+        <div
+          className={`hub-dev-bubble hub-dev-bubble--${devBubble.variant}`}
+          style={{ left: devBubble.x, top: devBubble.y }}
+          role="status"
+          aria-live="polite"
+        >
+          <span className="hub-dev-bubble-title">تحت التطوير</span>
+          <span className="hub-dev-bubble-sub">غير متاحة حاليًا</span>
+        </div>
+      )}
 
       {/* About Me overlay — covers the whole interface (z-index 80, beneath
           the z-90 route transition). Backdrop click / ✕ / Escape close. */}

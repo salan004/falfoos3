@@ -23,7 +23,7 @@ import { useEffect } from 'react';
  * resize + fonts.ready. No JS animation loops.
  */
 
-const ORB_KEYS = ['games', 'leaderboard', 'links', 'soon'] as const;
+const ORB_KEYS = ['games', 'leaderboard', 'links', 'stream-games'] as const;
 
 /** Straight radial connectors: slim constant box height (stroke + glow fit;
  *  overflow:visible lets them extend without clipping). */

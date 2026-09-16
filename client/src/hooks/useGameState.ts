@@ -75,7 +75,7 @@ export function useGameState() {
       setActiveGameId(data.gameId);
     });
     socket.emit('get:games');
-    apiFetch('/api/games')
+    apiFetch('/api/live-games')
       .then((r) => r.json())
       .then((data) => {
         if (Array.isArray(data.games)) {
@@ -88,7 +88,7 @@ export function useGameState() {
     // Phase 10B: hydrate the leaderboard on load — the server does not push an
     // initial board on connect, so a fresh viewer would see empty scores until
     // the next scoring event. Uses the existing REST endpoint (same pattern as
-    // /api/games above); live updates keep flowing via leaderboard:update.
+    // /api/live-games above); live updates keep flowing via leaderboard:update.
     apiFetch('/api/leaderboard')
       .then((r) => r.json())
       .then((data) => {

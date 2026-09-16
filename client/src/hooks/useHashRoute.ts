@@ -38,3 +38,26 @@ export function matchProfileRoute(path: string): { playerId?: string } | null {
   const m = path.match(/^\/profile(?:\/([A-Za-z0-9:_-]+))?$/i);
   return m ? { playerId: m[1] } : null;
 }
+
+export function matchTournamentRoute(path: string): { tournamentId: string } | null {
+  const m = path.match(/^\/tournaments\/([a-z0-9-]+)$/i);
+  return m ? { tournamentId: m[1] } : null;
+}
+
+export function matchGameTournamentsRoute(path: string): { gameId: string } | null {
+  const m = path.match(/^\/games\/([a-z_]+)$/i);
+  return m ? { gameId: m[1] } : null;
+}
+
+export function matchAdminGamesRoute(path: string): boolean {
+  return path === '/dashboard/games';
+}
+
+export function matchAdminTournamentsRoute(path: string): boolean {
+  return path === '/dashboard/tournaments';
+}
+
+export function matchStreamGamesRoute(path: string): { gameId: string } | null {
+  const m = path.match(/^\/stream-games\/([a-z_]+)$/i);
+  return m ? { gameId: m[1] } : null;
+}

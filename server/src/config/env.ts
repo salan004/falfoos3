@@ -29,6 +29,9 @@ export const env = {
 
   YOUTUBE_API_KEY: trim(process.env.YOUTUBE_API_KEY),
   YOUTUBE_POLL_MS: trim(process.env.YOUTUBE_POLL_MS),
+
+  /** Phase 3 — HMAC secret for bot purchase-event webhook. */
+  BOT_WEBHOOK_SECRET: trim(process.env.BOT_WEBHOOK_SECRET),
 } as const;
 
 export function isProduction(): boolean {
@@ -78,6 +81,7 @@ export function validateStartupConfig(): void {
     row('YOUTUBE_POLL_MS', !!env.YOUTUBE_POLL_MS),
     row('DB_PATH', !!env.DB_PATH),
     row('PORT', !!env.PORT),
+    row('BOT_WEBHOOK_SECRET', !!env.BOT_WEBHOOK_SECRET),
   ];
   for (const r of rows) {
     console.log(`[Config] ${r.name.padEnd(20)} ${r.status}`);

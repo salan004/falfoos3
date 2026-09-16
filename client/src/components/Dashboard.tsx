@@ -6,12 +6,15 @@ import { Leaderboard } from './Leaderboard';
 import { AdminControls } from './AdminControls';
 import { AdminGate } from './AdminGate';
 import { useGameState } from '../hooks/useGameState';
+import { useHashRoute } from '../hooks/useHashRoute';
 
 interface DashboardProps {
   game: ReturnType<typeof useGameState>;
 }
 
 export function Dashboard({ game }: DashboardProps) {
+  const { navigate } = useHashRoute();
+
   return (
     <div className="dash-shell">
       <header className="panel dash-toolbar">
@@ -22,6 +25,25 @@ export function Dashboard({ game }: DashboardProps) {
           </span>
           <AdminGate />
         </div>
+
+        {/* Stream Games administration — reuses the existing admin pages and
+            APIs; no separate dashboard, auth or authorization. */}
+        <nav className="flex items-center gap-2 flex-wrap" aria-label="إدارة العاب البث">
+          <span className="text-[var(--text-dim)] text-xs font-bold">🎮 العاب البث</span>
+          <button
+            className="btn-neon text-sm"
+            onClick={() => navigate('/dashboard/games')}
+          >
+            الألعاب
+          </button>
+          <button
+            className="btn-neon text-sm"
+            onClick={() => navigate('/dashboard/tournaments')}
+          >
+            البطولات
+          </button>
+        </nav>
+
         <GameSelector
           gameList={game.gameList}
           activeGameId={game.activeGameId}

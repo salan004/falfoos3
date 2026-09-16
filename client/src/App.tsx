@@ -10,13 +10,19 @@ import { PlayersPanel } from './components/game-room/PlayersPanel';
 import { RoomLeaderboard } from './components/game-room/RoomLeaderboard';
 import { HomePage } from './pages/HomePage';
 import { GamesPage } from './pages/GamesPage';
+import { StreamGamesPage } from './pages/StreamGamesPage';
+import { GameHubPage } from './pages/GameHubPage';
+import { GameTournamentsPage } from './pages/GameTournamentsPage';
+import { TournamentDetailPage } from './pages/TournamentDetailPage';
+import { AdminGamesPage } from './pages/AdminGamesPage';
+import { AdminTournamentsPage } from './pages/AdminTournamentsPage';
 import { LeaderboardPage } from './pages/LeaderboardPage';
 import { LinksPage } from './pages/LinksPage';
 import { ProfilePage } from './pages/ProfilePage';
 import { TriviaQuestionsPage } from './pages/TriviaQuestionsPage';
 import { GAMES_CATALOG, PHASE_LABELS_AR, resolveGameName } from './data/gamesCatalog';
 import { useGameState } from './hooks/useGameState';
-import { useHashRoute, matchGameRoute, matchProfileRoute } from './hooks/useHashRoute';
+import { useHashRoute, matchGameRoute, matchProfileRoute, matchTournamentRoute, matchGameTournamentsRoute, matchAdminGamesRoute, matchAdminTournamentsRoute, matchStreamGamesRoute } from './hooks/useHashRoute';
 import { useGameSounds } from './hooks/useGameSounds';
 
 // Phase 12F — the /connect route was consolidated into the Games page
@@ -164,8 +170,13 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const gameRoute = matchGameRoute(path);
+const gameRoute = matchGameRoute(path);
   const profileRoute = matchProfileRoute(path);
+  const tournamentRoute = matchTournamentRoute(path);
+  const gameTournamentsRoute = matchGameTournamentsRoute(path);
+  const streamGamesRoute = matchStreamGamesRoute(path);
+  const adminGamesRoute = matchAdminGamesRoute(path);
+  const adminTournamentsRoute = matchAdminTournamentsRoute(path);
 
   return (
     <div dir="rtl" style={{ position: 'relative', minHeight: '100vh' }}>
@@ -173,10 +184,14 @@ export default function App() {
       <PageTransition />
       {path === '/' && <HomePage />}
       {path === '/games' && <GamesPage game={game} />}
+      {path === '/stream-games' && <StreamGamesPage />}
+      {streamGamesRoute && <GameHubPage key={streamGamesRoute.gameId} gameId={streamGamesRoute.gameId} />}
       {path === '/leaderboard' && <LeaderboardPage game={game} />}
       {path === '/links' && <LinksPage />}
       {path === '/connect' && <ConnectPage game={game} />}
       {gameRoute && <GamePage key={gameRoute.gameId} gameId={gameRoute.gameId} game={game} />}
+      {gameTournamentsRoute && <GameTournamentsPage key={gameTournamentsRoute.gameId} gameId={gameTournamentsRoute.gameId} />}
+      {tournamentRoute && <TournamentDetailPage key={tournamentRoute.tournamentId} tournamentId={tournamentRoute.tournamentId} />}
       {profileRoute && (
         <ProfilePage
           key={profileRoute.playerId ?? 'me'}
@@ -184,10 +199,17 @@ export default function App() {
         />
       )}
       {path === '/dashboard' && <Dashboard game={game} />}
+      {adminGamesRoute && <AdminGamesPage />}
+      {adminTournamentsRoute && <AdminTournamentsPage />}
       {path === '/dashboard/trivia-questions' && <TriviaQuestionsPage />}
-      {!['/', '/games', '/leaderboard', '/links', '/connect', '/dashboard'].includes(path) &&
+      {!['/', '/games', '/stream-games', '/leaderboard', '/links', '/connect', '/dashboard'].includes(path) &&
         !gameRoute &&
-        !profileRoute && (
+        !streamGamesRoute &&
+        !gameTournamentsRoute &&
+        !tournamentRoute &&
+        !profileRoute &&
+        !adminGamesRoute &&
+        !adminTournamentsRoute && (
           <main className="page">
             <h2 className="page-title">الصفحة غير موجودة</h2>
           </main>

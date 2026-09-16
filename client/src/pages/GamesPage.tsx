@@ -1,8 +1,9 @@
-import { useGameState } from '../hooks/useGameState';
 import { useHashRoute } from '../hooks/useHashRoute';
 import { useScrollReveal } from '../hooks/useScrollReveal';
 import { GameCard } from '../components/GameCard';
 import { ConnectionStatusPill } from '../components/ConnectionStatusPill';
+import { useGameState } from '../hooks/useGameState';
+import { GAMES_CATALOG, PHASE_LABELS_AR, resolveGameName, resolveGameDescription } from '../data/gamesCatalog';
 
 /** The game currently in active development gets visual emphasis. */
 const FEATURED_GAME_ID = 'mafia';
@@ -16,13 +17,23 @@ export function GamesPage({ game }: GamesPageProps) {
   const headerRef = useScrollReveal<HTMLDivElement>();
   const gridRef = useScrollReveal<HTMLDivElement>();
 
-  // Sort: featured first, then the rest in registration order.
-  const orderedGames = [
-    ...game.gameList.filter((g) => g.id === FEATURED_GAME_ID),
-    ...game.gameList.filter((g) => g.id !== FEATURED_GAME_ID),
+  // Original games from catalog - these are the classic FalFoos live games
+  const originalGames = [
+    { id: 'trivia', ...GAMES_CATALOG.trivia },
+    { id: 'musical_chairs', ...GAMES_CATALOG.musical_chairs },
+    { id: 'mafia', ...GAMES_CATALOG.mafia },
+    { id: 'guessing', ...GAMES_CATALOG.guessing },
+    { id: 'drawing', ...GAMES_CATALOG.drawing },
+    { id: 'hide_and_seek', ...GAMES_CATALOG.hide_and_seek },
   ];
 
-  // Phase 9B: opening a Game Room is a passive view/join operation — it must
+  // Sort: featured first, then the rest in catalog order
+  const orderedGames = [
+    ...originalGames.filter((g) => g.id === FEATURED_GAME_ID),
+    ...originalGames.filter((g) => g.id !== FEATURED_GAME_ID),
+  ];
+
+  // Opening a Game Room is a passive view/join operation — it must
   // NEVER switch/reset the server-side active game or perform admin actions.
   // Activating/switching games is done by an authorized admin in the Control
   // Panel. Inactive rooms show their own in-room notice.
@@ -33,8 +44,8 @@ export function GamesPage({ game }: GamesPageProps) {
   return (
     <main className="page">
       <div ref={headerRef} className="reveal" style={{ textAlign: 'center', padding: '40px 0 28px' }}>
-        <div className="brand-kicker">اختر تجربتك</div>
-        <h1 className="hero-title" style={{ fontSize: '2rem' }}>الألعاب</h1>
+        <div className="brand-kicker">🎮 الألعاب</div>
+        <h1 className="hero-title" style={{ fontSize: '2rem' }}>الألعاب المباشرة</h1>
         <p className="hero-subtitle">ست تجارب مباشرة — التفاعل كله عبر دردشة يوتيوب</p>
       </div>
 
@@ -78,7 +89,12 @@ export function GamesPage({ game }: GamesPageProps) {
           orderedGames.map((g) => (
             <GameCard
               key={g.id}
-              game={g}
+              game={{
+                id: g.id,
+                name: g.nameAr || g.id,
+                description: g.descAr || '',
+                settingsSchema: undefined,
+              }}
               isActive={game.activeGameId === g.id}
               featured={g.id === FEATURED_GAME_ID}
               gameState={game.gameState}

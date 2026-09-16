@@ -117,3 +117,31 @@ export function sendMafiaVote(targetId: string): void {
   const s = getSocket();
   s.emit('mafia:vote', { targetId });
 }
+
+export interface CompetitiveEventPayload {
+  type: string;
+  at: number;
+  tournamentId?: string;
+  gameId?: string;
+  matchId?: string;
+  playerId?: string;
+  championPlayerId?: string | null;
+}
+
+/**
+ * Phase 4F — subscribes to server-published competitive invalidation events.
+ * The payload never contains LP/Elo/rank: callers should refetch authoritative
+ * state, not mutate local competitive values.
+ */
+export function onCompetitiveEvent(
+  handler: (event: CompetitiveEventPayload) => void
+): () => void {
+  const s = getSocket();
+  const listener = (payload: unknown) => {
+    handler(payload as CompetitiveEventPayload);
+  };
+  s.on('competitive:event', listener);
+  return () => {
+    s.off('competitive:event', listener);
+  };
+}

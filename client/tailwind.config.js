@@ -5,18 +5,27 @@ export default {
     extend: {
       colors: {
         neon: {
-          cyan: '#00f0ff',
+          cyan: '#22d3ee',
           pink: '#ff00aa',
-          purple: '#aa00ff',
+          purple: '#7c3aed',
           green: '#00ff88',
           yellow: '#ffdd00',
           red: '#ff3355',
         },
         dark: {
-          DEFAULT: '#0f1115',
-          panel: '#15181d',
-          card: '#1b1e24',
-          hover: '#23262d',
+          DEFAULT: '#080a12',
+          panel: '#101321',
+          card: '#161a2b',
+          hover: '#1e2338',
+        },
+        arena: {
+          bg: '#080a12',
+          'bg-2': '#101321',
+          purple: '#7c3aed',
+          cyan: '#22d3ee',
+          gold: '#f5c451',
+          text: '#f5f7ff',
+          'text-dim': '#8f96aa',
         },
       },
       fontFamily: {

@@ -17,6 +17,14 @@ import { authRoutes } from './routes/authRoutes';
 import { guestRoutes } from './routes/guestRoutes';
 import { playerRoutes } from './routes/playerRoutes';
 import { adminTriviaRoutes } from './routes/adminTriviaRoutes';
+import { adminGamesRoutes } from './routes/adminGamesRoutes';
+import { adminTournamentsRoutes } from './routes/adminTournamentsRoutes';
+import { gamesRoutes } from './routes/gamesRoutes';
+import { botRoutes } from './routes/botRoutes';
+import { tournamentCompetitiveRoutes } from './routes/tournamentCompetitiveRoutes';
+import { adminTournamentCompetitiveRoutes } from './routes/adminTournamentCompetitiveRoutes';
+import { onCompetitiveEvent } from './competitive/competitiveEvents';
+import { captureRawBody } from './middleware/verifyBotWebhook';
 import { setCurrentChatService } from './auth/claiming';
 import {
   attachSocketIdentity,
@@ -100,7 +108,9 @@ app.use(cors({
   origin: 'https://falfoos.vercel.app',
   credentials: true,
 }));
-app.use(express.json());
+app.use(express.json({
+  verify: captureRawBody,
+}));
 
 // Phase 11C: optional Google authentication. Fully additive — guests never
 // touch these routes, and nothing existing requires a session.
@@ -115,9 +125,35 @@ app.use('/api', playerRoutes);
 // Admin Trivia Question Management (Phase B3.3)
 app.use('/api/admin/trivia', adminTriviaRoutes);
 
+// Phase 4D — competitive tournament reads (bracket, matches, player state).
+app.use('/api', tournamentCompetitiveRoutes);
+
+// Phase 3 — Games & Tournaments (public)
+app.use('/api', gamesRoutes);
+
+// Phase 3 — Admin Games Management
+app.use('/api/admin/games', adminGamesRoutes);
+
+// Phase 3 — Admin Tournaments Management
+app.use('/api/admin/tournaments', adminTournamentsRoutes);
+
+// Phase 4D — Admin bracket / match / result controls (new sub-paths only)
+app.use('/api/admin/tournaments', adminTournamentCompetitiveRoutes);
+
+// Phase 3 — Bot Webhook Endpoint
+app.use('/api/v1/bot', botRoutes);
+
 const server = http.createServer(app);
 const io = new SocketIOServer(server, {
   cors: { origin: 'https://falfoos.vercel.app', credentials: true, methods: ['GET', 'POST'] },
+});
+
+// Phase 4F — rebroadcast competitive domain events over Socket.IO. Services
+// publish only AFTER their transaction commits; clients treat these as
+// invalidation/refetch signals (the server remains authoritative for LP/Elo/
+// rank/advancement). No sensitive admin payload is included.
+onCompetitiveEvent((event) => {
+  io.emit('competitive:event', event);
 });
 
 // ---------------------------------------------------------------------------
@@ -499,7 +535,11 @@ app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', activeGame: gameManager.getActiveGameId() });
 });
 
-app.get('/api/games', (_req, res) => {
+// Live in-memory game registry (trivia, mafia, …). Served at /api/live-games
+// because /api/games is the DB-backed tournament game catalog (public
+// /api/games + /api/games/:gameId). The socket `game:list` / `game:active`
+// events remain the primary live source; this endpoint mirrors them.
+app.get('/api/live-games', (_req, res) => {
   res.json({ games: gameManager.getRegisteredGames(), active: gameManager.getActiveGameId() });
 });
 

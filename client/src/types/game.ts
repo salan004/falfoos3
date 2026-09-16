@@ -7,6 +7,37 @@ export interface GameConfig {
   settingsSchema?: GameSettingsSchema;
 }
 
+/** Phase 3 — Database-backed game metadata for tournament directory */
+export interface GameDirectoryEntry {
+  id: string;
+  slug: string;
+  name_ar: string;
+  description_ar: string | null;
+  image_url: string | null;
+  is_active: number;
+  sort_order: number;
+  created_at: number;
+  updated_at: number;
+}
+
+/** Phase 3 — Admin input types for game management */
+export interface CreateGameInput {
+  slug: string;
+  name_ar: string;
+  description_ar?: string;
+  image_url?: string;
+  is_active?: number;
+  sort_order?: number;
+}
+
+export interface UpdateGameInput {
+  name_ar?: string;
+  description_ar?: string;
+  image_url?: string;
+  is_active?: number;
+  sort_order?: number;
+}
+
 export type GamePhase = 'idle' | 'lobby' | 'playing' | 'paused' | 'finished';
 
 export interface GameEvent {
@@ -176,4 +207,43 @@ export interface YouTubeConnectionStatus {
   attempt?: number;
   maxAttempts?: number;
   health?: YouTubeHealthSnapshot;
+}
+
+/** Phase 3 — Tournament types */
+export type TournamentStatus = 'draft' | 'open' | 'active' | 'completed' | 'cancelled';
+
+export interface TournamentEntry {
+  id: string;
+  game_id: string;
+  name_ar: string;
+  description_ar: string | null;
+  image_url: string | null;
+  status: TournamentStatus;
+  max_participants: number | null;
+  starts_at: number | null;
+  ends_at: number | null;
+  created_by: string;
+  created_at: number;
+  updated_at: number;
+}
+
+export interface TournamentWithGame extends TournamentEntry {
+  game_name_ar: string;
+  game_slug: string;
+  game_image_url: string | null;
+  participant_count: number;
+}
+
+export interface ParticipantEntry {
+  tournament_id: string;
+  player_id: string;
+  source: 'purchase' | 'admin' | 'qualifier';
+  registered_at: number;
+  ticket_ref: string | null;
+  status: 'registered' | 'confirmed' | 'cancelled' | 'disqualified';
+}
+
+export interface ParticipantWithProfile extends ParticipantEntry {
+  youtube_name: string | null;
+  youtube_avatar_url: string | null;
 }

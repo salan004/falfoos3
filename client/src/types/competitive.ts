@@ -1,0 +1,120 @@
+/**
+ * Phase 4E — client mirrors of the Phase 4D competitive API DTOs.
+ *
+ * These interfaces describe data RECEIVED from the backend. The frontend never
+ * computes LP, Elo, rank, advancement, brackets or champions — it only renders
+ * what the authoritative services returned.
+ */
+
+export interface ComputedRank {
+  rankKey: string;
+  rankName: string;
+  rankNameEn: string;
+  tierKey: string;
+  division: number;
+  levelIndex: number;
+  currentThreshold: number;
+  nextThreshold: number | null;
+  lpIntoLevel: number;
+  lpForNext: number | null;
+  progressPct: number;
+}
+
+export interface TournamentSummary {
+  id: string;
+  gameId: string;
+  gameSlug: string;
+  gameNameAr: string;
+  nameAr: string;
+  descriptionAr: string | null;
+  imageUrl: string | null;
+  status: string;
+  maxParticipants: number | null;
+  startsAt: number | null;
+  endsAt: number | null;
+  participantCount: number;
+  bracketGenerated: boolean;
+  totalRounds: number;
+  byes: number;
+  matchCount: number;
+  completedMatchCount: number;
+  remainingMatchCount: number;
+  championPlayerId: string | null;
+}
+
+export interface MatchParticipantDto {
+  playerId: string;
+  slot: number;
+  seed: number | null;
+  advancedByBye: boolean;
+}
+
+export interface MatchDto {
+  id: string;
+  tournamentId: string;
+  gameId: string;
+  roundNo: number;
+  slotNo: number;
+  status: string;
+  bestOf: number | null;
+  winnerPlayerId: string | null;
+  nextMatchId: string | null;
+  nextMatchSlot: number | null;
+  scheduledAt: number | null;
+  startedAt: number | null;
+  completedAt: number | null;
+  ready: boolean;
+  players: MatchParticipantDto[];
+}
+
+export interface BracketRoundDto {
+  roundNo: number;
+  nameEn: string;
+  nameAr: string;
+  matches: MatchDto[];
+}
+
+export interface BracketDto {
+  tournamentId: string;
+  gameId: string;
+  tournamentStatus: string;
+  bracketSize: number;
+  totalRounds: number;
+  byes: number;
+  participantCount: number;
+  rounds: BracketRoundDto[];
+}
+
+export interface CompetitiveRosterEntry {
+  playerId: string;
+  displayName: string | null;
+  avatarUrl: string | null;
+  source: string;
+  status: string;
+  seed: number | null;
+  eliminated: boolean;
+  advanced: boolean;
+  champion: boolean;
+}
+
+export interface GameLeaderboardEntry {
+  position: number;
+  playerId: string;
+  displayName: string | null;
+  avatarUrl: string | null;
+  lp: number;
+  elo: number;
+  matchesPlayed: number;
+  wins: number;
+  losses: number;
+  draws: number;
+  rank: ComputedRank;
+}
+
+export interface GameLeaderboard {
+  gameId: string;
+  gameNameAr: string | null;
+  players: GameLeaderboardEntry[];
+}
+
+export type CompetitiveProfileMap = Map<string, GameLeaderboardEntry>;
