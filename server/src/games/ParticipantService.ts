@@ -162,8 +162,11 @@ export function registerParticipantTransactional(
         return { success: false, error: 'Tournament is not open for registration' };
       }
 
-      // Atomic capacity check and increment using single UPDATE with WHERE clause
+      // Increment the participant count for every successful registration —
+      // including unlimited tournaments (max_participants = NULL), which must
+      // still reflect their real size.
       if (tournament.max_participants !== null) {
+        // Atomic capacity check and increment using single UPDATE with WHERE clause
         const updated = db.prepare(`
           UPDATE tournaments
           SET participant_count = participant_count + 1
@@ -174,14 +177,14 @@ export function registerParticipantTransactional(
           // Capacity exceeded - the WHERE clause prevented the update
           return { success: false, error: 'Tournament is full' };
         }
+      } else {
+        db.prepare('UPDATE tournaments SET participant_count = participant_count + 1 WHERE id = ?').run(tournamentId);
       }
 
       const existing = db.prepare('SELECT * FROM tournament_participants WHERE tournament_id = ? AND player_id = ?').get(tournamentId, playerId);
       if (existing) {
-        // Rollback the participant_count increment if we already incremented
-        if (tournament.max_participants !== null) {
-          db.prepare('UPDATE tournaments SET participant_count = participant_count - 1 WHERE id = ?').run(tournamentId);
-        }
+        // Roll back the participant_count increment performed above.
+        db.prepare('UPDATE tournaments SET participant_count = participant_count - 1 WHERE id = ?').run(tournamentId);
         return { success: false, error: 'Player already registered in this tournament' };
       }
 
@@ -319,10 +322,9 @@ export function updateParticipantStatus(tournamentId: string, playerId: string, 
 
 export function cancelParticipant(tournamentId: string, playerId: string): boolean {
   const db = getDb();
-  const tournament = db.prepare('SELECT max_participants FROM tournaments WHERE id = ?').get(tournamentId) as { max_participants: number | null } | undefined;
   const result = db.prepare('UPDATE tournament_participants SET status = ? WHERE tournament_id = ? AND player_id = ?').run('cancelled', tournamentId, playerId);
-  if (result.changes > 0 && tournament?.max_participants !== null) {
-    // Decrement participant count when cancelling
+  if (result.changes > 0) {
+    // Decrement participant count when cancelling (unlimited tournaments included).
     db.prepare('UPDATE tournaments SET participant_count = participant_count - 1 WHERE id = ? AND participant_count > 0').run(tournamentId);
   }
   return result.changes > 0;
