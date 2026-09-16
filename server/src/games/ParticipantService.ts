@@ -231,10 +231,15 @@ export function findPlayerByYouTubeChannelId(youtubeChannelId: string): { player
  * - `claimed_user_id` is always NULL — the webhook proves a channel made a
  *   purchase, NOT ownership of a website account. The normal live-chat claiming
  *   flow can claim this exact Guest later via youtube_channel_id.
+ *
+ * `avatarUrl` is an OPTIONAL enrichment (a pre-validated http(s) channel
+ * thumbnail). It is only applied to a brand-new row; existing Guests are always
+ * returned untouched.
  */
 export function findOrCreatePlayerByYouTubeChannelId(
   youtubeChannelId: string,
-  displayName: string
+  displayName: string,
+  avatarUrl?: string | null
 ): { player_id: string; created: boolean } {
   const db = getDb();
   return db.transaction((): { player_id: string; created: boolean } => {
@@ -246,8 +251,8 @@ export function findOrCreatePlayerByYouTubeChannelId(
     const inserted = db.prepare(`
       INSERT OR IGNORE INTO guests
         (player_id, display_name, avatar_url, first_seen, last_seen, claimed_user_id, youtube_channel_id)
-      VALUES (?, ?, NULL, ?, ?, NULL, ?)
-    `).run(playerId, displayName, now, now, youtubeChannelId);
+      VALUES (?, ?, ?, ?, ?, NULL, ?)
+    `).run(playerId, displayName, avatarUrl ?? null, now, now, youtubeChannelId);
 
     if (inserted.changes > 0) return { player_id: playerId, created: true };
 
@@ -278,17 +283,21 @@ export interface TicketPurchaseRegistrationResult {
  *
  * A redelivery whose participant row carries this exact `ticket_ref` is
  * reported as an idempotent success, matching the previous webhook behavior.
+ *
+ * `avatarUrl` (optional, pre-validated http(s)) is applied only when a NEW
+ * Guest is created; existing Guests are reused untouched.
  */
 export function registerTicketPurchaseParticipant(
   tournamentId: string,
   youtubeChannelId: string,
   displayName: string,
-  eventId: string
+  eventId: string,
+  avatarUrl?: string | null
 ): TicketPurchaseRegistrationResult {
   const db = getDb();
   try {
     return db.transaction((): TicketPurchaseRegistrationResult => {
-      const { player_id } = findOrCreatePlayerByYouTubeChannelId(youtubeChannelId, displayName);
+      const { player_id } = findOrCreatePlayerByYouTubeChannelId(youtubeChannelId, displayName, avatarUrl);
       const result = registerParticipantTransactional(tournamentId, player_id, 'purchase', eventId);
 
       if (result.success) {

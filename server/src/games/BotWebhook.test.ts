@@ -35,6 +35,32 @@ const TOURNAMENT = 'bot-tournament-1';
 let server: http.Server;
 let baseUrl = '';
 
+/* --- Mocked YouTube Data API (channels) for avatar enrichment tests --- */
+const realFetch = globalThis.fetch.bind(globalThis);
+let youtubeCalls = 0;
+let youtubeMock: { ok: boolean; json?: () => Promise<unknown>; throws?: Error } = {
+  ok: true,
+  json: async () => ({
+    items: [{ snippet: { thumbnails: { high: { url: 'https://yt.example/high.jpg' } } } }],
+  }),
+};
+
+function installYouTubeFetchMock(): void {
+  globalThis.fetch = (async (input: any, init?: any) => {
+    const url = typeof input === 'string' ? input : input?.url ?? '';
+    if (url.includes('googleapis.com/youtube/v3/channels')) {
+      youtubeCalls += 1;
+      if (youtubeMock.throws) throw youtubeMock.throws;
+      return {
+        ok: youtubeMock.ok,
+        status: youtubeMock.ok ? 200 : 500,
+        json: youtubeMock.json ?? (async () => ({})),
+      } as any;
+    }
+    return realFetch(input, init);
+  }) as typeof fetch;
+}
+
 function sign(raw: string, timestamp: number): string {
   return crypto
     .createHmac('sha256', TEST_BOT_WEBHOOK_SECRET)
@@ -209,6 +235,7 @@ async function main(): Promise<void> {
   seedYouTubePlayer(PLAYER, CHANNEL, 'Linked YouTube Player');
 
   await startApi();
+  installYouTubeFetchMock();
 
   await testAsync('Test 1 — existing Guest is reused and participant registers', async () => {
     reset();
@@ -487,6 +514,53 @@ async function main(): Promise<void> {
     assertEqual(res.status, 400, 'http status');
     assertEqual(res.body.error, 'stale_timestamp', 'error code');
     assertEqual(participantCount(), 0, 'no participant created');
+  });
+
+  await testAsync('Test 22 — new Guest stores the YouTube channel thumbnail', async () => {
+    reset();
+    openTournament();
+    const newChannel = 'UC_bot_avatar_ok';
+    youtubeMock = {
+      ok: true,
+      json: async () => ({
+        items: [{ snippet: { thumbnails: { default: { url: 'https://yt.example/d.jpg' }, high: { url: 'https://yt.example/high.jpg' } } } }],
+      }),
+    };
+    const res = await postEvent(ticketPayload({ eventId: 'evt_avatar_ok', channelId: newChannel }), {
+      idempotencyKey: 'evt_avatar_ok',
+    });
+    assertEqual(res.status, 200, 'http status');
+    const guest = guestRowByChannel(newChannel);
+    assertTrue(!!guest, 'guest created');
+    assertEqual(guest.avatar_url, 'https://yt.example/high.jpg', 'avatar_url populated from YouTube');
+    assertTrue(!!getParticipantRow(TOURNAMENT, guest.player_id), 'participant registered');
+  });
+
+  await testAsync('Test 23 — YouTube failure still registers the participant with NULL avatar', async () => {
+    reset();
+    openTournament();
+    const newChannel = 'UC_bot_avatar_fail';
+    youtubeMock = { ok: false };
+    const res = await postEvent(ticketPayload({ eventId: 'evt_avatar_fail', channelId: newChannel }), {
+      idempotencyKey: 'evt_avatar_fail',
+    });
+    assertEqual(res.status, 200, 'http status');
+    assertEqual(res.body.success, true, 'registration succeeded');
+    const guest = guestRowByChannel(newChannel);
+    assertTrue(!!guest, 'guest created');
+    assertNull(guest.avatar_url, 'avatar_url NULL on failure');
+    assertTrue(!!getParticipantRow(TOURNAMENT, guest.player_id), 'participant registered');
+  });
+
+  await testAsync('Test 24 — existing Guest does not trigger a YouTube fetch', async () => {
+    reset();
+    openTournament();
+    const before = youtubeCalls;
+    const res = await postEvent(ticketPayload({ eventId: 'evt_avatar_existing' }), {
+      idempotencyKey: 'evt_avatar_existing',
+    });
+    assertEqual(res.status, 200, 'http status');
+    assertEqual(youtubeCalls, before, 'no YouTube call for an existing Guest');
   });
 
   await new Promise<void>((resolve) => server.close(() => resolve()));

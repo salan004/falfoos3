@@ -5,7 +5,8 @@ import {
   recordBotWebhookEventSuccess,
   recordBotWebhookEventError,
 } from '../games/BotWebhookService';
-import { registerTicketPurchaseParticipant } from '../games/ParticipantService';
+import { findPlayerByYouTubeChannelId, registerTicketPurchaseParticipant } from '../games/ParticipantService';
+import { fetchYouTubeChannelAvatarUrl } from '../games/YouTubeChannelAvatar';
 import { getTournamentById } from '../games/TournamentService';
 
 /**
@@ -163,11 +164,20 @@ botRoutes.post('/purchase-event', verifyBotWebhook, async (req: Request, res: Re
     // valid ticket purchase is no longer rejected as `unknown_youtube_player`.
     const displayName = youtubeName && youtubeName.trim().length > 0 ? youtubeName.trim() : youtubeChannelId;
 
+    // Optional, best-effort avatar enrichment for NEW guests only. The network
+    // call happens OUTSIDE the registration transaction; any failure yields
+    // null and never affects purchase processing or registration.
+    let avatarUrl: string | null = null;
+    if (!findPlayerByYouTubeChannelId(youtubeChannelId)) {
+      avatarUrl = await fetchYouTubeChannelAvatarUrl(youtubeChannelId);
+    }
+
     const registration = registerTicketPurchaseParticipant(
       tournamentId,
       youtubeChannelId,
       displayName,
-      eventId
+      eventId,
+      avatarUrl
     );
 
     if (!registration.success) {

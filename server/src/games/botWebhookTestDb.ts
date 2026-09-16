@@ -10,3 +10,7 @@ import '../competitive/testDb';
 
 export const TEST_BOT_WEBHOOK_SECRET = 'test-bot-webhook-secret';
 process.env.BOT_WEBHOOK_SECRET = TEST_BOT_WEBHOOK_SECRET;
+
+/** Dummy server-side key so the (mocked) YouTube avatar enrichment is exercised. */
+export const TEST_YOUTUBE_API_KEY = 'test-youtube-api-key';
+process.env.YOUTUBE_API_KEY = TEST_YOUTUBE_API_KEY;
