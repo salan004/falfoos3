@@ -24,8 +24,13 @@ import { getEarnedAchievements, evaluateAchievements } from '../achievements/cat
 
 export const playerRoutes = Router();
 
-/** guests.player_id is either a bare UUID or `user:<uuid>` (socketIdentity). */
-const PLAYER_ID_RE = /^(?:user:)?[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+/**
+ * guests.player_id is stored in several legitimate forms: UUID v4, `user:<uuid>`
+ * (socketIdentity), and YouTube channel IDs (`UC...`) that legacy guest rows
+ * were keyed by. Accept the same compatible id space as the competitive routes;
+ * resolution remains exact (and still 404s) via `getProfileIdentity`.
+ */
+const PLAYER_ID_RE = /^[A-Za-z0-9:_-]{1,80}$/;
 
 /**
  * Resolves the CALLER's canonical scoring id exactly like the socket
