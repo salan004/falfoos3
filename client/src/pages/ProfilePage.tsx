@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { usePlayerProfile } from '../hooks/usePlayerProfile';
 import { PlayerAvatar } from '../components/PlayerAvatar';
 import { GAMES_CATALOG } from '../data/gamesCatalog';
@@ -12,6 +13,20 @@ import type { MatchHistoryItem } from '../types/profile';
  * Follows the Phase 12 design language: .page-fade > .content-page, glass
  * panels on hub tokens, cyan accent, full RTL Arabic copy.
  */
+
+/**
+ * Only http(s) avatar URLs may be used as the hero background (mirrors the
+ * PlayerAvatar safety rule). Anything else falls back to the existing theme.
+ */
+function isSafeAvatarUrl(url: string | null | undefined): url is string {
+  if (!url) return false;
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
 
 const GAME_LABELS: Record<string, string> = {
   trivia: 'الأسئلة',
@@ -66,6 +81,9 @@ function HistoryRow({ item }: { item: MatchHistoryItem }) {
 export function ProfilePage({ playerId }: { playerId?: string }) {
   const { profile, status } = usePlayerProfile(playerId);
   const isPublic = !!playerId;
+  // Background-image failure is contained here; App re-keys ProfilePage by
+  // playerId, so a per-player remount resets this (no cross-player leakage).
+  const [heroBgFailed, setHeroBgFailed] = useState(false);
 
   if (status === 'loading') {
     return (
@@ -113,12 +131,26 @@ export function ProfilePage({ playerId }: { playerId?: string }) {
 
   const { player, totals, perGame, recentMatches, historyTotal, level, achievements } = profile;
   const earnedIds = new Set(achievements.map((a) => a.id));
+  // The hero theme always uses the VIEWED player's image (never the viewer's).
+  const heroImage = isSafeAvatarUrl(player.avatarUrl) ? player.avatarUrl : null;
 
   return (
     <main className="page-fade">
       <div className="content-page">
-        {/* ---------- Hero ---------- */}
-        <section className="panel profile-hero">
+        {/* ---------- Hero — player identity theme (the viewed player's own image) ---------- */}
+        <section className={`panel profile-hero${heroImage && !heroBgFailed ? ' has-hero-bg' : ''}`}>
+          {heroImage && !heroBgFailed && (
+            <img
+              className="profile-hero-bg"
+              src={heroImage}
+              alt=""
+              aria-hidden="true"
+              loading="lazy"
+              referrerPolicy="no-referrer"
+              onError={() => setHeroBgFailed(true)}
+            />
+          )}
+          <span className="profile-hero-overlay" aria-hidden="true" />
           <PlayerAvatar
             id={player.playerId}
             name={player.displayName}
@@ -126,6 +158,7 @@ export function ProfilePage({ playerId }: { playerId?: string }) {
             size={88}
           />
           <div className="profile-hero-main">
+            <div className="profile-hero-kicker">بيانات اللاعب</div>
             <h1 className="profile-name">{player.displayName}</h1>
             <div className="profile-level-row">
               <span className="badge badge-cyan profile-level-chip">

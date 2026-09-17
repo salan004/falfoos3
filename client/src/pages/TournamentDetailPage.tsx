@@ -390,11 +390,7 @@ export function TournamentDetailPage({ tournamentId }: TournamentDetailPageProps
                   wins={rec.wins}
                   losses={rec.losses}
                   index={index}
-                  onClick={() =>
-                    navigate(
-                      `/player/${entry.playerId}?tournamentId=${encodeURIComponent(tournamentId)}&gameId=${encodeURIComponent(summary.gameId)}`
-                    )
-                  }
+                  onClick={() => navigate(`/profile/${entry.playerId}`)}
                 />
               );
             })}

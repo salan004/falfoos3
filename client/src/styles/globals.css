@@ -3992,6 +3992,8 @@ button.hub-orb:hover .hub-label {
 /* Hero — Phase 16 premium refresh */
 .profile-hero {
   position: relative;
+  overflow: hidden;
+  isolation: isolate;
   display: flex;
   align-items: center;
   gap: 20px;
@@ -4024,8 +4026,66 @@ button.hub-orb:hover .hub-label {
     transparent 72%);
   filter: blur(8px);
   pointer-events: none;
+  z-index: 2;
 }
-.profile-hero-main { flex: 1; min-width: 0; }
+
+/* Player identity theme — the VIEWED player's image as the hero background.
+   Layering: 0 image · 1 readability overlay · 2 avatar halo · 3 foreground. */
+.profile-hero.has-hero-bg {
+  min-height: 168px;
+  border-color: rgba(0, 240, 255, 0.22);
+}
+.profile-hero-bg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 30%;
+  z-index: 0;
+  pointer-events: none;
+  filter: brightness(0.5) saturate(1.12);
+  transform: scale(1.04);
+}
+.profile-hero-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background:
+    linear-gradient(180deg, rgba(6, 10, 18, 0.34) 0%, rgba(6, 10, 18, 0.72) 58%, rgba(6, 10, 18, 0.9) 100%),
+    radial-gradient(130% 120% at 12% 18%, rgba(0, 240, 255, 0.12), transparent 56%);
+}
+.profile-hero-main {
+  position: relative;
+  z-index: 3;
+  flex: 1;
+  min-width: 0;
+}
+.profile-hero .player-avatar {
+  position: relative;
+  z-index: 3;
+  border-color: rgba(0, 240, 255, 0.45);
+  box-shadow: 0 0 0 3px rgba(6, 10, 18, 0.55), 0 12px 30px rgba(0, 0, 0, 0.55);
+}
+.profile-hero-kicker {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--neon-cyan);
+  margin-bottom: 2px;
+  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.65);
+}
+.has-hero-bg .profile-name {
+  text-shadow: 0 2px 20px rgba(0, 0, 0, 0.72), 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+.has-hero-bg .level-progress-hint,
+.has-hero-bg .profile-level-row {
+  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.6);
+}
+.has-hero-bg .profile-scope-note {
+  color: rgba(255, 255, 255, 0.72);
+}
 .profile-name {
   font-size: 1.6rem;
   font-weight: 800;
@@ -4302,6 +4362,7 @@ button.hub-orb:hover .hub-label {
     text-align: center;
     padding: 20px 16px;
   }
+  .profile-hero-bg { object-position: center 24%; }
   .profile-name { white-space: normal; font-size: 1.35rem; }
   .profile-level-row { justify-content: center; }
   .profile-stats-row { gap: 8px; }

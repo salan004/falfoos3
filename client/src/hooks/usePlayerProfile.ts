@@ -9,11 +9,18 @@ import type { PlayerProfile } from '../types/profile';
  * `profile === null` with status 'ready' means signed-out/no identity yet
  * (server answers 200 {profile:null}) — not an error.
  */
-export function usePlayerProfile(playerId?: string) {
+export function usePlayerProfile(playerId?: string, enabled = true) {
   const [profile, setProfile] = useState<PlayerProfile | null>(null);
   const [status, setStatus] = useState<'loading' | 'ready' | 'missing' | 'error'>('loading');
 
   useEffect(() => {
+    // Gated callers (e.g. the site header) can mount this hook without fetching.
+    if (!enabled) {
+      setProfile(null);
+      setStatus('loading');
+      return;
+    }
+
     let cancelled = false;
     const url = playerId
       ? `/api/players/${encodeURIComponent(playerId)}/profile`
@@ -48,7 +55,7 @@ export function usePlayerProfile(playerId?: string) {
     return () => {
       cancelled = true;
     };
-  }, [playerId]);
+  }, [playerId, enabled]);
 
   return { profile, status };
 }

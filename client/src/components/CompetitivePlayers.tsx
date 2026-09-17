@@ -40,11 +40,11 @@ export function CompetitivePlayers({ players, loading, error, gameId }: Competit
           role="button"
           tabIndex={0}
           style={{ cursor: 'pointer' }}
-          onClick={() => navigate(`/player/${p.playerId}${gameId ? `?gameId=${encodeURIComponent(gameId)}` : ''}`)}
+          onClick={() => navigate(`/profile/${p.playerId}`)}
           onKeyDown={(e) => {
             if (e.key === 'Enter' || e.key === ' ') {
               e.preventDefault();
-              navigate(`/player/${p.playerId}${gameId ? `?gameId=${encodeURIComponent(gameId)}` : ''}`);
+              navigate(`/profile/${p.playerId}`);
             }
           }}
         >

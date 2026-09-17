@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
-import { matchGameTournamentsRoute, matchStreamGamesRoute, useHashRoute } from '../hooks/useHashRoute';
+import { matchGameTournamentsRoute, matchProfileRoute, matchStreamGamesRoute, useHashRoute } from '../hooks/useHashRoute';
 import { useAuthSession } from '../hooks/useAuthSession';
+import { usePlayerProfile } from '../hooks/usePlayerProfile';
 import { apiFetch } from '../utils/api';
 import { BrandLogo } from './BrandLogo';
 import { ConnectionStatusPill } from './ConnectionStatusPill';
@@ -30,6 +31,13 @@ export function PageHeader({ youtubeStatus }: PageHeaderProps) {
   const { path, navigate } = useHashRoute();
   const { user, isLoading } = useAuthSession();
   const isRoleAdmin = user?.role === 'admin';
+  // Profile routes (#/profile/:playerId) must title the header with the VIEWED
+  // player's name — sourced from the same authoritative profile API the page
+  // uses, never from the viewer's session. The hook is gated so non-profile
+  // pages never fetch a profile.
+  const profileRoute = matchProfileRoute(path);
+  const { profile: viewedProfile } = usePlayerProfile(profileRoute?.playerId, profileRoute !== null);
+  const profileTitle = profileRoute ? viewedProfile?.player.displayName ?? 'الملف الشخصي' : null;
   // Phase 12F — persisted sound preference (default ON, low volume).
   const [soundOff, setSoundOff] = useState<boolean>(() => isSoundMuted());
 
@@ -71,7 +79,7 @@ export function PageHeader({ youtubeStatus }: PageHeaderProps) {
         ? 'غرفة اللعبة'
         : path.startsWith('/tournaments/')
           ? 'البطولة'
-          : 'FalFoos');
+          : profileTitle ?? 'FalFoos');
 
   // Phase 12F FINAL — header YouTube controls exist ONLY on /games; the 📡
   // opens the dedicated connection interface at /connect.
