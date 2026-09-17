@@ -26,6 +26,7 @@ import {
   setMatchStatus,
   openDispute,
   resolveDispute,
+  cancelTournament,
 } from '../utils/competitiveApi';
 
 interface TournamentDetailPageProps {
@@ -346,6 +347,26 @@ export function TournamentDetailPage({ tournamentId }: TournamentDetailPageProps
         </div>
       )}
 
+      {isAdmin && (summary.status === 'draft' || summary.status === 'open' || summary.status === 'active') && (
+        <div className="panel tournament-admin-bar">
+          <span className="text-sm text-[var(--text-dim)]">
+            إلغاء البطولة يجمّدها مع الحفاظ على سجلها — لن تُحذف المباريات أو النتائج أو نقاط التصنيف.
+          </span>
+          <button
+            className="btn-neon"
+            style={{ background: 'var(--neon-red)' }}
+            disabled={busy}
+            onClick={() => {
+              if (window.confirm('هل أنت متأكد من إلغاء هذه البطولة؟')) {
+                void runAdminAction(() => cancelTournament(tournamentId));
+              }
+            }}
+          >
+            إلغاء البطولة
+          </button>
+        </div>
+      )}
+
       {isAdmin && adminError && <div className="panel text-[var(--neon-red)] mb-4">{adminError}</div>}
 
       {/* ---------- Participants ---------- */}
@@ -369,7 +390,11 @@ export function TournamentDetailPage({ tournamentId }: TournamentDetailPageProps
                   wins={rec.wins}
                   losses={rec.losses}
                   index={index}
-                  onClick={() => navigate(`/profile/${entry.playerId}`)}
+                  onClick={() =>
+                    navigate(
+                      `/player/${entry.playerId}?tournamentId=${encodeURIComponent(tournamentId)}&gameId=${encodeURIComponent(summary.gameId)}`
+                    )
+                  }
                 />
               );
             })}

@@ -294,7 +294,7 @@ export function GameHubPage({ gameId }: GameHubPageProps) {
       {activeTab === 'players' && (
         <section className="gh-section" aria-label="لاعبو اللعبة">
           <h2 className="section-title" style={{ marginBottom: 16 }}>👥 اللاعبين</h2>
-          <CompetitivePlayers players={players} loading={competitiveLoading} error={competitiveError} />
+          <CompetitivePlayers players={players} loading={competitiveLoading} error={competitiveError} gameId={gameId} />
         </section>
       )}
     </main>

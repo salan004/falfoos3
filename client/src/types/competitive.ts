@@ -125,3 +125,33 @@ export interface GameLeaderboard {
 }
 
 export type CompetitiveProfileMap = Map<string, GameLeaderboardEntry>;
+
+/** Mirror of GET /api/players/:playerId/competitive rows (per game). */
+export interface PlayerCompetitiveProfile {
+  gameId: string;
+  gameNameAr: string | null;
+  lp: number;
+  elo: number;
+  matchesPlayed: number;
+  wins: number;
+  losses: number;
+  draws: number;
+  rank: ComputedRank;
+}
+
+/** Mirror of GET /api/players/:playerId/tournaments and .../players/:playerId. */
+export interface PlayerTournamentState {
+  tournamentId: string;
+  playerId: string;
+  registered: boolean;
+  participantStatus: string | null;
+  seed: number | null;
+  currentMatchId: string | null;
+  eliminated: boolean;
+  advanced: boolean;
+  champion: boolean;
+  completedMatches: number;
+  wins: number;
+  losses: number;
+  draws: number;
+}

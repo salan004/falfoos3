@@ -14,6 +14,7 @@ import { StreamGamesPage } from './pages/StreamGamesPage';
 import { GameHubPage } from './pages/GameHubPage';
 import { GameTournamentsPage } from './pages/GameTournamentsPage';
 import { TournamentDetailPage } from './pages/TournamentDetailPage';
+import { PlayerStatsPage } from './pages/PlayerStatsPage';
 import { AdminGamesPage } from './pages/AdminGamesPage';
 import { AdminTournamentsPage } from './pages/AdminTournamentsPage';
 import { LeaderboardPage } from './pages/LeaderboardPage';
@@ -22,7 +23,7 @@ import { ProfilePage } from './pages/ProfilePage';
 import { TriviaQuestionsPage } from './pages/TriviaQuestionsPage';
 import { GAMES_CATALOG, PHASE_LABELS_AR, resolveGameName } from './data/gamesCatalog';
 import { useGameState } from './hooks/useGameState';
-import { useHashRoute, matchGameRoute, matchProfileRoute, matchTournamentRoute, matchGameTournamentsRoute, matchAdminGamesRoute, matchAdminTournamentsRoute, matchStreamGamesRoute } from './hooks/useHashRoute';
+import { useHashRoute, matchGameRoute, matchProfileRoute, matchTournamentRoute, matchGameTournamentsRoute, matchAdminGamesRoute, matchAdminTournamentsRoute, matchStreamGamesRoute, matchPlayerRoute } from './hooks/useHashRoute';
 import { useGameSounds } from './hooks/useGameSounds';
 
 // Phase 12F — the /connect route was consolidated into the Games page
@@ -172,6 +173,7 @@ export default function App() {
 
 const gameRoute = matchGameRoute(path);
   const profileRoute = matchProfileRoute(path);
+  const playerRoute = matchPlayerRoute(path);
   const tournamentRoute = matchTournamentRoute(path);
   const gameTournamentsRoute = matchGameTournamentsRoute(path);
   const streamGamesRoute = matchStreamGamesRoute(path);
@@ -198,6 +200,14 @@ const gameRoute = matchGameRoute(path);
           playerId={profileRoute.playerId}
         />
       )}
+      {playerRoute && (
+        <PlayerStatsPage
+          key={`${playerRoute.playerId}:${playerRoute.tournamentId ?? ''}:${playerRoute.gameId ?? ''}`}
+          playerId={playerRoute.playerId}
+          tournamentId={playerRoute.tournamentId}
+          gameId={playerRoute.gameId}
+        />
+      )}
       {path === '/dashboard' && <Dashboard game={game} />}
       {adminGamesRoute && <AdminGamesPage />}
       {adminTournamentsRoute && <AdminTournamentsPage />}
@@ -208,6 +218,7 @@ const gameRoute = matchGameRoute(path);
         !gameTournamentsRoute &&
         !tournamentRoute &&
         !profileRoute &&
+        !playerRoute &&
         !adminGamesRoute &&
         !adminTournamentsRoute && (
           <main className="page">

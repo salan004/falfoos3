@@ -10,6 +10,7 @@ import express from 'express';
 import http from 'http';
 import { tournamentCompetitiveRoutes } from '../routes/tournamentCompetitiveRoutes';
 import { gamesRoutes } from '../routes/gamesRoutes';
+import { adminTournamentsRoutes } from '../routes/adminTournamentsRoutes';
 import { adminTournamentCompetitiveRoutes } from '../routes/adminTournamentCompetitiveRoutes';
 
 export interface TestApi {
@@ -25,6 +26,9 @@ export async function startTestApi(): Promise<TestApi> {
   // `/api/tournaments` and friends).
   app.use('/api', tournamentCompetitiveRoutes);
   app.use('/api', gamesRoutes);
+  // Production mount order (index.ts): generic admin router first, then the
+  // competitive admin sub-paths.
+  app.use('/api/admin/tournaments', adminTournamentsRoutes);
   app.use('/api/admin/tournaments', adminTournamentCompetitiveRoutes);
 
   const server = http.createServer(app);

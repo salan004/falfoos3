@@ -4,6 +4,8 @@ import type {
   CompetitiveRosterEntry,
   GameLeaderboard,
   MatchDto,
+  PlayerCompetitiveProfile,
+  PlayerTournamentState,
   TournamentSummary,
 } from '../types/competitive';
 
@@ -65,6 +67,31 @@ export async function fetchTournamentMatches(id: string): Promise<ApiResult<{ ma
 export async function fetchGameLeaderboard(gameId: string, limit?: number): Promise<ApiResult<{ leaderboard: GameLeaderboard }>> {
   const query = limit ? `?limit=${encodeURIComponent(String(limit))}` : '';
   return jsonRequest(`/api/games/${gameId}/competitive${query}`);
+}
+
+/* --------------------------- player competitive --------------------------- */
+
+export async function fetchPlayerCompetitiveProfiles(
+  playerId: string
+): Promise<ApiResult<{ profiles: PlayerCompetitiveProfile[] }>> {
+  return jsonRequest(`/api/players/${encodeURIComponent(playerId)}/competitive`);
+}
+
+export async function fetchPlayerTournaments(
+  playerId: string,
+  tournamentId?: string
+): Promise<ApiResult<{ states: PlayerTournamentState[] }>> {
+  const query = tournamentId ? `?tournamentId=${encodeURIComponent(tournamentId)}` : '';
+  return jsonRequest(`/api/players/${encodeURIComponent(playerId)}/tournaments${query}`);
+}
+
+export async function fetchTournamentPlayerState(
+  tournamentId: string,
+  playerId: string
+): Promise<ApiResult<{ state: PlayerTournamentState }>> {
+  return jsonRequest(
+    `/api/tournaments/${encodeURIComponent(tournamentId)}/players/${encodeURIComponent(playerId)}`
+  );
 }
 
 /* ------------------------------ admin writes ------------------------------ */
@@ -146,6 +173,20 @@ export async function createTournament(
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
+  });
+}
+
+/**
+ * Cancels a tournament. Reuses the existing admin PATCH endpoint and its
+ * lifecycle validation; cancellation is non-destructive (status freeze only).
+ */
+export async function cancelTournament(
+  tournamentId: string
+): Promise<ApiResult<{ tournament: TournamentSummary }>> {
+  return jsonRequest(`/api/admin/tournaments/${encodeURIComponent(tournamentId)}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ status: 'cancelled' }),
   });
 }
 

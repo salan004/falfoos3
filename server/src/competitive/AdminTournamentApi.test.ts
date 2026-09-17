@@ -400,6 +400,90 @@ async function main(): Promise<void> {
       assertTrue(getProfile(players[0], DG)!.lp === 25, 'DG updated');
       assertNull(getProfile(players[0], RL), 'RL untouched');
     });
+
+    /* ------------------------ tournament cancellation -------------------- */
+    const tcount = (table: 'tournament_participants' | 'tournament_matches', tid: string) =>
+      (getDb().prepare(`SELECT COUNT(*) AS n FROM ${table} WHERE tournament_id = ?`).get(tid) as { n: number }).n;
+
+    await testAsync('cancellation: draft/open/active → cancelled via admin PATCH', async () => {
+      for (const status of ['draft', 'open', 'active'] as const) {
+        const id = `adm-cxl-${status}`;
+        seedTournament({ id, gameId: DG, status, createdBy: ADMIN_ID });
+        const res = await admin(`/api/admin/tournaments/${id}`, {
+          method: 'PATCH',
+          body: { status: 'cancelled' },
+        });
+        assertEqual(res.status, 200, `${status} status`);
+        assertEqual(res.body.tournament.status, 'cancelled', `${status} → cancelled`);
+      }
+    });
+
+    await testAsync('cancellation: completed is terminal; re-cancelling is an idempotent no-op', async () => {
+      const done = 'adm-cxl-done';
+      seedTournament({ id: done, gameId: DG, status: 'completed', createdBy: ADMIN_ID });
+      const r1 = await admin(`/api/admin/tournaments/${done}`, { method: 'PATCH', body: { status: 'cancelled' } });
+      assertEqual(r1.status, 400, 'completed → cancelled rejected');
+
+      // Existing updateTournament only validates status *changes*; setting the
+      // same status is a harmless no-op (no destructive effect).
+      const already = 'adm-cxl-already';
+      seedTournament({ id: already, gameId: DG, status: 'cancelled', createdBy: ADMIN_ID });
+      const r2 = await admin(`/api/admin/tournaments/${already}`, { method: 'PATCH', body: { status: 'cancelled' } });
+      assertEqual(r2.status, 200, 're-cancel is a no-op');
+      assertEqual(r2.body.tournament.status, 'cancelled', 'stays cancelled');
+    });
+
+    await testAsync('cancellation: authorization is enforced (401/403)', async () => {
+      const id = 'adm-cxl-auth';
+      seedTournament({ id, gameId: DG, status: 'open', createdBy: ADMIN_ID });
+      const anon = await call(`/api/admin/tournaments/${id}`, { method: 'PATCH', body: { status: 'cancelled' } });
+      assertEqual(anon.status, 401, 'unauthenticated');
+      const normal = await user(`/api/admin/tournaments/${id}`, { method: 'PATCH', body: { status: 'cancelled' } });
+      assertEqual(normal.status, 403, 'non-admin');
+    });
+
+    await testAsync('cancellation is non-destructive and blocks further progression', async () => {
+      const id = 'adm-cxl-run-active';
+      setupTournament(id, 4);
+      await admin(`/api/admin/tournaments/${id}/bracket`, { method: 'POST' });
+      const match = getTournamentMatches(id).find((m) => m.round_no === 1)!;
+      assertTrue(!!match, 'round-1 match exists');
+      const combatants = getMatchParticipants(match.id).map((p) => p.player_id);
+      const beforeP = tcount('tournament_participants', id);
+      const beforeM = tcount('tournament_matches', id);
+      assertEqual(beforeP, 4, 'participants seeded');
+      assertEqual(beforeM, 3, 'matches seeded');
+
+      const res = await admin(`/api/admin/tournaments/${id}`, { method: 'PATCH', body: { status: 'cancelled' } });
+      assertEqual(res.status, 200, 'cancelled');
+      assertEqual(res.body.tournament.status, 'cancelled', 'cancelled status');
+
+      // Non-destructive: participants + matches are preserved.
+      assertEqual(tcount('tournament_participants', id), beforeP, 'participants preserved');
+      assertEqual(tcount('tournament_matches', id), beforeM, 'matches preserved');
+
+      // Further progression is blocked by the existing rules.
+      const result = await admin(`/api/admin/tournaments/${id}/matches/${match.id}/result`, {
+        method: 'POST',
+        body: { winnerPlayerId: combatants[0] },
+      });
+      assertEqual(result.status, 409, 'result blocked');
+      assertEqual(result.body.error, 'tournament_not_active', 'result reason');
+
+      const openId = 'adm-cxl-run-open';
+      setupTournament(openId, 2);
+      await admin(`/api/admin/tournaments/${openId}`, { method: 'PATCH', body: { status: 'cancelled' } });
+      const bracketRes = await admin(`/api/admin/tournaments/${openId}/bracket`, { method: 'POST' });
+      assertEqual(bracketRes.status, 409, 'bracket blocked');
+      assertEqual(bracketRes.body.error, 'invalid_tournament_state', 'bracket reason');
+    });
+
+    await testAsync('draft-only deletion is preserved (non-draft delete rejected)', async () => {
+      const id = 'adm-cxl-delete-open';
+      seedTournament({ id, gameId: DG, status: 'open', createdBy: ADMIN_ID });
+      const res = await call(`/api/admin/tournaments/${id}`, { method: 'DELETE', cookie: adminCookie });
+      assertEqual(res.status, 400, 'non-draft delete rejected');
+    });
   } finally {
     await api.close();
   }

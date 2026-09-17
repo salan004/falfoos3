@@ -149,6 +149,27 @@ export function AdminTournamentsPage() {
     }
   };
 
+  // Phase 1D — non-destructive cancellation: reuses the existing admin PATCH
+  // (status lifecycle) and never deletes participants/matches/results.
+  const handleCancel = async (id: string) => {
+    if (!confirm('هل أنت متأكد من إلغاء هذه البطولة؟')) return;
+    try {
+      const res = await apiFetch(`/api/admin/tournaments/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'cancelled' }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(data.error || 'فشل إلغاء البطولة');
+        return;
+      }
+      loadTournaments();
+    } catch {
+      setError('فشل الاتصال بالخادم');
+    }
+  };
+
   const handleViewParticipants = async (tournamentId: string) => {
     if (viewingParticipants === tournamentId) {
       setViewingParticipants(null);
@@ -240,6 +261,15 @@ export function AdminTournamentsPage() {
                     <button className="btn-neon text-sm" onClick={() => startEdit(t)}>
                       تعديل
                     </button>
+                    {(t.status === 'draft' || t.status === 'open' || t.status === 'active') && (
+                      <button
+                        className="btn-neon text-sm"
+                        style={{ background: 'var(--neon-red)' }}
+                        onClick={() => handleCancel(t.id)}
+                      >
+                        إلغاء البطولة
+                      </button>
+                    )}
                     {t.status === 'draft' && (
                       <button className="btn-neon text-sm" style={{ background: 'var(--neon-red)' }} onClick={() => handleDelete(t.id)}>
                         حذف

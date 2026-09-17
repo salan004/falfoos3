@@ -1,15 +1,18 @@
 import { PlayerAvatar } from './PlayerAvatar';
 import { RankBadge } from './RankBadge';
+import { useHashRoute } from '../hooks/useHashRoute';
 import type { GameLeaderboardEntry } from '../types/competitive';
 
 interface CompetitivePlayersProps {
   players: GameLeaderboardEntry[];
   loading?: boolean;
   error?: string | null;
+  gameId?: string;
 }
 
 /** 👥 اللاعبين — per-game competitive player cards. */
-export function CompetitivePlayers({ players, loading, error }: CompetitivePlayersProps) {
+export function CompetitivePlayers({ players, loading, error, gameId }: CompetitivePlayersProps) {
+  const { navigate } = useHashRoute();
   if (loading) {
     return (
       <div className="panel text-center py-12 loading-pulse text-[var(--text-dim)]">
@@ -31,7 +34,20 @@ export function CompetitivePlayers({ players, loading, error }: CompetitivePlaye
   return (
     <div className="competitive-players-grid">
       {players.map((p) => (
-        <article key={p.playerId} className="card competitive-player-card text-right">
+        <article
+          key={p.playerId}
+          className="card competitive-player-card text-right"
+          role="button"
+          tabIndex={0}
+          style={{ cursor: 'pointer' }}
+          onClick={() => navigate(`/player/${p.playerId}${gameId ? `?gameId=${encodeURIComponent(gameId)}` : ''}`)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              navigate(`/player/${p.playerId}${gameId ? `?gameId=${encodeURIComponent(gameId)}` : ''}`);
+            }
+          }}
+        >
           <PlayerAvatar id={p.playerId} name={p.displayName ?? 'لاعب'} avatarUrl={p.avatarUrl ?? undefined} size={52} />
           <div className="competitive-player-card-info">
             <div className="competitive-player-card-name">{p.displayName ?? 'لاعب'}</div>
