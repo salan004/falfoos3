@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { apiFetch } from '../utils/api';
 import { AllTimeLeaderRow } from '../types/profile';
 
 /**
@@ -21,7 +22,7 @@ export function useAllTimeLeaderboard(active: boolean, gameId: string | null) {
       try {
         const params = new URLSearchParams();
         if (gameId) params.set('gameId', gameId);
-        const res = await fetch(`/api/leaderboard/all-time?${params.toString()}`, {
+        const res = await apiFetch(`/api/leaderboard/all-time?${params.toString()}`, {
           signal: controller.signal,
         });
         if (!res.ok) throw new Error('badStatus');

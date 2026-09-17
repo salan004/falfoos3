@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { apiFetch } from '../utils/api';
 import type { PlayerProfile } from '../types/profile';
 
 /**
@@ -29,7 +30,7 @@ export function usePlayerProfile(playerId?: string, enabled = true) {
     setProfile(null);
     setStatus('loading');
 
-    fetch(url)
+    apiFetch(url)
       .then(async (res) => {
         const body = await res.json().catch(() => null);
         return { okStatus: res.status, body };
