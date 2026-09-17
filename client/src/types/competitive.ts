@@ -95,6 +95,13 @@ export interface CompetitiveRosterEntry {
   eliminated: boolean;
   advanced: boolean;
   champion: boolean;
+  /** Competitive LP/Elo for this tournament's game; null until a profile exists. */
+  lp: number | null;
+  elo: number | null;
+  /** Rank derived from LP (or the base Bronze rank when unranked). */
+  rank: ComputedRank;
+  /** True when the participant has no competitive profile yet. */
+  unranked: boolean;
 }
 
 export interface GameLeaderboardEntry {

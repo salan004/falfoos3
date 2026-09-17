@@ -1,9 +1,11 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { apiFetch } from '../utils/api';
 import { useHashRoute } from '../hooks/useHashRoute';
 import { useScrollReveal } from '../hooks/useScrollReveal';
 import { useAuthSession } from '../hooks/useAuthSession';
+import { onCompetitiveEvent, getSocket } from '../utils/socket';
 import { TournamentCard } from '../components/TournamentCard';
+import { ArenaAtmosphere } from '../components/ArenaAtmosphere';
 import { CompetitiveLeaderboard } from '../components/CompetitiveLeaderboard';
 import { CompetitivePlayers } from '../components/CompetitivePlayers';
 import { CompetitiveRankings } from '../components/CompetitiveRankings';
@@ -40,19 +42,41 @@ export function GameHubPage({ gameId }: GameHubPageProps) {
   const [competitiveLoading, setCompetitiveLoading] = useState(true);
   const [competitiveError, setCompetitiveError] = useState<string | null>(null);
 
-  const loadTournaments = useCallback(async () => {
-    setTournamentsLoading(true);
-    setTournamentsError(null);
+  const loadTournaments = useCallback(async (silent = false) => {
+    if (!silent) {
+      setTournamentsLoading(true);
+      setTournamentsError(null);
+    }
     try {
-      const res = await apiFetch(`/api/games/${gameId}/tournaments`);
+      // `/api/games/:id/tournaments` returns bare tournament rows (no
+      // participant_count / game metadata). The game-filtered list endpoint
+      // returns the enriched `TournamentWithGame` rows the card renders.
+      const res = await apiFetch(`/api/tournaments?gameId=${encodeURIComponent(gameId)}`);
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'failed');
       setTournaments(data.tournaments || []);
     } catch {
       setTournamentsError('فشل تحميل البطولات');
     } finally {
-      setTournamentsLoading(false);
+      if (!silent) setTournamentsLoading(false);
     }
+  }, [gameId]);
+
+  // Server-authoritative competitive data (LP/Elo/rank/W-L) for the selected
+  // game. Shared by the Leaderboard, Rankings and Players tabs — one fetch
+  // feeds all three. `silent` skips the loading skeleton for background
+  // refreshes triggered by competitive:event.
+  const loadCompetitive = useCallback(async (silent = false) => {
+    if (!silent) setCompetitiveLoading(true);
+    setCompetitiveError(null);
+    const result = await fetchGameLeaderboard(gameId);
+    if (!result.ok || !result.data) {
+      setCompetitiveError('فشل تحميل بيانات التصنيف');
+      if (!silent) setCompetitiveLoading(false);
+      return;
+    }
+    setPlayers(result.data.leaderboard.players);
+    if (!silent) setCompetitiveLoading(false);
   }, [gameId]);
 
   useEffect(() => {
@@ -76,30 +100,80 @@ export function GameHubPage({ gameId }: GameHubPageProps) {
 
     loadTournaments();
 
-    setCompetitiveLoading(true);
-    setCompetitiveError(null);
-    fetchGameLeaderboard(gameId)
-      .then((result) => {
-        if (cancelled) return;
-        if (!result.ok || !result.data) {
-          setCompetitiveError('فشل تحميل بيانات التصنيف');
-          return;
-        }
-        setPlayers(result.data.leaderboard.players);
-      })
-      .finally(() => {
-        if (!cancelled) setCompetitiveLoading(false);
-      });
+    void loadCompetitive();
 
     return () => {
       cancelled = true;
     };
-  }, [gameId, loadTournaments]);
+  }, [gameId, loadTournaments, loadCompetitive]);
+
+  // Phase 1B — real-time invalidation for the Game Hub. The server publishes
+  // small `competitive:event` identifiers AFTER a result commits; we treat them
+  // as refetch signals only (never mutate LP/Elo/rank/bracket locally). Events
+  // for other games are ignored. A burst (a single result emits several events)
+  // collapses into one ~250ms-debounced refresh.
+  const reloadTimer = useRef<number | null>(null);
+  const tournamentsDirty = useRef(false);
+  useEffect(() => {
+    const scheduleRefresh = () => {
+      if (reloadTimer.current !== null) window.clearTimeout(reloadTimer.current);
+      reloadTimer.current = window.setTimeout(() => {
+        reloadTimer.current = null;
+        const refreshTournaments = tournamentsDirty.current;
+        tournamentsDirty.current = false;
+        void loadCompetitive(true);
+        if (refreshTournaments) void loadTournaments(true);
+      }, 250);
+    };
+
+    const off = onCompetitiveEvent((event) => {
+      if (event.gameId !== gameId) return;
+      // Only tournament/bracket/match events can change the tournament list.
+      if (event.tournamentId || event.type === 'tournament.completed') {
+        tournamentsDirty.current = true;
+      }
+      scheduleRefresh();
+    });
+
+    // Resync after a Socket.IO reconnect: events emitted while disconnected are
+    // not replayed, so refetch once on reconnect (the initial connect is skipped
+    // because mount already fetched).
+    const socket = getSocket();
+    let seenFirstConnect = socket.connected;
+    const onConnect = () => {
+      if (!seenFirstConnect) {
+        seenFirstConnect = true;
+        return;
+      }
+      tournamentsDirty.current = true;
+      scheduleRefresh();
+    };
+    socket.on('connect', onConnect);
+
+    return () => {
+      off();
+      socket.off('connect', onConnect);
+      if (reloadTimer.current !== null) {
+        window.clearTimeout(reloadTimer.current);
+        reloadTimer.current = null;
+      }
+      tournamentsDirty.current = false;
+    };
+  }, [gameId, loadCompetitive, loadTournaments]);
 
   const openTournament = (id: string) => navigate(`/tournaments/${id}`);
 
   const gameImage = game?.image_url || null;
   const subtitle = useMemo(() => game?.description_ar || 'المنصة التنافسية للعبة', [game]);
+
+  // Real, derived status only — never invented. Reflects the game's tournaments.
+  const activeTournamentEntry = tournaments.find((t) => t.status === 'active');
+  const openTournamentEntry = tournaments.find((t) => t.status === 'open');
+  const heroStatus = activeTournamentEntry
+    ? { label: 'بطولة جارية', className: 'badge-yellow' }
+    : openTournamentEntry
+      ? { label: 'التسجيل مفتوح', className: 'badge-green' }
+      : null;
 
   if (gameError) {
     return (
@@ -110,28 +184,52 @@ export function GameHubPage({ gameId }: GameHubPageProps) {
   }
 
   return (
-    <main className="page game-hub-page">
-      <div ref={headerRef} className="reveal game-hub-header panel">
-        <div className="game-hub-header-main">
-          <div className="game-hub-artwork">
-            {gameImage ? (
-              <img src={gameImage} alt={game?.name_ar ?? ''} loading="lazy" decoding="async" />
-            ) : (
-              <span className="game-hub-artwork-icon" aria-hidden="true">🎮</span>
+    <main className="page game-hub-page gh-arena">
+      {/* Shared Games/Tournaments atmosphere — same world as the hub, without
+          the hub-only character illumination. */}
+      <ArenaAtmosphere />
+
+      <section ref={headerRef} className="reveal gh-hero">
+        <div className="gh-hero-art">
+          {gameImage ? (
+            <img src={gameImage} alt={game?.name_ar ?? ''} loading="lazy" decoding="async" />
+          ) : (
+            <span className="gh-hero-art-icon" aria-hidden="true">🎮</span>
+          )}
+        </div>
+
+        <div className="gh-hero-body">
+          {heroStatus && (
+            <div className="gh-hero-status-row">
+              <span className={`badge ${heroStatus.className}`}>{heroStatus.label}</span>
+            </div>
+          )}
+          <h1 className="gh-hero-title">{game?.name_ar ?? 'جارٍ التحميل…'}</h1>
+          <p className="gh-hero-subtitle">{subtitle}</p>
+
+          <div className="gh-hero-meta">
+            {!tournamentsLoading && (
+              <span className="gh-chip">🏆 {tournaments.length.toLocaleString('ar')} بطولة</span>
+            )}
+            {!competitiveLoading && (
+              <span className="gh-chip">👥 {players.length.toLocaleString('ar')} لاعب مصنّف</span>
             )}
           </div>
-          <div className="game-hub-titles">
-            <div className="brand-kicker">🎮 مركز اللعبة</div>
-            <h1 className="game-hub-title">{game?.name_ar ?? 'جارٍ التحميل…'}</h1>
-            <p className="game-hub-subtitle">{subtitle}</p>
+
+          <div className="gh-hero-actions">
+            {isAdmin && (
+              <button className="btn-neon" onClick={() => navigate('/dashboard/tournaments')}>
+                إدارة البطولات
+              </button>
+            )}
+            <button className="btn-neon gh-hero-back" onClick={() => navigate('/stream-games')}>
+              ← كل الألعاب
+            </button>
           </div>
         </div>
-        <button className="btn-neon game-hub-back" onClick={() => navigate('/stream-games')}>
-          ← كل الألعاب
-        </button>
-      </div>
+      </section>
 
-      <div className="room-tabs game-hub-tabs" role="tablist" aria-label="أقسام مركز اللعبة">
+      <div className="room-tabs game-hub-tabs gh-tabs" role="tablist" aria-label="أقسام اللعبة">
         {HUB_TABS.map((tab) => (
           <button
             key={tab.id}
@@ -146,7 +244,7 @@ export function GameHubPage({ gameId }: GameHubPageProps) {
       </div>
 
       {activeTab === 'tournaments' && (
-        <section aria-label="بطولات اللعبة">
+        <section className="gh-section" aria-label="بطولات اللعبة">
           <div className="game-hub-section-head">
             <h2 className="section-title">🏆 البطولات</h2>
             {isAdmin && (
@@ -165,7 +263,7 @@ export function GameHubPage({ gameId }: GameHubPageProps) {
           ) : tournaments.length === 0 ? (
             <div className="panel text-center py-12 text-[var(--text-dim)]">لا توجد بطولات لهذه اللعبة حاليًا</div>
           ) : (
-            <div className="games-grid">
+            <div className="games-grid gh-tournaments-grid">
               {tournaments.map((t) => (
                 <TournamentCard
                   key={t.id}
@@ -180,21 +278,21 @@ export function GameHubPage({ gameId }: GameHubPageProps) {
       )}
 
       {activeTab === 'leaderboard' && (
-        <section aria-label="متصدرو اللعبة">
+        <section className="gh-section" aria-label="متصدرو اللعبة">
           <h2 className="section-title" style={{ marginBottom: 16 }}>🥇 المتصدرين</h2>
           <CompetitiveLeaderboard players={players} loading={competitiveLoading} error={competitiveError} />
         </section>
       )}
 
       {activeTab === 'rankings' && (
-        <section aria-label="تصنيف اللعبة">
+        <section className="gh-section" aria-label="تصنيف اللعبة">
           <h2 className="section-title" style={{ marginBottom: 16 }}>📊 التصنيف</h2>
           <CompetitiveRankings players={players} loading={competitiveLoading} error={competitiveError} />
         </section>
       )}
 
       {activeTab === 'players' && (
-        <section aria-label="لاعبو اللعبة">
+        <section className="gh-section" aria-label="لاعبو اللعبة">
           <h2 className="section-title" style={{ marginBottom: 16 }}>👥 اللاعبين</h2>
           <CompetitivePlayers players={players} loading={competitiveLoading} error={competitiveError} />
         </section>

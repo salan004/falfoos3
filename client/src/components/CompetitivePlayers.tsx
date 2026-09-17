@@ -1,4 +1,5 @@
 import { PlayerAvatar } from './PlayerAvatar';
+import { RankBadge } from './RankBadge';
 import type { GameLeaderboardEntry } from '../types/competitive';
 
 interface CompetitivePlayersProps {
@@ -22,7 +23,7 @@ export function CompetitivePlayers({ players, loading, error }: CompetitivePlaye
   if (players.length === 0) {
     return (
       <div className="panel text-center py-12 text-[var(--text-dim)]">
-        لا يوجد لاعبون مصنفون لهذه اللعبة حاليًا
+        لا يوجد لاعبون مصنّفون لهذه اللعبة حتى الآن — يظهر اللاعب هنا بعد أول مباراة تُعتمد نتيجتها.
       </div>
     );
   }
@@ -35,6 +36,7 @@ export function CompetitivePlayers({ players, loading, error }: CompetitivePlaye
           <div className="competitive-player-card-info">
             <div className="competitive-player-card-name">{p.displayName ?? 'لاعب'}</div>
             <div className="competitive-player-card-rank">
+              <RankBadge tierKey={p.rank.tierKey} label={p.rank.rankName} size={18} />
               <span className="badge badge-cyan">{p.rank.rankName}</span>
             </div>
             <dl className="competitive-player-card-stats">

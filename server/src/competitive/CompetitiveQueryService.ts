@@ -11,6 +11,7 @@
 
 import { getDb } from '../db/db';
 import {
+  getTournamentById,
   getTournamentWithGameInfo,
   getTournamentsWithGameInfo,
   type TournamentWithGame,
@@ -104,6 +105,22 @@ export interface ParticipantDto {
   eliminated: boolean;
   advanced: boolean;
   champion: boolean;
+  /**
+   * Competitive LP/Elo for this tournament's game. Null until the participant
+   * has a competitive profile (which is created lazily on the first scored
+   * match — registration alone never creates one).
+   */
+  lp: number | null;
+  elo: number | null;
+  /**
+   * Rank derived from LP via the single `computeRank` source of truth. For a
+   * participant with no profile yet this is the base rank `computeRank(0)`
+   * (Bronze 3) — the documented initial competitive rank — and `unranked` is
+   * true. No LP/Elo/W-L is fabricated.
+   */
+  rank: ComputedRank;
+  /** True when the participant has no competitive profile yet. */
+  unranked: boolean;
 }
 
 export interface PlayerTournamentStateDto {
@@ -372,10 +389,31 @@ export function getParticipantsDto(tournamentId: string): ParticipantDto[] {
   const rows = getParticipantsByTournament(tournamentId);
   const states = computePlayerStates(tournamentId);
   const champion = getTournamentChampion(tournamentId);
+
+  // Targeted competitive lookup for exactly this tournament's participants —
+  // independent of any leaderboard limit, so bracket/roster rank metadata is
+  // available even for players outside the top-N leaderboard.
+  const tournament = getTournamentById(tournamentId);
+  const profileByPlayer = new Map<string, { lp: number; elo: number }>();
+  const eligibleIds = rows
+    .filter((row) => PARTICIPANT_STATUSES.has(row.status))
+    .map((row) => row.player_id);
+  if (tournament && eligibleIds.length > 0) {
+    const placeholders = eligibleIds.map(() => '?').join(',');
+    const profiles = getDb()
+      .prepare(
+        `SELECT player_id, lp, elo FROM competitive_profiles
+          WHERE game_id = ? AND player_id IN (${placeholders})`
+      )
+      .all(tournament.game_id, ...eligibleIds) as { player_id: string; lp: number; elo: number }[];
+    for (const p of profiles) profileByPlayer.set(p.player_id, { lp: p.lp, elo: p.elo });
+  }
+
   return rows
     .filter((row) => PARTICIPANT_STATUSES.has(row.status))
     .map((row) => {
       const state = states.get(row.player_id);
+      const profile = profileByPlayer.get(row.player_id);
       return {
         playerId: row.player_id,
         displayName: row.youtube_name,
@@ -386,6 +424,10 @@ export function getParticipantsDto(tournamentId: string): ParticipantDto[] {
         eliminated: state?.eliminated ?? false,
         advanced: state?.advanced ?? false,
         champion: champion === row.player_id,
+        lp: profile?.lp ?? null,
+        elo: profile?.elo ?? null,
+        rank: computeRank(profile?.lp ?? 0),
+        unranked: !profile,
       };
     });
 }

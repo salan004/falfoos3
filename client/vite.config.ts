@@ -7,11 +7,15 @@ export default defineConfig({
     port: 3000,
     proxy: {
       '/socket.io': {
-        target: 'http://localhost:4000',
+        target: 'https://api-falfoos.duckdns.org',
         ws: true,
+        changeOrigin: true,
+        secure: true,
       },
       '/api': {
-        target: 'http://localhost:4000',
+        target: 'https://api-falfoos.duckdns.org',
+        changeOrigin: true,
+        secure: true,
       },
     },
   },

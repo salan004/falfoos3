@@ -62,11 +62,10 @@ export function TournamentCard({ tournament, gameImageUrl, onClick }: Tournament
           <p className="tournament-card-desc">{tournament.description_ar}</p>
         )}
         <div className="tournament-card-meta">
-          {tournament.max_participants && (
-            <span className="badge badge-yellow">
-              👥 {tournament.participant_count ?? 0} / {tournament.max_participants}
-            </span>
-          )}
+          <span className="badge badge-yellow">
+            👥 {(tournament.participant_count ?? 0).toLocaleString('ar')}
+            {tournament.max_participants ? ` / ${tournament.max_participants.toLocaleString('ar')}` : ''}
+          </span>
           {tournament.starts_at && (
             <span className="badge badge-cyan">
               📅 {new Date(tournament.starts_at).toLocaleDateString('ar-SA', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}

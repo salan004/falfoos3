@@ -1,10 +1,12 @@
 import { PlayerAvatar } from './PlayerAvatar';
+import { RankBadge } from './RankBadge';
 import type { BracketDto, MatchDto } from '../types/competitive';
 
 export interface BracketPlayerMeta {
   name: string;
   avatarUrl?: string | null;
   rankName?: string | null;
+  tierKey?: string | null;
   lp?: number | null;
   elo?: number | null;
   seed?: number | null;
@@ -73,6 +75,7 @@ function MatchCard({
                 <div className="bracket-player-body">
                   <span className="bracket-player-name">{meta?.name ?? 'لاعب'}</span>
                   <span className="bracket-player-meta">
+                    <RankBadge tierKey={meta?.tierKey} label={meta?.rankName} size={14} />
                     {meta?.rankName ? <span className="bracket-player-rank">{meta.rankName}</span> : null}
                     {typeof meta?.lp === 'number' ? <span>{meta.lp.toLocaleString('ar')} LP</span> : null}
                     {typeof meta?.elo === 'number' ? <span>Elo {meta.elo.toLocaleString('ar')}</span> : null}
@@ -185,7 +188,12 @@ export function BracketView({ bracket, players, championPlayerId }: BracketViewP
           size={48}
         />
         <div className="bracket-champion-name">{championMeta?.name ?? 'البطل'}</div>
-        {championMeta?.rankName ? <div className="bracket-champion-rank">{championMeta.rankName}</div> : null}
+        {championMeta?.rankName ? (
+          <div className="bracket-champion-rank">
+            <RankBadge tierKey={championMeta?.tierKey} label={championMeta?.rankName} size={18} />
+            {championMeta.rankName}
+          </div>
+        ) : null}
         {typeof championMeta?.lp === 'number' ? (
           <div className="bracket-champion-stats">
             {championMeta.lp.toLocaleString('ar')} LP

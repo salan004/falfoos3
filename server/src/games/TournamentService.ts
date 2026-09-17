@@ -117,7 +117,8 @@ export function getTournamentsWithGameInfo(): TournamentWithGame[] {
   const db = getDb();
   const rows = db.prepare(`
     SELECT t.*, g.name_ar as game_name_ar, g.slug as game_slug, g.image_url as game_image_url,
-           (SELECT COUNT(*) FROM tournament_participants WHERE tournament_id = t.id) as participant_count
+           (SELECT COUNT(*) FROM tournament_participants
+             WHERE tournament_id = t.id AND status IN ('registered','confirmed')) as participant_count
     FROM tournaments t
     JOIN games g ON g.id = t.game_id
     ORDER BY t.created_at DESC
@@ -148,7 +149,8 @@ export function getTournamentWithGameInfo(id: string): TournamentWithGame | null
   const db = getDb();
   const row = db.prepare(`
     SELECT t.*, g.name_ar as game_name_ar, g.slug as game_slug, g.image_url as game_image_url,
-           (SELECT COUNT(*) FROM tournament_participants WHERE tournament_id = t.id) as participant_count
+           (SELECT COUNT(*) FROM tournament_participants
+             WHERE tournament_id = t.id AND status IN ('registered','confirmed')) as participant_count
     FROM tournaments t
     JOIN games g ON g.id = t.game_id
     WHERE t.id = ?

@@ -1,6 +1,7 @@
-import { useState } from 'react';
-import { useHashRoute } from '../hooks/useHashRoute';
+import { useEffect, useState } from 'react';
+import { matchGameTournamentsRoute, matchStreamGamesRoute, useHashRoute } from '../hooks/useHashRoute';
 import { useAuthSession } from '../hooks/useAuthSession';
+import { apiFetch } from '../utils/api';
 import { BrandLogo } from './BrandLogo';
 import { ConnectionStatusPill } from './ConnectionStatusPill';
 import { AuthWidget } from './AuthWidget';
@@ -32,12 +33,42 @@ export function PageHeader({ youtubeStatus }: PageHeaderProps) {
   // Phase 12F — persisted sound preference (default ON, low volume).
   const [soundOff, setSoundOff] = useState<boolean>(() => isSoundMuted());
 
-  const pageTitle =
-    PAGE_TITLES[path] ??
-    (path.startsWith('/game/')
-      ? 'غرفة اللعبة'
-      : path.startsWith('/stream-games/')
-        ? 'مركز اللعبة'
+  // Game routes (#/games/:gameId and #/stream-games/:gameId) both render the
+  // game detail hub. The page label must be the REAL game name read from the
+  // catalog API — never the brand wordmark and never a hardcoded string.
+  const gameId =
+    matchGameTournamentsRoute(path)?.gameId ?? matchStreamGamesRoute(path)?.gameId ?? null;
+  const [gameName, setGameName] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!gameId) {
+      setGameName(null);
+      return;
+    }
+    let cancelled = false;
+    setGameName(null);
+    apiFetch(`/api/games/${gameId}`)
+      .then(async (res) => {
+        const data = await res.json().catch(() => null);
+        if (cancelled) return;
+        const nameAr = data?.game?.name_ar;
+        if (res.ok && typeof nameAr === 'string' && nameAr.trim().length > 0) {
+          setGameName(nameAr.trim());
+        }
+      })
+      .catch(() => {
+        /* keeps the neutral fallback below */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [gameId]);
+
+  const pageTitle = gameId
+    ? gameName ?? 'مركز اللعبة'
+    : PAGE_TITLES[path] ??
+      (path.startsWith('/game/')
+        ? 'غرفة اللعبة'
         : path.startsWith('/tournaments/')
           ? 'البطولة'
           : 'FalFoos');

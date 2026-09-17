@@ -1,4 +1,5 @@
 import { PlayerAvatar } from './PlayerAvatar';
+import { RankBadge } from './RankBadge';
 import type { CompetitiveRosterEntry, GameLeaderboardEntry } from '../types/competitive';
 
 interface CompetitiveParticipantCardProps {
@@ -21,6 +22,12 @@ export function CompetitiveParticipantCard({
 }: CompetitiveParticipantCardProps) {
   const name = entry.displayName ?? profile?.displayName ?? 'لاعب';
   const interactive = typeof onClick === 'function';
+  // Prefer the roster's targeted competitive data (available regardless of the
+  // leaderboard's top-N limit); fall back to the leaderboard entry when present.
+  const rankName = entry.rank?.rankName ?? profile?.rank.rankName ?? null;
+  const tierKey = entry.rank?.tierKey ?? profile?.rank.tierKey ?? null;
+  const lp = entry.lp ?? profile?.lp ?? null;
+  const elo = entry.elo ?? profile?.elo ?? null;
 
   return (
     <article
@@ -42,7 +49,7 @@ export function CompetitiveParticipantCard({
       }
     >
       <div className="competitive-participant-top">
-        <PlayerAvatar id={entry.playerId} name={name} avatarUrl={entry.avatarUrl ?? profile?.avatarUrl ?? undefined} size={52} />
+        <PlayerAvatar id={entry.playerId} name={name} avatarUrl={entry.avatarUrl ?? profile?.avatarUrl ?? undefined} size={64} />
         <div className="competitive-participant-head">
           <span className="competitive-participant-name">{name}</span>
           <div className="competitive-participant-badges">
@@ -58,15 +65,18 @@ export function CompetitiveParticipantCard({
       <dl className="competitive-participant-stats">
         <div>
           <dt>الرتبة</dt>
-          <dd>{profile?.rank.rankName ?? '—'}</dd>
+          <dd>
+            <RankBadge tierKey={tierKey} label={rankName} size={16} />
+            {rankName ?? '—'}
+          </dd>
         </div>
         <div>
           <dt>LP</dt>
-          <dd>{typeof profile?.lp === 'number' ? profile.lp.toLocaleString('ar') : '—'}</dd>
+          <dd>{typeof lp === 'number' ? lp.toLocaleString('ar') : '—'}</dd>
         </div>
         <div>
           <dt>Elo</dt>
-          <dd>{typeof profile?.elo === 'number' ? profile.elo.toLocaleString('ar') : '—'}</dd>
+          <dd>{typeof elo === 'number' ? elo.toLocaleString('ar') : '—'}</dd>
         </div>
         <div>
           <dt>ف / خ</dt>

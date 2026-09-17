@@ -4600,196 +4600,6 @@ button.hub-orb:hover .hub-label {
   min-height: 100vh;
 }
 
-/* Hero: no panel, no background, no hard edges. Overflow stays visible so the
-   trophy glow/shadow bleed continuously into the games section below. */
-.stream-games-hero {
-  text-align: center;
-  padding: clamp(20px, 4vh, 44px) 20px clamp(14px, 3vh, 34px);
-  position: relative;
-  overflow: visible;
-  isolation: isolate;
-}
-
-/* Soft circular atmosphere behind the trophy. A radial gradient that fades to
-   transparent well before its own edge — so it can never produce a rectangle
-   or a horizontal boundary. Purely decorative. */
-.stream-games-hero::before {
-  content: '';
-  position: absolute;
-  left: 50%;
-  top: 42%;
-  width: min(96%, 780px);
-  aspect-ratio: 1 / 1;
-  transform: translate(-50%, -50%);
-  border-radius: 50%;
-  background: radial-gradient(circle,
-    rgba(255, 205, 90, 0.16) 0%,
-    rgba(255, 190, 60, 0.07) 44%,
-    transparent 70%);
-  filter: blur(16px);
-  pointer-events: none;
-  z-index: 0;
-}
-
-/* Floating trophy — the PNG sits directly on the page atmosphere. No
-   container, no box, no outline; only a soft warm glow + restrained shadow. */
-.stream-games-trophy-img {
-  position: relative;
-  z-index: 1;
-  display: block;
-  margin: 0 auto;
-  width: clamp(280px, 58vw, 640px);
-  height: auto;
-  pointer-events: none;
-  animation: stream-trophy-float 8s ease-in-out infinite;
-  filter:
-    drop-shadow(0 30px 58px rgba(0, 0, 0, 0.42))
-    drop-shadow(0 0 64px rgba(255, 190, 60, 0.14));
-}
-
-@keyframes stream-trophy-float {
-  0%, 100% { transform: translateY(0); }
-  50%      { transform: translateY(-12px); }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .stream-games-trophy-img { animation: none; }
-}
-
-@media (max-width: 480px) {
-  .stream-games-trophy-img { width: clamp(260px, 88vw, 420px); }
-}
-
-/* ---------- Premium game cards (Phase 4E refinement) ----------
-   Structure: an integrated glass header (icon + name) sits on top, the artwork
-   fills the remaining area with a tall 4:5 canvas, and the description rides a
-   bottom gradient overlay so the image stays the dominant visual. */
-.stream-game-card {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  padding: 0;
-  overflow: hidden;
-  border-radius: 14px;
-  cursor: pointer;
-  transition: transform 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease;
-}
-
-.stream-game-card:hover {
-  transform: translateY(-6px);
-  border-color: rgba(255, 215, 0, 0.55);
-  box-shadow:
-    0 24px 48px rgba(0, 0, 0, 0.5),
-    0 0 38px rgba(255, 215, 0, 0.16);
-}
-
-.stream-game-card-header {
-  position: relative;
-  z-index: 2;
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  padding: 16px 18px;
-  background: linear-gradient(160deg, rgba(32, 36, 46, 0.94), rgba(13, 16, 22, 0.94));
-  border-bottom: 1px solid var(--border-color);
-}
-
-.stream-game-card-header-icon {
-  width: 44px;
-  height: 44px;
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 12px;
-  font-size: 1.45rem;
-  background: rgba(255, 215, 0, 0.12);
-  border: 1px solid rgba(255, 215, 0, 0.28);
-}
-
-.stream-game-card-title {
-  font-size: 1.3rem;
-  font-weight: 800;
-  color: var(--text-primary);
-  margin: 0;
-  line-height: 1.25;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.stream-game-card-media {
-  position: relative;
-  flex: 1 1 auto;
-  width: 100%;
-  min-height: 0;
-  aspect-ratio: 4 / 5;
-  overflow: hidden;
-  background: rgba(8, 11, 16, 0.6);
-}
-
-.stream-game-card-media img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-  transition: transform 0.5s ease;
-}
-
-.stream-game-card:hover .stream-game-card-media img {
-  transform: scale(1.04);
-}
-
-.stream-game-card-placeholder {
-  width: 100%;
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: linear-gradient(135deg, rgba(255, 215, 0, 0.1) 0%, rgba(255, 165, 0, 0.08) 100%);
-}
-
-.stream-game-card-icon {
-  font-size: 3.8rem;
-  opacity: 0.5;
-}
-
-.stream-game-badge {
-  position: absolute;
-  top: 12px;
-  inset-inline-start: 12px;
-  z-index: 2;
-}
-
-.stream-game-card-overlay {
-  position: absolute;
-  inset-inline: 0;
-  bottom: 0;
-  z-index: 1;
-  padding: 56px 18px 16px;
-  background: linear-gradient(
-    to top,
-    rgba(6, 8, 13, 0.94) 0%,
-    rgba(6, 8, 13, 0.74) 48%,
-    transparent 100%
-  );
-  pointer-events: none;
-}
-
-.stream-game-card-desc {
-  margin: 0;
-  color: #f3f5f8;
-  font-size: 0.95rem;
-  font-weight: 500;
-  line-height: 1.6;
-  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.75);
-  display: -webkit-box;
-  -webkit-line-clamp: 3;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
 .badge-gold {
   background: linear-gradient(135deg, var(--neon-gold) 0%, var(--neon-gold-dim) 100%);
   color: #1a1a2e;
@@ -4809,7 +4619,6 @@ button.hub-orb:hover .hub-label {
    ============================================================ */
 
 /* ---------- Stream Games dynamic grid: admin add-game tile ---------- */
-.stream-game-card { cursor: pointer; }
 .stream-game-add-card {
   display: flex;
   flex-direction: column;
@@ -4832,7 +4641,6 @@ button.hub-orb:hover .hub-label {
 .stream-game-add-plus { font-size: 2.6rem; font-weight: 300; line-height: 1; color: var(--neon-gold); }
 .stream-game-add-label { font-weight: 700; }
 
-.stream-game-card:focus-visible,
 .stream-game-add-card:focus-visible,
 .tournament-card:focus-visible,
 .competitive-participant-card:focus-visible {
@@ -5530,74 +5338,608 @@ body::before {
 /* Tables — dark surface, clear hierarchy, restrained hover. */
 .competitive-table tbody tr:hover { background: rgba(124, 58, 237, 0.06); }
 
-/* ---------- Tournament detail — vertical section flow (UI only) ---------- */
-.tournament-detail-page .tournament-section {
-  margin-top: 44px;
-  padding-top: 34px;
-  border-top: 1px solid color-mix(in srgb, var(--border-color) 70%, transparent);
+/* ============================================================
+   GAME DETAIL (GAME HUB) — Pic 1 arena composition
+   Presentation only: no functional/layout dependencies.
+   ============================================================ */
+.game-hub-page.gh-arena {
+  position: relative;
+  isolation: isolate;
+  padding-bottom: 56px;
 }
-.tournament-detail-page .tournament-section-title {
-  text-align: center;
-  font-size: 1.35rem;
-  margin-bottom: 20px;
-}
-.tournament-detail-page .tournament-section-title::after {
+.gh-arena::before {
   content: '';
-  display: block;
-  width: 56px;
-  height: 3px;
-  margin: 10px auto 0;
-  border-radius: 999px;
-  background: linear-gradient(90deg, var(--neon-cyan), var(--neon-purple));
-  opacity: 0.7;
+  position: absolute;
+  inset: -32px -20px -20px;
+  z-index: -1;
+  pointer-events: none;
+  border-radius: 28px;
+  background:
+    radial-gradient(58% 40% at 20% 0%, rgba(124, 58, 237, 0.18), transparent 72%),
+    radial-gradient(50% 40% at 88% 14%, rgba(34, 211, 238, 0.12), transparent 74%);
+  -webkit-mask-image: linear-gradient(180deg, #000 0%, rgba(0, 0, 0, 0.45) 55%, transparent 100%);
+  mask-image: linear-gradient(180deg, #000 0%, rgba(0, 0, 0, 0.45) 55%, transparent 100%);
 }
 
-.tournament-podium {
+/* --- prominent horizontal game information card --- */
+.gh-hero {
   display: grid;
-  grid-template-columns: 1fr;
-  gap: 16px;
-  align-items: stretch;
+  grid-template-columns: minmax(0, 208px) minmax(0, 1fr);
+  gap: clamp(18px, 3vw, 34px);
+  align-items: center;
+  margin-top: 18px;
+  padding: clamp(18px, 2.6vw, 30px);
+  border: 1px solid var(--arena-border);
+  border-radius: 20px;
+  background:
+    radial-gradient(120% 150% at 100% 0%, rgba(124, 58, 237, 0.16), transparent 58%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0) 140px),
+    rgba(12, 15, 28, 0.72);
+  backdrop-filter: blur(10px);
+  box-shadow:
+    0 24px 60px rgba(0, 0, 0, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
 }
-@media (min-width: 640px) {
-  .tournament-podium {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    align-items: end;
-  }
+.gh-hero-art {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  border-radius: 16px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(34, 211, 238, 0.28);
+  background: rgba(8, 11, 20, 0.7);
+  box-shadow:
+    0 0 30px rgba(34, 211, 238, 0.14),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
 }
-.tournament-podium-card {
+.gh-hero-art img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.gh-hero-art-icon { font-size: 4rem; opacity: 0.6; }
+
+.gh-hero-body { min-width: 0; }
+.gh-hero-title {
+  margin: 6px 0 0;
+  font-size: clamp(1.7rem, 3.4vw, 2.6rem);
+  font-weight: 800;
+  line-height: 1.2;
+  color: var(--arena-text);
+  text-shadow: 0 2px 20px rgba(124, 58, 237, 0.35);
+}
+.gh-hero-subtitle {
+  margin: 10px 0 0;
+  color: var(--text-dim);
+  font-size: 1rem;
+  line-height: 1.7;
+  max-width: 62ch;
+}
+.gh-hero-meta { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+.gh-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--arena-text);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--arena-border);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+.gh-hero-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 20px; }
+
+/* --- segmented navigation --- */
+.gh-tabs.game-hub-tabs {
+  display: flex;
+  gap: 6px;
+  margin: 26px 0 24px;
+  padding: 6px;
+  border: 1px solid var(--arena-border);
+  border-radius: 14px;
+  background: rgba(10, 13, 24, 0.72);
+  backdrop-filter: blur(8px);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.gh-tabs.game-hub-tabs::-webkit-scrollbar { display: none; }
+.gh-tabs .room-tab {
+  flex: 1 1 0;
+  min-width: max-content;
+  padding: 10px 16px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  font-weight: 700;
+  color: var(--text-dim);
+}
+.gh-tabs .room-tab:hover { color: var(--text-primary); border-color: var(--border-color); }
+.gh-tabs .room-tab.active {
+  color: #eafcff;
+  border-color: rgba(34, 211, 238, 0.55);
+  background:
+    linear-gradient(180deg, rgba(124, 58, 237, 0.22), rgba(34, 211, 238, 0.08)),
+    rgba(124, 58, 237, 0.06);
+  box-shadow:
+    0 0 22px rgba(34, 211, 238, 0.22),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+.gh-tabs .room-tab.active::after {
+  background: linear-gradient(90deg, var(--arena-cyan), var(--arena-purple));
+}
+
+/* --- sections + tournament cards --- */
+.gh-section { margin-top: 8px; }
+.gh-tournaments-grid { margin-top: 4px; }
+.gh-tournaments-grid .tournament-card {
+  border: 1px solid var(--arena-border);
+  border-radius: 16px;
+  transition: transform 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease;
+}
+.gh-tournaments-grid .tournament-card:hover {
+  transform: translateY(-6px);
+  border-color: rgba(34, 211, 238, 0.45);
+  box-shadow:
+    0 22px 46px rgba(0, 0, 0, 0.5),
+    0 0 30px rgba(34, 211, 238, 0.14);
+}
+
+/* ============================================================
+   STREAM GAMES HUB — Pic 2 full-page arena theme
+   ============================================================ */
+.sg-arena {
+  position: relative;
+  isolation: isolate;
+  min-height: 100vh;
+  padding-bottom: 64px;
+}
+.sg-arena::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(72% 46% at 50% 0%, rgba(124, 58, 237, 0.22), transparent 70%),
+    radial-gradient(46% 38% at 10% 30%, rgba(34, 211, 238, 0.1), transparent 72%),
+    radial-gradient(48% 40% at 90% 68%, rgba(124, 58, 237, 0.1), transparent 72%),
+    radial-gradient(40% 34% at 50% 105%, rgba(34, 211, 238, 0.06), transparent 72%);
+}
+
+/* --- Stream Games: invisible hero spacer ---
+   The Hero owns no visual identity of its own: no content, background, border,
+   divider, shadow, outline, gradient, filter or pseudo-element. It only reserves
+   vertical breathing room between the header and the game cards, so the shared
+   arena theme stays continuous behind the whole page. */
+.sg-hero {
+  min-height: clamp(280px, 42vh, 480px);
+  padding: clamp(40px, 6vh, 72px) 16px 0;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  outline: none;
+}
+
+/* --- games grid --- */
+.sg-grid { position: relative; z-index: 1; }
+
+.sg-card {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 8px;
-  text-align: center;
-  padding: 22px 16px;
-  min-height: 196px;
+  height: 100%;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--arena-border);
+  border-radius: 18px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0) 90px),
+    rgba(16, 19, 33, 0.72);
+  backdrop-filter: blur(8px);
+  cursor: pointer;
+  transition: transform 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease;
 }
-.tournament-podium-card.is-first {
-  border-color: rgba(255, 215, 0, 0.5);
-  background: radial-gradient(circle at 50% 0%, rgba(255, 215, 0, 0.12), rgba(21, 24, 29, 0.9) 72%);
-  box-shadow: 0 0 26px rgba(255, 215, 0, 0.12);
+.sg-card:hover {
+  transform: translateY(-7px);
+  border-color: rgba(34, 211, 238, 0.5);
+  box-shadow:
+    0 26px 54px rgba(0, 0, 0, 0.55),
+    0 0 40px rgba(34, 211, 238, 0.16),
+    0 0 60px rgba(124, 58, 237, 0.1);
 }
-@media (min-width: 640px) {
-  .tournament-podium-card.is-first { transform: translateY(-10px); }
+.sg-card-media {
+  position: relative;
+  aspect-ratio: 4 / 3;
+  overflow: hidden;
+  background: rgba(8, 11, 20, 0.6);
 }
-.tournament-podium-medal { font-size: 1.6rem; line-height: 1; }
-.tournament-podium-card.is-first .tournament-podium-medal { font-size: 2rem; }
-.tournament-podium-name { font-weight: 800; font-size: 1rem; }
-.tournament-podium-stats {
+.sg-card-media img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  transition: transform 0.5s ease;
+}
+.sg-card:hover .sg-card-media img { transform: scale(1.05); }
+.sg-card-media::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(to top, rgba(6, 8, 13, 0.74) 0%, transparent 58%);
+}
+.sg-card-placeholder {
+  width: 100%;
+  height: 100%;
   display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
+  align-items: center;
   justify-content: center;
+  background: linear-gradient(135deg, rgba(124, 58, 237, 0.16), rgba(34, 211, 238, 0.1));
+}
+.sg-card-icon { font-size: 3.6rem; opacity: 0.55; }
+.sg-card-badge {
+  position: absolute;
+  top: 12px;
+  inset-inline-start: 12px;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 11px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: #04121a;
+  background: linear-gradient(135deg, var(--arena-cyan) 0%, var(--neon-blue) 100%);
+  box-shadow: 0 0 16px rgba(34, 211, 238, 0.35);
+}
+.sg-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px 18px 18px;
+  text-align: start;
+}
+.sg-card-title { margin: 0; font-size: 1.22rem; font-weight: 800; color: var(--arena-text); }
+.sg-card-desc {
+  margin: 0;
   color: var(--text-dim);
-  font-size: 0.82rem;
+  font-size: 0.9rem;
+  line-height: 1.65;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.sg-card-cta { margin-top: auto; font-size: 0.82rem; font-weight: 800; color: var(--arena-cyan); }
+
+/* --- loading + placeholders --- */
+.sg-card-skeleton { cursor: default; }
+.sg-card-skeleton-media {
+  aspect-ratio: 4 / 3;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.09), rgba(255, 255, 255, 0.04));
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.4s ease-in-out infinite;
+}
+.sg-card-skeleton-body { display: flex; flex-direction: column; gap: 10px; padding: 18px; }
+.sg-card-skeleton-line {
+  height: 14px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+}
+.sg-card-skeleton-line.short { width: 55%; }
+
+.sg-grid .stream-game-add-card,
+.sg-grid .stream-game-placeholder-card {
+  border-radius: 18px;
+  min-height: 300px;
+}
+.sg-grid .stream-game-add-card {
+  border: 1px dashed rgba(245, 196, 81, 0.45);
+  background: linear-gradient(160deg, rgba(245, 196, 81, 0.06), rgba(8, 14, 24, 0.4));
+}
+.sg-grid .stream-game-placeholder-card {
+  border: 1px dashed rgba(34, 211, 238, 0.32);
+  background: linear-gradient(160deg, rgba(124, 58, 237, 0.08), rgba(8, 14, 24, 0.4));
 }
 
-@media (max-width: 639px) {
-  .tournament-detail-page .tournament-section {
-    margin-top: 34px;
-    padding-top: 26px;
+/* ============================================================
+   RESPONSIVE — Game Detail + Stream Games Hub
+   ============================================================ */
+@media (max-width: 720px) {
+  .gh-hero { grid-template-columns: 1fr; text-align: center; }
+  .gh-hero-art { max-width: 200px; margin: 0 auto; }
+  .gh-hero-body { text-align: center; }
+  .gh-hero-subtitle { margin-inline: auto; }
+  .gh-hero-meta,
+  .gh-hero-actions { justify-content: center; }
+  .gh-tabs .room-tab { flex: 1 1 auto; padding: 9px 12px; font-size: 0.82rem; }
+}
+@media (max-width: 480px) {
+  .gh-tabs.game-hub-tabs { gap: 4px; padding: 4px; }
+  .gh-tabs .room-tab { padding: 8px 9px; font-size: 0.74rem; }
+  .sg-grid .stream-game-add-card,
+  .sg-grid .stream-game-placeholder-card { min-height: 220px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sg-card,
+  .gh-tournaments-grid .tournament-card { transition: none; }
+  .sg-card-skeleton-media { animation: none; }
+}
+
+/* ============================================================
+   ESPORTS REFINEMENT — typography + atmosphere + polish
+   Scoped strictly to the Stream Games Hub (.sg-*) and the
+   Game Detail page (.gh-*). The restored Tournament Detail Page
+   is NOT targeted by any rule in this section.
+   ============================================================ */
+
+/* --- Arabic UI font (only these two surfaces) --- */
+.sg-arena,
+.gh-arena {
+  font-family: 'IBM Plex Sans Arabic', 'Tajawal', 'Segoe UI', Tahoma, Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+.sg-arena h1, .sg-arena h2, .sg-arena h3, .sg-arena h4,
+.gh-arena h1, .gh-arena h2, .gh-arena h3, .gh-arena h4 {
+  font-family: inherit;
+  letter-spacing: 0;
+}
+.sg-arena .badge,
+.gh-arena .badge { font-family: inherit; letter-spacing: 0; }
+.sg-arena .sg-card-cta,
+.gh-arena .gh-chip { font-variant-numeric: tabular-nums; }
+
+/* ============================================================
+   SHARED GAMES/TOURNAMENTS ATMOSPHERE
+   One fixed environment for the hub, Game Detail and Tournament
+   Detail. Purely decorative (aria-hidden), never a card/frame.
+   ============================================================ */
+.arena-atmosphere {
+  position: fixed;
+  inset: 0;
+  z-index: -2;
+  pointer-events: none;
+  overflow: hidden;
+}
+.arena-atmosphere-image {
+  position: absolute;
+  inset: -4%;
+  background-image: url('/assets/images/tournaments/stream-games-theme.png');
+  background-size: cover;
+  background-position: center 24%;
+  background-repeat: no-repeat;
+  transform: scale(1.05);
+}
+.arena-atmosphere-shade {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(74% 58% at 50% 24%, rgba(6, 9, 20, 0.16) 0%, rgba(6, 9, 20, 0.66) 60%, rgba(4, 6, 14, 0.95) 100%),
+    linear-gradient(180deg, rgba(5, 7, 15, 0.9) 0%, rgba(5, 7, 15, 0.32) 24%, rgba(5, 7, 15, 0.56) 58%, rgba(5, 7, 15, 0.96) 100%);
+}
+
+@media (max-width: 720px) {
+  .arena-atmosphere-image { background-position: center 30%; }
+}
+
+/* --- Stream Games: premium glass game cards --- */
+.sg-card {
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.075);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0) 96px),
+    rgba(11, 15, 28, 0.66);
+  box-shadow:
+    0 18px 40px rgba(0, 0, 0, 0.42),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(10px);
+}
+.sg-card:hover {
+  transform: translateY(-6px);
+  border-color: rgba(34, 211, 238, 0.42);
+  box-shadow:
+    0 26px 54px rgba(0, 0, 0, 0.55),
+    0 0 30px rgba(34, 211, 238, 0.14);
+}
+.sg-card-media { aspect-ratio: 16 / 10; }
+.sg-card-title { font-size: 1.18rem; }
+.sg-card-desc { color: #9aa3b8; }
+.sg-card-cta { color: #7fe7f5; }
+.sg-card-badge {
+  background: linear-gradient(135deg, rgba(34, 211, 238, 0.92), rgba(14, 165, 233, 0.92));
+  box-shadow: 0 0 14px rgba(34, 211, 238, 0.28);
+}
+
+/* --- Game Detail: richer glass hero + integrated artwork --- */
+.gh-hero {
+  border-radius: 22px;
+  border-color: rgba(255, 255, 255, 0.08);
+  background:
+    radial-gradient(120% 150% at 100% 0%, rgba(124, 58, 237, 0.18), transparent 58%),
+    radial-gradient(90% 120% at 0% 100%, rgba(34, 211, 238, 0.08), transparent 62%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0) 150px),
+    rgba(11, 15, 28, 0.74);
+  box-shadow:
+    0 26px 64px rgba(0, 0, 0, 0.48),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+.gh-hero-art {
+  border-radius: 18px;
+  border-color: rgba(34, 211, 238, 0.22);
+  box-shadow:
+    0 0 0 1px rgba(34, 211, 238, 0.14),
+    0 18px 40px rgba(0, 0, 0, 0.5),
+    0 0 44px rgba(34, 211, 238, 0.16);
+}
+.gh-hero-art::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(160deg, rgba(255, 255, 255, 0.1), transparent 44%);
+}
+/* --- Game Detail: status pill row (real, derived status only) --- */
+.gh-hero-status-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 2px;
+}
+.gh-hero-title { letter-spacing: 0; }
+.gh-chip { backdrop-filter: blur(6px); }
+
+/* --- Game Detail: polished segmented tabs --- */
+.gh-tabs.game-hub-tabs {
+  border-radius: 16px;
+  border-color: rgba(255, 255, 255, 0.08);
+  background: rgba(9, 12, 22, 0.72);
+}
+.gh-tabs .room-tab {
+  font-size: 0.9rem;
+  letter-spacing: 0;
+}
+.gh-tabs .room-tab.active {
+  box-shadow:
+    0 0 18px rgba(34, 211, 238, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+@media (max-width: 720px) {
+  .sg-hero {
+    min-height: clamp(220px, 32vh, 340px);
+    padding: clamp(32px, 5vh, 52px) 16px 0;
   }
+  .gh-hero-status-row { justify-content: center; }
+}
+
+/* ============================================================
+   STREAM GAMES HUB + GAME DETAIL — identity & continuity
+   (Tournament Detail receives only the shared atmosphere and
+   typography; its internal content structure is untouched.)
+   ============================================================ */
+
+/* --- Game Detail: status pill row --- */
+.gh-arena .gh-hero-status-row .badge { font-weight: 700; }
+
+/* ============================================================
+   REGISTERED PLAYER CARDS — premium esports identity tiles
+   ============================================================ */
+.participants-grid .competitive-participant-card {
+  position: relative;
+  gap: 16px;
+  padding: 20px 20px 18px;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 18px;
+  background:
+    radial-gradient(120% 140% at 100% 0%, rgba(124, 58, 237, 0.16), transparent 58%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0) 120px),
+    rgba(12, 15, 28, 0.72);
+  box-shadow:
+    0 20px 46px rgba(0, 0, 0, 0.42),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(10px);
+  overflow: hidden;
+  transition: transform 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
+}
+.participants-grid .competitive-participant-card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  background: linear-gradient(160deg, rgba(255, 255, 255, 0.08), transparent 42%);
+}
+.participants-grid .competitive-participant-card:hover,
+.participants-grid .competitive-participant-card:focus-visible {
+  transform: translateY(-5px);
+  border-color: rgba(34, 211, 238, 0.42);
+  box-shadow:
+    0 28px 58px rgba(0, 0, 0, 0.5),
+    0 0 34px rgba(34, 211, 238, 0.16);
+}
+.participants-grid .competitive-participant-card.is-champion {
+  border-color: rgba(245, 196, 81, 0.55);
+  box-shadow:
+    0 24px 54px rgba(0, 0, 0, 0.46),
+    0 0 40px rgba(245, 196, 81, 0.2);
+}
+.participants-grid .competitive-participant-card.is-eliminated {
+  opacity: 0.6;
+  filter: saturate(0.75);
+}
+.participants-grid .competitive-participant-top {
+  position: relative;
+  z-index: 1;
+  align-items: center;
+}
+.participants-grid .competitive-participant-head { flex: 1; min-width: 0; }
+.participants-grid .competitive-participant-name {
+  font-family: 'IBM Plex Sans Arabic', 'Tajawal', 'Segoe UI', Tahoma, Arial, sans-serif;
+  font-size: clamp(1.15rem, 2.4vw, 1.5rem);
+  font-weight: 800;
+  line-height: 1.25;
+  color: var(--arena-text);
+  text-shadow: 0 2px 16px rgba(124, 58, 237, 0.3);
+  overflow-wrap: anywhere;
+}
+.participants-grid .competitive-participant-stats {
+  position: relative;
+  z-index: 1;
+  gap: 10px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
+}
+.participants-grid .competitive-participant-stats dt {
+  font-size: 0.7rem;
+  letter-spacing: 0.02em;
+}
+.participants-grid .competitive-participant-stats dd {
+  font-size: 1rem;
+  font-weight: 800;
+  color: var(--arena-text);
+}
+@media (max-width: 480px) {
+  .participants-grid .competitive-participant-card { padding: 16px; }
+  .participants-grid .competitive-participant-name { font-size: 1.15rem; }
+  .participants-grid .competitive-participant-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+/* ============================================================
+   TOURNAMENT DETAIL — shared arena atmosphere (VISUAL ONLY)
+   The restored content structure (info → participants → bracket
+   → matches) is not touched; only ambient background + type.
+   ============================================================ */
+.tournament-detail-page {
+  position: relative;
+  isolation: isolate;
+  font-family: 'IBM Plex Sans Arabic', 'Tajawal', 'Segoe UI', Tahoma, Arial, sans-serif;
+}
+/* Same top-of-page purple/cyan bloom as Game Detail, so all three pages open
+   with the identical lighting language. Sits above the shared theme, behind
+   the content. */
+.tournament-detail-page::before {
+  content: '';
+  position: absolute;
+  inset: -24px -20px -20px;
+  z-index: -1;
+  pointer-events: none;
+  border-radius: 28px;
+  background:
+    radial-gradient(58% 34% at 18% 0%, rgba(124, 58, 237, 0.16), transparent 72%),
+    radial-gradient(50% 34% at 86% 6%, rgba(34, 211, 238, 0.1), transparent 74%);
+  -webkit-mask-image: linear-gradient(180deg, #000 0%, rgba(0, 0, 0, 0.45) 55%, transparent 100%);
+  mask-image: linear-gradient(180deg, #000 0%, rgba(0, 0, 0, 0.45) 55%, transparent 100%);
+}
+.tournament-detail-page .hero-title {
+  font-family: 'IBM Plex Sans Arabic', 'Tajawal', 'Segoe UI', Tahoma, Arial, sans-serif;
+  font-weight: 800;
+  text-shadow: 0 3px 28px rgba(124, 58, 237, 0.35);
+}
+.tournament-detail-page .tournament-detail-image img {
+  box-shadow: 0 24px 56px rgba(0, 0, 0, 0.5), 0 0 40px rgba(34, 211, 238, 0.12);
 }
 
 

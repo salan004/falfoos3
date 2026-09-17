@@ -3,10 +3,11 @@ import { apiFetch } from '../utils/api';
 import { useHashRoute } from '../hooks/useHashRoute';
 import { useScrollReveal } from '../hooks/useScrollReveal';
 import { useAuthSession } from '../hooks/useAuthSession';
+import { ArenaAtmosphere } from '../components/ArenaAtmosphere';
 import { GameDirectoryEntry } from '../types/game';
 
 /**
- * Phase 4E — «🕹️ العاب البث» entry point.
+ * Phase 4E — Stream Games / competitive games entry point.
  *
  * The grid is generated entirely from the competitive game records returned by
  * the public `GET /api/games` endpoint (active games only). No game is
@@ -25,7 +26,6 @@ export function StreamGamesPage() {
   const { navigate } = useHashRoute();
   const { user } = useAuthSession();
   const isAdmin = user?.role === 'admin';
-  const headerRef = useScrollReveal<HTMLDivElement>();
   const gridRef = useScrollReveal<HTMLDivElement>();
   const [games, setGames] = useState<GameDirectoryEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -54,7 +54,7 @@ export function StreamGamesPage() {
   }, [loadGames]);
 
   const openGame = (id: string) => {
-    navigate(`/games/${id}`);
+    navigate(`/stream-games/${id}`);
   };
 
   // Visual placeholders fill the remaining slots; never more than the target
@@ -62,30 +62,26 @@ export function StreamGamesPage() {
   const placeholderCount = Math.max(0, PLACEHOLDER_COUNT - games.length);
 
   return (
-    <main className="page stream-games-page">
-      {/* Hero Section — the supplied trophy artwork is the single, dominant
-          visual of the Hero and already carries the «الفلفوسيين المصنفين»
-          inscription, so the title stays accessibility-only and is never
-          rendered a second time. */}
-      <div ref={headerRef} className="reveal stream-games-hero">
-        <img
-          src="/assets/images/tournaments/stream-games-trophy.png"
-          alt="الفلفوسيين المصنفين"
-          className="stream-games-trophy-img"
-          width={1254}
-          height={1254}
-          decoding="async"
-        />
-        <h1 className="sr-only">🏆 الفلفوسيين المصنفين</h1>
-      </div>
+    <main className="page stream-games-page sg-arena">
+      {/* Shared Games/Tournaments atmosphere — the single continuous arena
+          environment behind the Hero and the game cards. */}
+      <ArenaAtmosphere />
+
+      {/* Invisible Hero spacer — vertical breathing room only. It has no
+          content, background, border, divider or effect of its own, so the
+          arena theme reads as one continuous environment behind the whole page. */}
+      <div className="sg-hero" aria-hidden="true" />
 
       {/* Dynamic competitive games grid — always visible. */}
-      <div ref={gridRef} className="reveal games-grid stream-games-grid mb-16">
+      <div ref={gridRef} className="reveal games-grid stream-games-grid sg-grid mb-16">
         {loading ? (
           Array.from({ length: PLACEHOLDER_COUNT }, (_, i) => (
-            <div key={`skeleton-${i}`} className="card stream-game-skeleton" aria-hidden="true">
-              <div className="stream-game-skeleton-header" />
-              <div className="stream-game-skeleton-media" />
+            <div key={`skeleton-${i}`} className="card sg-card sg-card-skeleton" aria-hidden="true">
+              <div className="sg-card-skeleton-media" />
+              <div className="sg-card-skeleton-body">
+                <span className="sg-card-skeleton-line" />
+                <span className="sg-card-skeleton-line short" />
+              </div>
             </div>
           ))
         ) : (
@@ -102,8 +98,7 @@ export function StreamGamesPage() {
             {games.map((g) => (
               <article
                 key={g.id}
-                className="card stream-game-card text-right"
-                style={{ '--card-accent': 'var(--neon-gold)' } as React.CSSProperties}
+                className="card sg-card text-right"
                 onClick={() => openGame(g.id)}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' || e.key === ' ') {
@@ -115,25 +110,21 @@ export function StreamGamesPage() {
                 role="button"
                 aria-label={g.name_ar}
               >
-                <header className="stream-game-card-header">
-                  <span className="stream-game-card-header-icon" aria-hidden="true">🎮</span>
-                  <h3 className="stream-game-card-title">{g.name_ar}</h3>
-                </header>
-
-                <div className="stream-game-card-media">
+                <div className="sg-card-media">
                   {g.image_url ? (
                     <img src={g.image_url} alt={g.name_ar} loading="lazy" decoding="async" />
                   ) : (
-                    <div className="stream-game-card-placeholder">
-                      <span className="stream-game-card-icon">🎮</span>
+                    <div className="sg-card-placeholder">
+                      <span className="sg-card-icon">🎮</span>
                     </div>
                   )}
-                  <span className="badge badge-gold stream-game-badge">بطولة</span>
-                  {g.description_ar && (
-                    <div className="stream-game-card-overlay">
-                      <p className="stream-game-card-desc">{g.description_ar}</p>
-                    </div>
-                  )}
+                  <span className="sg-card-badge">🎮 بطولة</span>
+                </div>
+
+                <div className="sg-card-body">
+                  <h3 className="sg-card-title">{g.name_ar}</h3>
+                  {g.description_ar && <p className="sg-card-desc">{g.description_ar}</p>}
+                  <span className="sg-card-cta">ادخل الساحة ←</span>
                 </div>
               </article>
             ))}
@@ -143,7 +134,7 @@ export function StreamGamesPage() {
                 <button
                   key={`placeholder-${i}`}
                   type="button"
-                  className="card stream-game-add-card"
+                  className="card stream-game-add-card sg-add-card"
                   onClick={() => navigate('/dashboard/games')}
                   aria-label="إضافة لعبة جديدة"
                 >
@@ -151,7 +142,7 @@ export function StreamGamesPage() {
                   <span className="stream-game-add-label">إضافة لعبة</span>
                 </button>
               ) : (
-                <div key={`placeholder-${i}`} className="card stream-game-placeholder-card" role="presentation">
+                <div key={`placeholder-${i}`} className="card stream-game-placeholder-card sg-placeholder-card" role="presentation">
                   <span className="stream-game-add-plus" aria-hidden="true">+</span>
                   <span className="stream-game-add-label">متاحة لإضافة لعبة</span>
                 </div>

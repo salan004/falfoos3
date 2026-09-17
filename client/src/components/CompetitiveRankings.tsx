@@ -1,4 +1,6 @@
 import type { GameLeaderboardEntry } from '../types/competitive';
+import { RankBadge } from './RankBadge';
+import { rankBadgeAsset } from '../data/rankBadges';
 
 interface CompetitiveRankingsProps {
   players: GameLeaderboardEntry[];
@@ -32,7 +34,7 @@ export function CompetitiveRankings({ players, loading, error }: CompetitiveRank
   if (players.length === 0) {
     return (
       <div className="panel text-center py-12 text-[var(--text-dim)]">
-        لا يوجد لاعبون مصنفون لهذه اللعبة حاليًا
+        لا توجد نتائج تصنيف حتى الآن — يبدأ التصنيف بعد أول مباراة تُعتمد نتيجتها.
       </div>
     );
   }
@@ -86,7 +88,10 @@ export function CompetitiveRankings({ players, loading, error }: CompetitiveRank
         <div className="rank-distribution">
           {trueTiers.map(([tier, count]) => (
             <div key={tier} className="rank-distribution-row">
-              <span className={`rank-tier-dot rank-tier-${tier}`} aria-hidden="true" />
+              <RankBadge tierKey={tier} label={TIER_LABELS[tier] ?? tier} size={18} />
+              {rankBadgeAsset(tier) ? null : (
+                <span className={`rank-tier-dot rank-tier-${tier}`} aria-hidden="true" />
+              )}
               <span className="rank-distribution-label">{TIER_LABELS[tier] ?? tier}</span>
               <span className="rank-distribution-bar" aria-hidden="true">
                 <span

@@ -58,6 +58,8 @@ export function matchAdminTournamentsRoute(path: string): boolean {
 }
 
 export function matchStreamGamesRoute(path: string): { gameId: string } | null {
-  const m = path.match(/^\/stream-games\/([a-z_]+)$/i);
+  // Accepts both catalog slugs (a-z_) and database game UUIDs (hex + hyphens),
+  // because Tournament Detail links to #/stream-games/<gameId> with the raw id.
+  const m = path.match(/^\/stream-games\/([A-Za-z0-9_-]+)$/);
   return m ? { gameId: m[1] } : null;
 }
