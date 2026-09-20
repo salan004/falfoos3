@@ -310,7 +310,7 @@ export function TicketPurchasePanel({
           <span className="ticket-gate-icon" aria-hidden="true">🔐</span>
           <h3 className="ticket-gate-title">سجّل الدخول لشراء التذاكر</h3>
           <p className="ticket-gate-text">
-            استخدم حساب Google الخاص بك لإتمام عملية الشراء عبر رصيد ولاء Streamlabs.
+            استخدم حساب Google الخاص بك لإتمام عملية شراء التذكرة.
           </p>
           <a className="btn-neon" href={apiUrl('/api/auth/google')}>
             تسجيل الدخول عبر Google

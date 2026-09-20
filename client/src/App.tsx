@@ -20,10 +20,12 @@ import { AdminTournamentsPage } from './pages/AdminTournamentsPage';
 import { LeaderboardPage } from './pages/LeaderboardPage';
 import { LinksPage } from './pages/LinksPage';
 import { ProfilePage } from './pages/ProfilePage';
+import { RegisterPage } from './pages/RegisterPage';
+import { BroadcastBracketPage } from './pages/BroadcastBracketPage';
 import { TriviaQuestionsPage } from './pages/TriviaQuestionsPage';
 import { GAMES_CATALOG, PHASE_LABELS_AR, resolveGameName } from './data/gamesCatalog';
 import { useGameState } from './hooks/useGameState';
-import { useHashRoute, matchGameRoute, matchProfileRoute, matchTournamentRoute, matchGameTournamentsRoute, matchAdminGamesRoute, matchAdminTournamentsRoute, matchStreamGamesRoute, matchPlayerRoute } from './hooks/useHashRoute';
+import { useHashRoute, matchGameRoute, matchProfileRoute, matchTournamentRoute, matchGameTournamentsRoute, matchAdminGamesRoute, matchAdminTournamentsRoute, matchStreamGamesRoute, matchPlayerRoute, matchRegisterRoute, matchBroadcastRoute } from './hooks/useHashRoute';
 import { useGameSounds } from './hooks/useGameSounds';
 
 // Phase 12F — the /connect route was consolidated into the Games page
@@ -161,7 +163,7 @@ function GamePage({ gameId, game }: { gameId: string; game: ReturnType<typeof us
   );
 }
 
-export default function App() {
+function MainApp() {
   const { path } = useHashRoute();
   const game = useGameState();
   useGameSounds();
@@ -179,6 +181,7 @@ const gameRoute = matchGameRoute(path);
   const streamGamesRoute = matchStreamGamesRoute(path);
   const adminGamesRoute = matchAdminGamesRoute(path);
   const adminTournamentsRoute = matchAdminTournamentsRoute(path);
+  const registerRoute = matchRegisterRoute(path);
 
   return (
     <div dir="rtl" style={{ position: 'relative', minHeight: '100vh' }}>
@@ -191,6 +194,7 @@ const gameRoute = matchGameRoute(path);
       {path === '/leaderboard' && <LeaderboardPage game={game} />}
       {path === '/links' && <LinksPage />}
       {path === '/connect' && <ConnectPage game={game} />}
+      {registerRoute && <RegisterPage />}
       {gameRoute && <GamePage key={gameRoute.gameId} gameId={gameRoute.gameId} game={game} />}
       {gameTournamentsRoute && <GameHubPage key={gameTournamentsRoute.gameId} gameId={gameTournamentsRoute.gameId} />}
       {tournamentRoute && <TournamentDetailPage key={tournamentRoute.tournamentId} tournamentId={tournamentRoute.tournamentId} />}
@@ -212,7 +216,7 @@ const gameRoute = matchGameRoute(path);
       {adminGamesRoute && <AdminGamesPage />}
       {adminTournamentsRoute && <AdminTournamentsPage />}
       {path === '/dashboard/trivia-questions' && <TriviaQuestionsPage />}
-      {!['/', '/games', '/stream-games', '/leaderboard', '/links', '/connect', '/dashboard'].includes(path) &&
+      {!['/', '/games', '/stream-games', '/leaderboard', '/links', '/connect', '/register', '/dashboard'].includes(path) &&
         !gameRoute &&
         !streamGamesRoute &&
         !gameTournamentsRoute &&
@@ -227,4 +231,23 @@ const gameRoute = matchGameRoute(path);
         )}
     </div>
   );
+}
+
+/**
+ * Post-Phase 8 — the Broadcast Bracket is a chrome-less, transparent route, so
+ * it is resolved BEFORE the main app mounts (no header, no game state, no
+ * sockets). Every other route renders the normal app unchanged.
+ */
+export default function App() {
+  const { path } = useHashRoute();
+  const broadcastRoute = matchBroadcastRoute(path);
+  if (broadcastRoute) {
+    return (
+      <BroadcastBracketPage
+        key={broadcastRoute.tournamentId}
+        tournamentId={broadcastRoute.tournamentId}
+      />
+    );
+  }
+  return <MainApp />;
 }

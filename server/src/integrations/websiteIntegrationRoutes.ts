@@ -1,10 +1,10 @@
 import { Router, type Request, type Response } from 'express';
 import { resolveSession, type SessionUser } from '../auth/session';
 import { requireAdmin } from '../middleware/requireAdmin';
-import { getDb } from '../db/db';
+import { findLinkedPlayerForUser } from '../identity/identityService';
 import { IntegrationError, isIntegrationError } from './errors';
 import { BotIntegrationError } from './falfoosBotClient';
-import { startLink, verifyLink } from './linkService';
+import { startLink, verifyLink, normalizeLinkOperation } from './linkService';
 import { getPurchaseStatus, recoverPurchaseIntents, startPurchase } from './purchaseService';
 
 /**
@@ -44,13 +44,7 @@ function sendError(res: Response, err: unknown): void {
 websiteIntegrationRoutes.get('/account', (req, res) => {
   const user = requireUser(req, res);
   if (!user) return;
-  const row = getDb()
-    .prepare(
-      `SELECT player_id, youtube_channel_id, display_name
-         FROM guests WHERE claimed_user_id = ? AND youtube_channel_id IS NOT NULL
-         ORDER BY first_seen ASC LIMIT 1`
-    )
-    .get(user.id) as { player_id: string; youtube_channel_id: string; display_name: string | null } | undefined;
+  const row = findLinkedPlayerForUser(user.id);
   res.json({
     linked: Boolean(row),
     player: row
@@ -64,7 +58,7 @@ websiteIntegrationRoutes.post('/link/start', async (req, res) => {
   const user = requireUser(req, res);
   if (!user) return;
   try {
-    const result = await startLink(user, req.body?.channel);
+    const result = await startLink(user, req.body?.channel, normalizeLinkOperation(req.body?.operation));
     res.json(result);
   } catch (err) {
     sendError(res, err);

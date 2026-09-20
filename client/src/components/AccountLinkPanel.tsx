@@ -6,6 +6,7 @@ import {
   startAccountLink,
   verifyAccountLink,
   type AccountLinkStatus,
+  type AccountLinkOperation,
   type LinkStartResult,
 } from '../utils/accountLinkApi';
 import { PlayerAvatar } from './PlayerAvatar';
@@ -49,6 +50,8 @@ function mapLinkError(status: number, code: string): string {
       return 'لم يُصدر كود تحقق لهذا الطلب — ابدأ من جديد.';
     case 'account_already_linked':
       return 'هذا الحساب مرتبط بلاعب آخر مسبقاً ولا يمكن استبداله تلقائياً. تواصل مع فريق FalFoos للمساعدة.';
+    case 'player_claimed_by_other':
+      return 'هذا اللاعب مرتبط بحساب آخر مسبقاً ولا يمكن استبداله تلقائياً. تواصل مع فريق FalFoos للمساعدة.';
     case 'player_not_found':
       return 'لا يوجد لاعب FalFoos مرتبط بهذه القناة بعد. تأكد من قناتك ثم أعد المحاولة.';
     case 'link_start_failed':
@@ -79,6 +82,7 @@ export function AccountLinkPanel({ onLinked }: AccountLinkPanelProps) {
   const [status, setStatus] = useState<StatusPhase>('loading');
   const [account, setAccount] = useState<AccountLinkStatus | null>(null);
   const [flow, setFlow] = useState<FlowPhase>('intro');
+  const [operation, setOperation] = useState<AccountLinkOperation | null>(null);
   const [channel, setChannel] = useState('');
   const [challenge, setChallenge] = useState<LinkStartResult | null>(null);
   const [error, setError] = useState('');
@@ -105,6 +109,10 @@ export function AccountLinkPanel({ onLinked }: AccountLinkPanelProps) {
   }, [sessionLoading, user, loadStatus]);
 
   async function handleStart(): Promise<void> {
+    if (!operation) {
+      setError('اختر نوع العملية أولاً.');
+      return;
+    }
     const value = channel.trim();
     if (!value) {
       setError('أدخل رابط قناة YouTube أو معرّفها أولاً.');
@@ -112,7 +120,7 @@ export function AccountLinkPanel({ onLinked }: AccountLinkPanelProps) {
     }
     setError('');
     setFlow('starting');
-    const res = await startAccountLink(value);
+    const res = await startAccountLink(value, operation);
     if (res.ok) {
       setChallenge(res.data);
       setFlow('challenge');
@@ -134,6 +142,7 @@ export function AccountLinkPanel({ onLinked }: AccountLinkPanelProps) {
       setFlow('intro');
       setChallenge(null);
       setChannel('');
+      setOperation(null);
       await loadStatus();
       onLinked?.();
       return;
@@ -149,6 +158,7 @@ export function AccountLinkPanel({ onLinked }: AccountLinkPanelProps) {
     setFlow('intro');
     setChallenge(null);
     setChannel('');
+    setOperation(null);
     setError('');
   }
 
@@ -230,14 +240,56 @@ export function AccountLinkPanel({ onLinked }: AccountLinkPanelProps) {
                 <button className="nav-link" onClick={resetFlow}>إلغاء</button>
               </div>
             </>
+          ) : operation === null ? (
+            <>
+              <p className="acct-link-instruction">اختر نوع العملية</p>
+              <div className="acct-link-choices">
+                <button
+                  type="button"
+                  className="acct-link-choice"
+                  onClick={() => {
+                    setOperation('LINK_EXISTING_PLAYER');
+                    setError('');
+                  }}
+                >
+                  <span className="acct-link-choice-icon" aria-hidden="true">🔗</span>
+                  <span className="acct-link-choice-title">ربط لاعب موجود</span>
+                  <span className="acct-link-choice-desc">
+                    لديك لاعب FalFoos من مشتريات البطولات؟ اربطه بحسابك.
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  className="acct-link-choice"
+                  onClick={() => {
+                    setOperation('REGISTER_NEW_PLAYER');
+                    setError('');
+                  }}
+                >
+                  <span className="acct-link-choice-icon" aria-hidden="true">🆕</span>
+                  <span className="acct-link-choice-title">تسجيل لاعب جديد</span>
+                  <span className="acct-link-choice-desc">
+                    لا تملك لاعباً؟ وثّق قناتك وأنشئ لاعباً جديداً.
+                  </span>
+                </button>
+              </div>
+              {error && <p className="acct-link-error" role="alert">{error}</p>}
+            </>
           ) : (
             <>
+              <p className="acct-link-instruction">
+                {operation === 'LINK_EXISTING_PLAYER' ? '🔗 ربط لاعب موجود' : '🆕 تسجيل لاعب جديد'}
+              </p>
               <ol className="acct-link-steps">
-                <li>ابدأ عملية الربط وأدخل رابط قناتك.</li>
+                <li>ابدأ العملية وأدخل رابط قناتك.</li>
                 <li>استلم كود التحقق من الموقع.</li>
                 <li>ضع الكود في وصف قناة YouTube الخاصة بك.</li>
                 <li>عُد إلى الموقع واضغط «تحقق الآن».</li>
-                <li>سيُربط لاعبك الحالي بحسابك تلقائياً.</li>
+                <li>
+                  {operation === 'LINK_EXISTING_PLAYER'
+                    ? 'سيُربط لاعبك الحالي بحسابك تلقائياً.'
+                    : 'سيُنشأ لاعبك الجديد ويُربط بحسابك تلقائياً.'}
+                </li>
               </ol>
               <label className="acct-link-field" htmlFor="acct-link-channel">
                 <span className="acct-link-field-label">رابط قناة YouTube أو معرّفها</span>
@@ -253,13 +305,28 @@ export function AccountLinkPanel({ onLinked }: AccountLinkPanelProps) {
                 />
               </label>
               {error && <p className="acct-link-error" role="alert">{error}</p>}
-              <button
-                className="btn-neon acct-link-btn"
-                onClick={() => void handleStart()}
-                disabled={flow === 'starting'}
-              >
-                {flow === 'starting' ? 'جارٍ بدء الربط…' : 'ابدأ الربط'}
-              </button>
+              <div className="acct-link-actions">
+                <button
+                  className="btn-neon acct-link-btn"
+                  onClick={() => void handleStart()}
+                  disabled={flow === 'starting'}
+                >
+                  {flow === 'starting'
+                    ? 'جارٍ بدء العملية…'
+                    : operation === 'LINK_EXISTING_PLAYER'
+                      ? 'ابدأ الربط'
+                      : 'ابدأ التسجيل'}
+                </button>
+                <button
+                  className="nav-link"
+                  onClick={() => {
+                    setOperation(null);
+                    setError('');
+                  }}
+                >
+                  رجوع
+                </button>
+              </div>
             </>
           )}
         </div>

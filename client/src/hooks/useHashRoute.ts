@@ -88,3 +88,22 @@ export function matchStreamGamesRoute(path: string): { gameId: string } | null {
   const m = path.match(/^\/stream-games\/([A-Za-z0-9_-]+)$/);
   return m ? { gameId: m[1] } : null;
 }
+
+/**
+ * Post-Phase 8 — dedicated FalFoos identity / registration experience
+ * (`#/register`). Reuses the existing Phase 8 account-linking flow; this route
+ * is presentation only and adds no new registration path.
+ */
+export function matchRegisterRoute(path: string): boolean {
+  return path === '/register';
+}
+
+/**
+ * Broadcast Bracket (`#/broadcast/:tournamentId`) — a transparent, interactive
+ * presentation of the SAME tournament bracket for stream overlays. The id is
+ * resolved through the existing public tournament APIs (no new data source).
+ */
+export function matchBroadcastRoute(path: string): { tournamentId: string } | null {
+  const m = path.match(/^\/broadcast\/([a-z0-9-]+)$/i);
+  return m ? { tournamentId: m[1] } : null;
+}

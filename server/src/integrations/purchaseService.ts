@@ -1,5 +1,6 @@
 import crypto from 'crypto';
 import { getDb } from '../db/db';
+import { findLinkedPlayerForUser } from '../identity/identityService';
 import type { SessionUser } from '../auth/session';
 import {
   getParticipant,
@@ -183,15 +184,8 @@ function updateIntent(requestId: string, fields: Record<string, unknown>): void 
 }
 
 function resolveLinkedIdentity(userId: string): LinkedIdentity | null {
-  const row = getDb()
-    .prepare(
-      `SELECT player_id, youtube_channel_id, display_name
-         FROM guests
-        WHERE claimed_user_id = ? AND youtube_channel_id IS NOT NULL
-        ORDER BY first_seen ASC LIMIT 1`
-    )
-    .get(userId) as { player_id: string; youtube_channel_id: string; display_name: string | null } | undefined;
-  return row ?? null;
+  // Phase 8 — single source of truth: a canonical Player is channel-backed.
+  return findLinkedPlayerForUser(userId);
 }
 
 function displayNameFor(playerId: string, channelId: string): string {

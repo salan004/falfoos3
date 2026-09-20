@@ -145,6 +145,11 @@ export function ProfilePage({ playerId }: { playerId?: string }) {
           {/* Phase 7 / Step 2 — an authenticated account with no Player yet is
               exactly the account-linking target; keep the CTA reachable here. */}
           {!isPublic && <AccountLinkPanel onLinked={() => setLinkVersion((v) => v + 1)} />}
+          {!isPublic && (
+            <a className="nav-link profile-register-link" href="#/register">
+              صفحة تسجيل الهوية ←
+            </a>
+          )}
           <div className="panel text-center" style={{ padding: '40px 20px' }}>
             <h2 className="page-title" style={{ fontSize: '1.4rem' }}>
               {status === 'error' ? 'تعذّر تحميل الملف الشخصي' : 'لا توجد هوية لاعب بعد'}
@@ -227,6 +232,11 @@ export function ProfilePage({ playerId }: { playerId?: string }) {
 
         {/* ---------- Account <-> Player linking (own profile only) ---------- */}
         {!isPublic && <AccountLinkPanel onLinked={() => setLinkVersion((v) => v + 1)} />}
+        {!isPublic && (
+          <a className="nav-link profile-register-link" href="#/register">
+            صفحة تسجيل الهوية ←
+          </a>
+        )}
 
         {/* ---------- Competitive stat trio (global) ---------- */}
         <section className="profile-stats-row">

@@ -6,7 +6,7 @@ import { initDatabase, getDb } from '../db/db';
 import { TEST_SECRET, cleanupTestDb } from './integrationTestDb';
 import { test, testAsync, assertEqual, assertTrue, assertNull, summarize } from '../competitive/testHarness';
 import { ensureUserCanonicalPlayer, resolveSocketIdentity } from '../auth/socketIdentity';
-import { findCanonicalPlayerIdByChannel } from '../identity/identityService';
+import { findCanonicalPlayerIdByChannel, findLinkedPlayerForUser } from '../identity/identityService';
 import { startLink, verifyLink, isClaimOwnershipConflict } from './linkService';
 import { callBot, BOT_ENDPOINTS, health, BotIntegrationError } from './falfoosBotClient';
 import { startPurchase, recoverPurchaseIntents } from './purchaseService';
@@ -39,6 +39,19 @@ let bot: BotMockState;
 function reset(): void {
   const db = getDb();
   for (const table of [
+    'match_result_corrections',
+    'tournament_match_participants',
+    'tournament_matches',
+    'competitive_xp_transactions',
+    'competitive_progressions',
+    'elo_transactions',
+    'lp_transactions',
+    'competitive_profiles',
+    'score_events',
+    'participations',
+    'match_winners',
+    'player_achievements',
+    'matches',
     'website_purchase_intents',
     'link_intents',
     'tournament_participants',
@@ -139,6 +152,52 @@ function postRecover(cookie?: string): Promise<{ status: number; body: any }> {
       }
     );
     req.on('error', reject);
+    req.end();
+  });
+}
+
+/**
+ * Posts a JSON body to the integration routes over node:http (NOT global fetch)
+ * so the bot mock cannot intercept this local request.
+ */
+function postIntegration(
+  path: string,
+  body: unknown,
+  cookie?: string
+): Promise<{ status: number; body: any }> {
+  return new Promise((resolve, reject) => {
+    const payload = JSON.stringify(body);
+    const req = http.request(
+      {
+        host: '127.0.0.1',
+        port: recoverApiPort,
+        method: 'POST',
+        path,
+        headers: {
+          'Content-Type': 'application/json',
+          'Content-Length': Buffer.byteLength(payload),
+          ...(cookie ? { Cookie: cookie } : {}),
+        },
+      },
+      (res) => {
+        let text = '';
+        res.setEncoding('utf8');
+        res.on('data', (chunk) => (text += chunk));
+        res.on('end', () => {
+          let parsed: any = null;
+          if (text.length > 0) {
+            try {
+              parsed = JSON.parse(text);
+            } catch {
+              parsed = text;
+            }
+          }
+          resolve({ status: res.statusCode || 0, body: parsed });
+        });
+      }
+    );
+    req.on('error', reject);
+    req.write(payload);
     req.end();
   });
 }
@@ -305,7 +364,7 @@ async function main(): Promise<void> {
     seedUser(USER.id);
     seedUser(USER2.id);
     // PLAYER is already owned by a DIFFERENT account, so the pre-claim
-    // `ensureUserCanonicalPlayer(USER)` check passes but the atomic claim loses.
+    // canonical check passes but the atomic claim loses.
     seedGuest(PLAYER, CHANNEL, USER2.id);
 
     const start = await startLink(USER, CHANNEL);
@@ -317,14 +376,14 @@ async function main(): Promise<void> {
       code = err instanceof IntegrationError ? err.code : 'other';
       httpStatus = err instanceof IntegrationError ? err.httpStatus : 0;
     }
-    assertEqual(code, 'account_already_linked', 'conflict mapped to account_already_linked');
+    assertEqual(code, 'player_claimed_by_other', 'player owned by another account is a distinct 409');
     assertEqual(httpStatus, 409, 'conflict is HTTP 409');
 
     const intent = getDb()
       .prepare('SELECT status, error FROM link_intents WHERE request_id = ?')
       .get(start.request_id) as { status: string; error: string | null } | undefined;
     assertEqual(intent?.status, 'FAILED', 'link intent finalized as FAILED');
-    assertEqual(intent?.error, 'account_already_linked', 'intent error recorded');
+    assertEqual(intent?.error, 'player_claimed_by_other', 'intent error recorded');
 
     const owner = getDb()
       .prepare('SELECT claimed_user_id FROM guests WHERE player_id = ?')
@@ -407,6 +466,297 @@ async function main(): Promise<void> {
       .prepare('SELECT claimed_user_id FROM guests WHERE player_id = ?')
       .get(PLAYER) as { claimed_user_id: string | null };
     assertEqual(guest.claimed_user_id, USER.id, 'existing Player claimed by the account');
+  });
+
+  // -------------------------------------------------------------------------
+  // Phase 8 — explicit LINK_EXISTING_PLAYER vs REGISTER_NEW_PLAYER
+  // -------------------------------------------------------------------------
+
+  const ARTIFACT = 'user:' + USER.id;
+  const ARTIFACT2 = 'user:' + USER2.id;
+
+  function guestRow(playerId: string): any {
+    return getDb().prepare('SELECT * FROM guests WHERE player_id = ?').get(playerId) ?? null;
+  }
+
+  function countWhere(table: string, playerId: string): number {
+    return (
+      getDb().prepare(`SELECT COUNT(*) AS n FROM ${table} WHERE player_id = ?`).get(playerId) as { n: number }
+    ).n;
+  }
+
+  function guestsWithChannel(channelId: string): number {
+    return (
+      getDb().prepare('SELECT COUNT(*) AS n FROM guests WHERE youtube_channel_id = ?').get(channelId) as { n: number }
+    ).n;
+  }
+
+  /** Seeds B-style history: one tournament participant + LP/Elo ledgers + profile. */
+  function seedPlayerBHistory(playerId: string): void {
+    const db = getDb();
+    const now = Date.now();
+    seedParticipant(TOURNEY, playerId, 'evt_history');
+    db.prepare(
+      `INSERT INTO competitive_profiles
+         (player_id, game_id, lp, elo, matches_played, wins, losses, draws, created_at, updated_at)
+       VALUES (?, ?, 5, 1199, 2, 1, 1, 0, ?, ?)`
+    ).run(playerId, GAME, now, now);
+    db.prepare(
+      `INSERT INTO lp_transactions
+         (player_id, game_id, amount, balance_before, balance_after, reason, source_type, idempotency_key, created_at)
+       VALUES (?, ?, 5, 0, 5, 'match_win', 'match', ?, ?)`
+    ).run(playerId, GAME, `hist:${playerId}:lp`, now);
+    db.prepare(
+      `INSERT INTO elo_transactions
+         (player_id, game_id, delta, rating_before, rating_after, source_type, idempotency_key, created_at)
+       VALUES (?, ?, -1, 1200, 1199, 'match', ?, ?)`
+    ).run(playerId, GAME, `hist:${playerId}:elo`, now);
+  }
+
+  /** Seeds a user + admin + game + open tournament (FK prerequisites). */
+  function seedBase(): void {
+    seedUser(USER.id);
+    seedUser(ADMIN, 'admin');
+    seedGame();
+    seedTournament();
+  }
+
+  await testAsync('phase8: Google login does not create a Player', async () => {
+    reset();
+    seedUser(USER.id);
+    seedSession('sess-p8', USER.id);
+    assertNull(ensureUserCanonicalPlayer(USER), 'no canonical Player');
+    assertEqual(countWhere('guests', ARTIFACT), 0, 'no synthetic artifact minted');
+    assertNull(
+      resolveSocketIdentity('falfoos_session=sess-p8'),
+      'incomplete account has no identity without a guest cookie'
+    );
+  });
+
+  await testAsync('phase8: LINK existing channel-backed Player succeeds', async () => {
+    reset();
+    seedBase();
+    seedGuest(PLAYER, CHANNEL, null);
+    const start = await startLink(USER, CHANNEL, 'LINK_EXISTING_PLAYER');
+    const verify = await verifyLink(USER, start.request_id);
+    assertEqual(verify.status, 'CLAIMED', 'linked');
+    assertEqual(verify.player_id, PLAYER, 'existing Player reused');
+    assertEqual(guestRow(PLAYER).claimed_user_id, USER.id, 'claimed by user');
+  });
+
+  await testAsync('phase8: LINK nonexistent channel returns player_not_found', async () => {
+    reset();
+    seedUser(USER.id);
+    const start = await startLink(USER, CHANNEL, 'LINK_EXISTING_PLAYER');
+    let code: string | null = null;
+    try {
+      await verifyLink(USER, start.request_id);
+    } catch (err) {
+      code = err instanceof IntegrationError ? err.code : 'other';
+    }
+    assertEqual(code, 'player_not_found', 'no Player for the channel');
+    assertEqual(guestsWithChannel(CHANNEL), 0, 'nothing created');
+  });
+
+  await testAsync('phase8: LINK same user existing Player is idempotent', async () => {
+    reset();
+    seedBase();
+    seedGuest(PLAYER, CHANNEL, USER.id);
+    const start = await startLink(USER, CHANNEL, 'LINK_EXISTING_PLAYER');
+    const verify = await verifyLink(USER, start.request_id);
+    assertEqual(verify.status, 'CLAIMED', 'idempotent success');
+    assertEqual(verify.player_id, PLAYER, 'same Player');
+    const again = await verifyLink(USER, start.request_id);
+    assertEqual(again.player_id, PLAYER, 'replay idempotent');
+  });
+
+  await testAsync('phase8: LINK Player owned by another user returns player_claimed_by_other', async () => {
+    reset();
+    seedBase();
+    seedUser(USER2.id);
+    seedGuest(PLAYER, CHANNEL, USER2.id);
+    const start = await startLink(USER, CHANNEL, 'LINK_EXISTING_PLAYER');
+    let code: string | null = null;
+    try {
+      await verifyLink(USER, start.request_id);
+    } catch (err) {
+      code = err instanceof IntegrationError ? err.code : 'other';
+    }
+    assertEqual(code, 'player_claimed_by_other', 'ownership conflict');
+    assertEqual(guestRow(PLAYER).claimed_user_id, USER2.id, 'owner untouched');
+  });
+
+  await testAsync('phase8: REGISTER new channel creates exactly one Player and claims it', async () => {
+    reset();
+    seedUser(USER.id);
+    const start = await startLink(USER, CHANNEL, 'REGISTER_NEW_PLAYER');
+    const verify = await verifyLink(USER, start.request_id);
+    assertEqual(verify.status, 'CLAIMED', 'registered');
+    assertEqual(guestsWithChannel(CHANNEL), 1, 'exactly one Player for the channel');
+    const row = guestRow(verify.player_id);
+    assertEqual(row.claimed_user_id, USER.id, 'claimed by user');
+    assertEqual(row.youtube_channel_id, CHANNEL, 'channel bound');
+  });
+
+  await testAsync('phase8: REGISTER existing unclaimed channel reuses the existing Player', async () => {
+    reset();
+    seedUser(USER.id);
+    seedGuest(PLAYER, CHANNEL, null);
+    const start = await startLink(USER, CHANNEL, 'REGISTER_NEW_PLAYER');
+    const verify = await verifyLink(USER, start.request_id);
+    assertEqual(verify.player_id, PLAYER, 'reused, not duplicated');
+    assertEqual(guestsWithChannel(CHANNEL), 1, 'still one Player');
+  });
+
+  await testAsync('phase8: REGISTER Player owned by another user returns player_claimed_by_other', async () => {
+    reset();
+    seedUser(USER.id);
+    seedUser(USER2.id);
+    seedGuest(PLAYER, CHANNEL, USER2.id);
+    const start = await startLink(USER, CHANNEL, 'REGISTER_NEW_PLAYER');
+    let code: string | null = null;
+    try {
+      await verifyLink(USER, start.request_id);
+    } catch (err) {
+      code = err instanceof IntegrationError ? err.code : 'other';
+    }
+    assertEqual(code, 'player_claimed_by_other', 'ownership conflict');
+    assertEqual(guestsWithChannel(CHANNEL), 1, 'no duplicate created');
+    assertEqual(guestRow(PLAYER).claimed_user_id, USER2.id, 'owner untouched');
+  });
+
+  await testAsync('phase8: REGISTER same channel cannot create a duplicate Player', async () => {
+    reset();
+    seedUser(USER.id);
+    const first = await verifyLink(USER, (await startLink(USER, CHANNEL, 'REGISTER_NEW_PLAYER')).request_id);
+    const second = await verifyLink(USER, (await startLink(USER, CHANNEL, 'REGISTER_NEW_PLAYER')).request_id);
+    assertEqual(second.player_id, first.player_id, 'same Player reused');
+    assertEqual(guestsWithChannel(CHANNEL), 1, 'exactly one Player');
+  });
+
+  await testAsync('phase8: duplicate/replayed REGISTER is idempotent', async () => {
+    reset();
+    seedUser(USER.id);
+    const start = await startLink(USER, CHANNEL, 'REGISTER_NEW_PLAYER');
+    const first = await verifyLink(USER, start.request_id);
+    const replay = await verifyLink(USER, start.request_id);
+    assertEqual(replay.status, 'CLAIMED', 'replay success');
+    assertEqual(replay.player_id, first.player_id, 'same Player');
+    assertEqual(guestsWithChannel(CHANNEL), 1, 'no duplicate');
+  });
+
+  await testAsync('phase8: two users concurrently LINK the same Player — exactly one owns it', async () => {
+    reset();
+    seedUser(USER.id);
+    seedUser(USER2.id);
+    seedGuest(PLAYER, CHANNEL, null);
+    const s1 = await startLink(USER, CHANNEL, 'LINK_EXISTING_PLAYER');
+    const v1 = await verifyLink(USER, s1.request_id);
+    assertEqual(v1.player_id, PLAYER, 'first user wins');
+    const s2 = await startLink(USER2, CHANNEL, 'LINK_EXISTING_PLAYER');
+    let code: string | null = null;
+    try {
+      await verifyLink(USER2, s2.request_id);
+    } catch (err) {
+      code = err instanceof IntegrationError ? err.code : 'other';
+    }
+    assertEqual(code, 'player_claimed_by_other', 'second user loses');
+    assertEqual(guestRow(PLAYER).claimed_user_id, USER.id, 'exactly one owner');
+  });
+
+  await testAsync('phase8: two users concurrently REGISTER the same channel — one Player, one owner', async () => {
+    reset();
+    seedUser(USER.id);
+    seedUser(USER2.id);
+    const v1 = await verifyLink(USER, (await startLink(USER, CHANNEL, 'REGISTER_NEW_PLAYER')).request_id);
+    let code: string | null = null;
+    try {
+      await verifyLink(USER2, (await startLink(USER2, CHANNEL, 'REGISTER_NEW_PLAYER')).request_id);
+    } catch (err) {
+      code = err instanceof IntegrationError ? err.code : 'other';
+    }
+    assertEqual(code, 'player_claimed_by_other', 'second user loses');
+    assertEqual(guestsWithChannel(CHANNEL), 1, 'exactly one Player');
+    assertEqual(guestRow(v1.player_id).claimed_user_id, USER.id, 'exactly one owner');
+  });
+
+  await testAsync(
+    'phase8: synthetic artifact does not block LINK; claim released, row + history preserved, B history intact',
+    async () => {
+      reset();
+      seedBase();
+      seedGuest(ARTIFACT, null, USER.id); // channel-less synthetic artifact
+      seedGuest(PLAYER, CHANNEL, null); // canonical bot Player
+      seedPlayerBHistory(PLAYER);
+      const db = getDb();
+      const now = Date.now();
+      db.prepare('INSERT INTO matches (id, game_id, started_at) VALUES (?, ?, ?)').run('m-artifact', GAME, now);
+      db.prepare(
+        'INSERT INTO score_events (match_id, player_id, points, reason, created_at) VALUES (?, ?, ?, ?, ?)'
+      ).run('m-artifact', ARTIFACT, 7, 'test', now);
+
+      const start = await startLink(USER, CHANNEL, 'LINK_EXISTING_PLAYER');
+      const verify = await verifyLink(USER, start.request_id);
+      assertEqual(verify.player_id, PLAYER, 'channel Player claimed');
+
+      const a = guestRow(ARTIFACT);
+      assertTrue(!!a, 'artifact row still exists');
+      assertNull(a.claimed_user_id, 'artifact claim released');
+      assertNull(a.youtube_channel_id, 'artifact remains channel-less');
+      assertEqual(countWhere('score_events', ARTIFACT), 1, 'artifact history untouched');
+
+      const b = guestRow(PLAYER);
+      assertEqual(b.player_id, PLAYER, 'canonical id unchanged');
+      assertEqual(b.claimed_user_id, USER.id, 'canonical Player claimed by user');
+      assertEqual(b.youtube_channel_id, CHANNEL, 'channel unchanged');
+      assertEqual(findCanonicalPlayerIdByChannel(CHANNEL), PLAYER, 'canonical resolution unchanged');
+      assertEqual(findLinkedPlayerForUser(USER.id)!.player_id, PLAYER, 'canonical helper resolves B');
+
+      assertEqual(countWhere('tournament_participants', PLAYER), 1, 'B tournament participant intact');
+      assertEqual(countWhere('lp_transactions', PLAYER), 1, 'B LP intact');
+      assertEqual(countWhere('elo_transactions', PLAYER), 1, 'B Elo intact');
+      assertEqual(countWhere('competitive_profiles', PLAYER), 1, 'B competitive profile intact');
+    }
+  );
+
+  await testAsync('phase8: no unrelated user:* artifact is changed', async () => {
+    reset();
+    seedUser(USER.id);
+    seedUser(USER2.id);
+    seedGuest(ARTIFACT, null, USER.id);
+    seedGuest(ARTIFACT2, null, USER2.id);
+    seedGuest(PLAYER, CHANNEL, null);
+    const start = await startLink(USER, CHANNEL, 'LINK_EXISTING_PLAYER');
+    await verifyLink(USER, start.request_id);
+    assertEqual(guestRow(ARTIFACT2).claimed_user_id, USER2.id, 'other user artifact untouched');
+    assertNull(guestRow(ARTIFACT2).youtube_channel_id, 'other artifact still channel-less');
+  });
+
+  test('phase8: claimed_user_id uniqueness remains enforced', () => {
+    reset();
+    seedUser(USER.id);
+    seedGuest(PLAYER, CHANNEL, USER.id);
+    seedGuest(PLAYER2, CHANNEL2, null);
+    let threw = false;
+    try {
+      getDb().prepare('UPDATE guests SET claimed_user_id = ? WHERE player_id = ?').run(USER.id, PLAYER2);
+    } catch {
+      threw = true;
+    }
+    assertTrue(threw, 'second claim for one user is rejected by the DB');
+    assertNull(guestRow(PLAYER2).claimed_user_id, 'second Player stays unclaimed');
+  });
+
+  test('phase8: youtube_channel_id uniqueness remains enforced', () => {
+    reset();
+    seedGuest(PLAYER, CHANNEL, null);
+    let threw = false;
+    try {
+      seedGuest(PLAYER2, CHANNEL, null);
+    } catch {
+      threw = true;
+    }
+    assertTrue(threw, 'two Players for one channel rejected by the DB');
   });
 
   // -------------------------------------------------------------------------
@@ -693,6 +1043,34 @@ async function main(): Promise<void> {
     assertEqual(typeof res.body.finalized, 'number', 'finalized present');
     assertEqual(typeof res.body.refunded, 'number', 'refunded present');
     assertEqual(typeof res.body.pending, 'number', 'pending present');
+  });
+
+  await testAsync('phase8: client-supplied player_id cannot control the claimed Player', async () => {
+    reset();
+    seedUser(USER.id);
+    seedSession('sess-p8-route', USER.id);
+    seedGuest(PLAYER, CHANNEL, null);
+    seedGuest(PLAYER2, CHANNEL2, null);
+
+    const started = await postIntegration(
+      '/api/integrations/link/start',
+      { channel: CHANNEL, operation: 'LINK_EXISTING_PLAYER' },
+      'falfoos_session=sess-p8-route'
+    );
+    assertEqual(started.status, 200, 'start ok');
+    const requestId = started.body.request_id;
+    assertTrue(!!requestId, 'request id issued');
+
+    // A malicious extra player_id must be ignored: identity is derived ONLY
+    // from the verified YouTube channel.
+    const verified = await postIntegration(
+      '/api/integrations/link/verify',
+      { request_id: requestId, player_id: PLAYER2 },
+      'falfoos_session=sess-p8-route'
+    );
+    assertEqual(verified.status, 200, 'verify ok');
+    assertEqual(verified.body.player_id, PLAYER, 'channel-derived Player, not the injected one');
+    assertNull(guestRow(PLAYER2).claimed_user_id, 'injected Player2 untouched');
   });
 
   if (recoverApiServer) {

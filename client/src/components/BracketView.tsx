@@ -16,6 +16,10 @@ interface BracketViewProps {
   bracket: BracketDto;
   players: Map<string, BracketPlayerMeta>;
   championPlayerId?: string | null;
+  /** `broadcast` renders the same tree with stream-overlay-friendly styling. */
+  variant?: 'default' | 'broadcast';
+  selectedMatchId?: string | null;
+  onSelectMatch?: (match: MatchDto) => void;
 }
 
 const STATUS_LABELS: Record<string, string> = {
@@ -41,11 +45,17 @@ function MatchCard({
   players,
   hasNext,
   isFinalRound,
+  interactive,
+  selected,
+  onSelect,
 }: {
   match: MatchDto;
   players: Map<string, BracketPlayerMeta>;
   hasNext: boolean;
   isFinalRound: boolean;
+  interactive: boolean;
+  selected: boolean;
+  onSelect?: (match: MatchDto) => void;
 }) {
   const statusLabel = STATUS_LABELS[match.status] ?? match.status;
   const badge = STATUS_BADGE[match.status] ?? 'badge-cyan';
@@ -54,7 +64,23 @@ function MatchCard({
     <div
       className={`bracket-match ${hasNext ? 'has-next' : ''} ${
         match.status === 'completed' ? 'is-completed' : ''
-      } ${match.status === 'active' ? 'is-active' : ''} ${isFinalRound ? 'is-final-round' : ''}`}
+      } ${match.status === 'active' ? 'is-active' : ''} ${isFinalRound ? 'is-final-round' : ''} ${
+        interactive ? 'is-interactive' : ''
+      } ${selected ? 'is-selected' : ''}`}
+      role={interactive ? 'button' : undefined}
+      tabIndex={interactive ? 0 : undefined}
+      aria-pressed={interactive ? selected : undefined}
+      onClick={interactive ? () => onSelect?.(match) : undefined}
+      onKeyDown={
+        interactive
+          ? (e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                onSelect?.(match);
+              }
+            }
+          : undefined
+      }
     >
       <div className="bracket-match-head">
         <span className="bracket-match-slot">م{match.slotNo.toLocaleString('ar')}</span>
@@ -103,16 +129,30 @@ function MatchCard({
 }
 
 /**
- * Phase 4E — visual single-elimination bracket rendered purely from the Phase
- * 4D bracket DTO. Round 1 is the outer column (right in RTL), later rounds move
- * inward, and the final sits next to the champion. Connector lines are drawn
- * with CSS from the deterministic grid geometry. The frontend never calculates
- * progression.
+ * Phase 4E / Post-Phase 8 — visual single-elimination bracket rendered purely
+ * from the Phase 4D bracket DTO. Round 1 is the outer column (right in RTL),
+ * later rounds move inward, and the final sits next to the champion.
+ *
+ * Geometry: every match column is a fixed track and every gap column has a
+ * fixed width, so the connector lines land exactly on each match's vertical
+ * centre. A single uniform row unit (`--bracket-row`) keeps every round's
+ * matches on a predictable grid; a match always centres inside the rows it
+ * spans, so its centre is mathematically the midpoint of its two feeders.
+ *
+ * The `broadcast` variant reuses the exact same tree and geometry with
+ * overlay-tuned styling. The frontend never calculates progression.
  */
-export function BracketView({ bracket, players, championPlayerId }: BracketViewProps) {
+export function BracketView({
+  bracket,
+  players,
+  championPlayerId,
+  variant = 'default',
+  selectedMatchId,
+  onSelectMatch,
+}: BracketViewProps) {
   if (!bracket || bracket.rounds.length === 0) {
     return (
-      <div className="panel text-center py-12 text-[var(--text-dim)]">
+      <div className={`panel text-center py-12 text-[var(--text-dim)]${variant === 'broadcast' ? ' bracket-empty-broadcast' : ''}`}>
         لم يتم توليد جدول البطولة بعد
       </div>
     );
@@ -122,14 +162,15 @@ export function BracketView({ bracket, players, championPlayerId }: BracketViewP
   const totalRounds = rounds.length;
   const firstRoundCount = rounds[0].matches.length;
   const championMeta = championPlayerId ? players.get(championPlayerId) : undefined;
+  const interactive = typeof onSelectMatch === 'function';
 
   const columns: string[] = [];
   for (let ri = 0; ri < totalRounds; ri++) {
-    columns.push('minmax(200px, 1fr)');
-    if (ri < totalRounds - 1) columns.push('38px');
+    columns.push('minmax(var(--bracket-col, 210px), 1fr)');
+    if (ri < totalRounds - 1) columns.push('var(--bracket-gap, 46px)');
   }
   if (championPlayerId) {
-    columns.push('38px');
+    columns.push('var(--bracket-gap, 46px)');
     columns.push('minmax(180px, 0.9fr)');
   }
 
@@ -151,10 +192,11 @@ export function BracketView({ bracket, players, championPlayerId }: BracketViewP
   rounds.forEach((round, ri) => {
     const span = Math.pow(2, ri);
     const hasNext = ri < totalRounds - 1;
-      round.matches.forEach((match, mi) => {
+    round.matches.forEach((match, mi) => {
       nodes.push(
         <div
           key={`m-${match.id}`}
+          className="bracket-slot"
           style={{
             gridColumn: 2 * ri + 1,
             gridRow: `${mi * span + 2} / span ${span}`,
@@ -165,6 +207,9 @@ export function BracketView({ bracket, players, championPlayerId }: BracketViewP
             players={players}
             hasNext={hasNext}
             isFinalRound={ri === totalRounds - 1}
+            interactive={interactive}
+            selected={selectedMatchId === match.id}
+            onSelect={onSelectMatch}
           />
         </div>
       );
@@ -229,12 +274,12 @@ export function BracketView({ bracket, players, championPlayerId }: BracketViewP
   }
 
   return (
-    <div className="bracket-scroll" dir="rtl">
+    <div className={`bracket-scroll bracket-scroll-${variant}`} dir="rtl">
       <div
-        className="bracket-grid"
+        className={`bracket-grid bracket-grid-${variant}`}
         style={{
           gridTemplateColumns: columns.join(' '),
-          gridTemplateRows: `auto repeat(${firstRoundCount}, minmax(86px, auto))`,
+          gridTemplateRows: `auto repeat(${firstRoundCount}, var(--bracket-row, 132px))`,
         }}
       >
         {nodes}

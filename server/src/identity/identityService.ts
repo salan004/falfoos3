@@ -93,6 +93,36 @@ export function findCanonicalPlayerIdByChannel(channelId: string): string | null
   return findLegacyChannelPlayer(channelId)?.player_id ?? null;
 }
 
+export interface LinkedPlayerRow {
+  player_id: string;
+  youtube_channel_id: string;
+  display_name: string | null;
+}
+
+/**
+ * Phase 8 — the SINGLE source of truth for a website user's canonical linked
+ * Player.
+ *
+ * A canonical Player is channel-backed: it must satisfy BOTH
+ * `claimed_user_id = userId` AND `youtube_channel_id IS NOT NULL`. Channel-less
+ * synthetic `user:<id>` artifacts are account-identity rows, never canonical
+ * links, so they are deliberately excluded here.
+ *
+ * Read-only: never creates, claims or mutates anything.
+ */
+export function findLinkedPlayerForUser(userId: string): LinkedPlayerRow | null {
+  const row = getDb()
+    .prepare(
+      `SELECT player_id, youtube_channel_id, display_name
+         FROM guests
+        WHERE claimed_user_id = ? AND youtube_channel_id IS NOT NULL
+        ORDER BY first_seen ASC
+        LIMIT 1`
+    )
+    .get(userId) as LinkedPlayerRow | undefined;
+  return row ?? null;
+}
+
 export interface CanonicalResolution {
   playerId: string;
   /** True only when a brand-new UUID guest was created by this call. */

@@ -12,6 +12,7 @@ import { cleanupTestDb, testDbPath } from '../competitive/testDb';
 import { getDb, initDatabase } from '../db/db';
 import {
   findCanonicalPlayerIdByChannel,
+  findLinkedPlayerForUser,
   isYouTubeChannelId,
   mergePlayerIdentities,
   resolveOrCreatePlayerByYouTubeChannelId,
@@ -335,6 +336,22 @@ test('11 — a forced merge failure rolls back every partial change', () => {
   assertTrue(!!getGuestRaw(CHANNEL), 'duplicate intact');
   assertEqual(countWhere('score_events', CHANNEL), 1, 'score still owned by duplicate');
   assertEqual(countWhere('score_events', SURVIVOR), 0, 'nothing partially migrated');
+});
+
+test('12 — findLinkedPlayerForUser ignores a channel-less synthetic artifact', () => {
+  wipeAll();
+  seedGuest('user:admin', { claimed: 'admin' });
+  assertNull(findLinkedPlayerForUser('admin'), 'channel-less artifact is not a canonical link');
+});
+
+test('13 — findLinkedPlayerForUser returns the channel-backed canonical Player', () => {
+  wipeAll();
+  seedGuest(SURVIVOR, { channel: CHANNEL, claimed: 'admin', name: 'Falfoos' });
+  const linked = findLinkedPlayerForUser('admin');
+  assertTrue(!!linked, 'canonical Player found');
+  assertEqual(linked!.player_id, SURVIVOR, 'channel-backed id');
+  assertEqual(linked!.youtube_channel_id, CHANNEL, 'channel returned');
+  assertEqual(linked!.display_name, 'Falfoos', 'display name returned');
 });
 
 cleanupTestDb();

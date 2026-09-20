@@ -23,6 +23,7 @@ export { migration0022MatchResultCorrections } from './0022_match_result_correct
 export { migration0023CompetitiveProgression } from './0023_competitive_progression';
 export { migration0024WebsiteIntegration } from './0024_website_integration';
 export { migration0025GuestsClaimedUnique } from './0025_guests_claimed_unique';
+export { migration0026LinkIntentsOperation } from './0026_link_intents_operation';
 
 import { migration0001Init } from './0001_init';
 import { migration0002GuestChannel } from './0002_guest_channel';
@@ -49,6 +50,7 @@ import { migration0022MatchResultCorrections } from './0022_match_result_correct
 import { migration0023CompetitiveProgression } from './0023_competitive_progression';
 import { migration0024WebsiteIntegration } from './0024_website_integration';
 import { migration0025GuestsClaimedUnique } from './0025_guests_claimed_unique';
+import { migration0026LinkIntentsOperation } from './0026_link_intents_operation';
 
 /**
  * Ordered migration registry. New migrations are appended here in order —
@@ -80,4 +82,5 @@ export const migrations: { id: string; sql: string }[] = [
   migration0023CompetitiveProgression,
   migration0024WebsiteIntegration,
   migration0025GuestsClaimedUnique,
+  migration0026LinkIntentsOperation,
 ];

@@ -6,11 +6,18 @@ import { apiFetch } from './api';
  * (credentials included); it never resolves identity, verifies signatures,
  * talks to YouTube/Streamlabs, or chooses a Player.
  *
- * Endpoints (server-owned contract, unchanged):
+ * Endpoints (server-owned contract):
  *   GET  /api/integrations/account
- *   POST /api/integrations/link/start   { channel }
+ *   POST /api/integrations/link/start   { channel, operation }
  *   POST /api/integrations/link/verify  { request_id }
  */
+
+/**
+ * Phase 8 — the two explicit account operations. The server decides the final
+ * outcome after verifying the signed YouTube attestation; the browser only
+ * states which operation the user chose.
+ */
+export type AccountLinkOperation = 'LINK_EXISTING_PLAYER' | 'REGISTER_NEW_PLAYER';
 
 export interface LinkedPlayer {
   player_id: string;
@@ -95,14 +102,18 @@ export function fetchAccountLinkStatus(): Promise<AccountLinkResponse<AccountLin
 }
 
 /**
- * Starts linking for the authenticated account. `channel` is the ONLY
- * client-supplied value the backend contract requires; the server owns the
- * request id and resolves/validates the channel with the bot.
+ * Starts an account operation for the authenticated account. `channel` and
+ * `operation` are the only client-supplied values; the server owns the request
+ * id, validates the operation against its allowlist, and resolves/validates the
+ * channel with the bot.
  */
-export function startAccountLink(channel: string): Promise<AccountLinkResponse<LinkStartResult>> {
+export function startAccountLink(
+  channel: string,
+  operation: AccountLinkOperation
+): Promise<AccountLinkResponse<LinkStartResult>> {
   return accountLinkRequest<LinkStartResult>('/api/integrations/link/start', {
     method: 'POST',
-    body: JSON.stringify({ channel }),
+    body: JSON.stringify({ channel, operation }),
   });
 }
 

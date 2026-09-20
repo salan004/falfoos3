@@ -65,9 +65,18 @@ export function CompetitiveParticipantCard({
       <dl className="competitive-participant-stats">
         <div>
           <dt>الرتبة</dt>
-          <dd>
-            <RankBadge tierKey={tierKey} label={rankName} size={16} />
-            {rankName ?? '—'}
+          <dd className="competitive-participant-rank">
+            {rankName ? (
+              <span
+                className="rank-display rank-display-card"
+                style={{ '--rank-display-size': '58px' } as React.CSSProperties}
+              >
+                <RankBadge tierKey={tierKey} label={rankName} size={58} />
+                <span className="rank-display-name">{rankName}</span>
+              </span>
+            ) : (
+              '—'
+            )}
           </dd>
         </div>
         <div>

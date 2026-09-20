@@ -1,25 +1,14 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { useHashRoute } from '../hooks/useHashRoute';
 import { useScrollReveal } from '../hooks/useScrollReveal';
 import { useAuthSession } from '../hooks/useAuthSession';
-import { onCompetitiveEvent } from '../utils/socket';
+import { useTournamentBracket } from '../hooks/useTournamentBracket';
 import { BracketView, type BracketPlayerMeta } from '../components/BracketView';
 import { ArenaAtmosphere } from '../components/ArenaAtmosphere';
 import { CompetitiveParticipantCard } from '../components/CompetitiveParticipantCard';
 import { PlayerAvatar } from '../components/PlayerAvatar';
-import type {
-  BracketDto,
-  CompetitiveRosterEntry,
-  GameLeaderboardEntry,
-  MatchDto,
-  TournamentSummary,
-} from '../types/competitive';
+import type { MatchDto } from '../types/competitive';
 import {
-  fetchTournamentSummary,
-  fetchTournamentRoster,
-  fetchTournamentBracket,
-  fetchTournamentMatches,
-  fetchGameLeaderboard,
   generateBracket,
   recordMatchResult,
   correctMatchResult,
@@ -73,130 +62,25 @@ export function TournamentDetailPage({ tournamentId }: TournamentDetailPageProps
   const { user } = useAuthSession();
   const isAdmin = user?.role === 'admin';
 
-  const [summary, setSummary] = useState<TournamentSummary | null>(null);
-  const [roster, setRoster] = useState<CompetitiveRosterEntry[]>([]);
-  const [bracket, setBracket] = useState<BracketDto | null>(null);
-  const [matches, setMatches] = useState<MatchDto[]>([]);
-  const [profiles, setProfiles] = useState<Map<string, GameLeaderboardEntry>>(new Map());
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  // Post-Phase 8 — bracket/summary/roster/matches come from the shared hook so
+  // the normal page and the Broadcast Bracket read the exact same data source.
+  const {
+    summary,
+    roster,
+    bracket,
+    matches,
+    profiles,
+    playerMeta,
+    roundNames,
+    participantRecords,
+    championMeta,
+    loading,
+    error,
+    reload,
+  } = useTournamentBracket(tournamentId);
+
   const [adminError, setAdminError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-
-  const load = useCallback(async () => {
-    setError(null);
-    const summaryRes = await fetchTournamentSummary(tournamentId);
-    if (!summaryRes.ok || !summaryRes.data) {
-      setError(summaryRes.status === 404 ? 'البطولة غير موجودة' : 'فشل تحميل البطولة');
-      setLoading(false);
-      return;
-    }
-    const summaryData = summaryRes.data.tournament;
-    setSummary(summaryData);
-
-    const [rosterRes, bracketRes, matchesRes, leaderboardRes] = await Promise.all([
-      fetchTournamentRoster(tournamentId),
-      fetchTournamentBracket(tournamentId),
-      fetchTournamentMatches(tournamentId),
-      fetchGameLeaderboard(summaryData.gameId),
-    ]);
-
-    setRoster(rosterRes.data?.participants ?? []);
-    setBracket(bracketRes.data?.bracket ?? null);
-    setMatches(matchesRes.data?.matches ?? []);
-
-    const map = new Map<string, GameLeaderboardEntry>();
-    for (const entry of leaderboardRes.data?.leaderboard.players ?? []) {
-      map.set(entry.playerId, entry);
-    }
-    setProfiles(map);
-    setLoading(false);
-  }, [tournamentId]);
-
-  useEffect(() => {
-    setLoading(true);
-    load();
-  }, [load]);
-
-  // Phase 4F — real-time invalidation. Server events are refetch signals only;
-  // we never apply LP/Elo/rank locally. Debounced so a burst (e.g. a correction
-  // emits several events) results in a single refetch.
-  const reloadTimer = useRef<number | null>(null);
-  useEffect(() => {
-    const off = onCompetitiveEvent((event) => {
-      const relevant =
-        event.tournamentId === tournamentId ||
-        (event.type === 'competitive_profile.updated' && event.gameId === summary?.gameId);
-      if (!relevant) return;
-      if (reloadTimer.current !== null) window.clearTimeout(reloadTimer.current);
-      reloadTimer.current = window.setTimeout(() => {
-        reloadTimer.current = null;
-        void load();
-      }, 250);
-    });
-    return () => {
-      off();
-      if (reloadTimer.current !== null) window.clearTimeout(reloadTimer.current);
-    };
-  }, [tournamentId, summary?.gameId, load]);
-
-  const playerMeta = useMemo(() => {
-    const map = new Map<string, BracketPlayerMeta>();
-    for (const entry of roster) {
-      map.set(entry.playerId, {
-        name: entry.displayName ?? 'لاعب',
-        avatarUrl: entry.avatarUrl,
-        seed: entry.seed,
-        // Roster carries the participant's competitive rank/LP/Elo directly,
-        // independent of the leaderboard's top-N limit.
-        rankName: entry.rank?.rankName ?? null,
-        tierKey: entry.rank?.tierKey ?? null,
-        lp: entry.lp ?? null,
-        elo: entry.elo ?? null,
-      });
-    }
-    for (const [playerId, profile] of profiles) {
-      const existing = map.get(playerId);
-      map.set(playerId, {
-        name: existing?.name ?? profile.displayName ?? 'لاعب',
-        avatarUrl: existing?.avatarUrl ?? profile.avatarUrl,
-        seed: existing?.seed ?? null,
-        rankName: profile.rank.rankName ?? existing?.rankName ?? null,
-        tierKey: profile.rank.tierKey ?? existing?.tierKey ?? null,
-        lp: profile.lp ?? existing?.lp ?? null,
-        elo: profile.elo ?? existing?.elo ?? null,
-      });
-    }
-    return map;
-  }, [roster, profiles]);
-
-  const roundNames = useMemo(() => {
-    const map = new Map<number, string>();
-    for (const round of bracket?.rounds ?? []) map.set(round.roundNo, round.nameAr);
-    return map;
-  }, [bracket]);
-
-  const participantRecords = useMemo(() => {
-    const records = new Map<string, { wins: number; losses: number }>();
-    const ensure = (playerId: string) => {
-      let rec = records.get(playerId);
-      if (!rec) {
-        rec = { wins: 0, losses: 0 };
-        records.set(playerId, rec);
-      }
-      return rec;
-    };
-    for (const match of matches) {
-      if (match.status !== 'completed') continue;
-      for (const p of match.players) {
-        const rec = ensure(p.playerId);
-        if (match.winnerPlayerId === null) continue; // corrected draw: neither W nor L
-        if (match.winnerPlayerId === p.playerId) rec.wins += 1;
-        else rec.losses += 1;
-      }
-    }
-    return records;
-  }, [matches]);
 
   const runAdminAction = useCallback(
     async (action: () => Promise<{ ok: boolean; error: string | null }>) => {
@@ -208,9 +92,9 @@ export function TournamentDetailPage({ tournamentId }: TournamentDetailPageProps
         setAdminError(result.error || 'فشل تنفيذ العملية');
         return;
       }
-      await load();
+      await reload();
     },
-    [load]
+    [reload]
   );
 
   if (loading) {
@@ -229,7 +113,6 @@ export function TournamentDetailPage({ tournamentId }: TournamentDetailPageProps
     );
   }
 
-  const championMeta = summary.championPlayerId ? playerMeta.get(summary.championPlayerId) : undefined;
   const canGenerate = isAdmin && !summary.bracketGenerated && summary.status === 'open';
   const canCancelTournament =
     isAdmin && (summary.status === 'draft' || summary.status === 'open' || summary.status === 'active');
@@ -399,7 +282,22 @@ export function TournamentDetailPage({ tournamentId }: TournamentDetailPageProps
 
       {/* ---------- Bracket ---------- */}
       <section className="mb-10">
-        <h2 className="section-title tournament-section-title">⚔ جدول البطولة</h2>
+        <div className="tournament-section-head">
+          <h2 className="section-title tournament-section-title">⚔ جدول البطولة</h2>
+          {bracket && (
+            <button
+              type="button"
+              className="btn-neon tournament-broadcast-btn"
+              title="افتح نسخة البث الشفافة (مناسبة لـ OBS)"
+              onClick={() => {
+                const url = `${window.location.origin}${window.location.pathname}#/broadcast/${encodeURIComponent(tournamentId)}`;
+                window.open(url, '_blank', 'noopener');
+              }}
+            >
+              📺 براكيت البث
+            </button>
+          )}
+        </div>
         {bracket ? (
           <BracketView bracket={bracket} players={playerMeta} championPlayerId={summary.championPlayerId} />
         ) : (
@@ -429,7 +327,7 @@ export function TournamentDetailPage({ tournamentId }: TournamentDetailPageProps
                 isAdmin={isAdmin}
                 busy={busy}
                 onAction={runAdminAction}
-                onReload={load}
+                onReload={reload}
                 tournamentId={tournamentId}
               />
             ))}

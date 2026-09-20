@@ -2,6 +2,7 @@ import type { Socket } from 'socket.io';
 import { getDb } from '../db/db';
 import { COOKIE_NAME, parseCookieHeader, resolveSessionBySid, type SessionUser } from './session';
 import { resolveVerifiedGuestId } from './guest';
+import { findLinkedPlayerForUser } from '../identity/identityService';
 
 /**
  * Phase 11E — server-authoritative socket identity.
@@ -33,30 +34,25 @@ export interface SocketIdentity {
 /**
  * Resolves the canonical Player for an authenticated account.
  *
- * Phase 7 change — an authenticated account with NO claimed Player is now an
- * INCOMPLETE account: it must NOT auto-create a `user:<id>` Player. The
- * function returns the claimed Player id, or `null` when none is linked.
+ * Phase 7 change — an authenticated account with NO claimed Player is an
+ * INCOMPLETE account: it must NOT auto-create a `user:<id>` Player.
  *
- * Accounts created before Phase 7 that already own a `user:<id>` row still
- * match the `claimed_user_id` lookup and keep working unchanged. Only the
- * silent creation of new synthetic Players is removed.
+ * Phase 8 change — a canonical Player must be channel-backed
+ * (`youtube_channel_id IS NOT NULL`). A channel-less synthetic `user:<id>`
+ * artifact is an account-identity row, NOT the user's canonical Player, so it
+ * must never satisfy this lookup. Resolution goes through the single
+ * `findLinkedPlayerForUser` helper.
  *
  * Phase 12B — exported so HTTP routes (/api/me/profile) resolve the SAME
  * canonical scoring id as the socket handshake. Single source of truth.
  */
 export function ensureUserCanonicalPlayer(user: SessionUser): string | null {
-  const claimed = getDb()
-    .prepare('SELECT player_id FROM guests WHERE claimed_user_id = ? ORDER BY first_seen ASC LIMIT 1')
-    .get(user.id) as { player_id: string } | undefined;
-  return claimed ? claimed.player_id : null;
+  return findLinkedPlayerForUser(user.id)?.player_id ?? null;
 }
 
-/** True when the account already owns a canonical Player (linked/complete). */
+/** True when the account already owns a channel-backed canonical Player. */
 export function isAccountLinked(userId: string): boolean {
-  const row = getDb()
-    .prepare('SELECT 1 AS ok FROM guests WHERE claimed_user_id = ? LIMIT 1')
-    .get(userId);
-  return Boolean(row);
+  return findLinkedPlayerForUser(userId) !== null;
 }
 
 /**

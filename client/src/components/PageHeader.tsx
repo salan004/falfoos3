@@ -15,6 +15,7 @@ const PAGE_TITLES: Record<string, string> = {
   '/leaderboard': 'المتصدرين',
   '/links': 'الروابط',
   '/connect': 'ربط البث',
+  '/register': 'تسجيل الهوية',
   '/dashboard': 'لوحة التحكم',
 };
 

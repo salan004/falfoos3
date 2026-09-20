@@ -160,6 +160,19 @@ export function claimGuestForUser(
     const resolved = resolveOrCreatePlayerByYouTubeChannelId(channelId, displayName, avatarUrl);
     const playerId = resolved.playerId;
 
+    // Phase 8 — ownership reconciliation. Release THIS user's channel-less
+    // synthetic `user:<id>` artifact(s) BEFORE claiming the channel-backed
+    // canonical Player, so the `idx_guests_claimed_unique` partial index is
+    // free. The artifact ROW is preserved (only its claim is cleared): any
+    // historical data it might hold is never deleted or migrated. The scope is
+    // deliberately narrow — this user AND `youtube_channel_id IS NULL` — so
+    // channel-backed Players and other users' rows are never touched. Runs in
+    // the SAME transaction as the claim, so a failed claim rolls the release
+    // back and no partial state is left behind.
+    db.prepare(
+      'UPDATE guests SET claimed_user_id = NULL WHERE claimed_user_id = ? AND youtube_channel_id IS NULL'
+    ).run(user.id);
+
     // The live-chat proof refreshes the display identity on the canonical row.
     db.prepare(
       'UPDATE guests SET last_seen = ?, display_name = ?, avatar_url = COALESCE(?, avatar_url) WHERE player_id = ?'

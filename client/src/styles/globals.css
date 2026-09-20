@@ -5039,13 +5039,21 @@ button.hub-orb:hover .hub-label {
 .rank-display-compact .rank-display-name {
   font-size: 0.85rem;
 }
-/* Compact variant used inside the tournament participant card rank cell. */
+/* Post-Phase 8 — prominent rank cell in the tournament participant card:
+   a large emblem with the rank name underneath at a medium readable size. */
 .rank-display-card {
-  gap: 4px;
+  gap: 8px;
 }
 .rank-display-card .rank-display-name {
-  font-size: 0.78rem;
+  font-size: 0.95rem;
+  font-weight: 800;
   line-height: 1.25;
+}
+.competitive-participant-rank {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 84px;
 }
 @media (max-width: 480px) {
   /* Direct override (not the var) so the emblem scales down on small screens. */
@@ -5143,12 +5151,26 @@ button.hub-orb:hover .hub-label {
   background: rgba(0, 240, 255, 0.07);
   box-shadow: 0 0 14px rgba(0, 240, 255, 0.12);
 }
-.bracket-grid { display: grid; align-items: stretch; min-width: max-content; }
+.bracket-grid {
+  /* Deterministic tree geometry: fixed match track, fixed gap and one uniform
+     row unit. A match always centres inside the rows it spans, so every match's
+     vertical centre is exactly the midpoint of its two feeders and the connector
+     lines land on the match centres. */
+  --bracket-col: 210px;
+  --bracket-gap: 46px;
+  --bracket-row: 132px;
+  --bracket-match-h: 112px;
+  display: grid;
+  align-items: stretch;
+  min-width: max-content;
+}
+.bracket-slot { display: flex; align-items: center; min-width: 0; }
 .bracket-match {
   position: relative;
-  align-self: center;
   width: 100%;
-  margin: 6px 0;
+  height: var(--bracket-match-h, 112px);
+  display: flex;
+  flex-direction: column;
   border: 1px solid rgba(0, 240, 255, 0.14);
   border-radius: 10px;
   background: linear-gradient(160deg, rgba(30, 34, 42, 0.94), rgba(15, 17, 21, 0.96));
@@ -5163,6 +5185,11 @@ button.hub-orb:hover .hub-label {
 }
 .bracket-match.is-final-round { border-color: rgba(0, 240, 255, 0.32); }
 .bracket-match.is-completed { border-color: rgba(0, 255, 136, 0.22); }
+.bracket-match.is-interactive { cursor: pointer; }
+.bracket-match.is-selected {
+  border-color: rgba(34, 211, 238, 0.85);
+  box-shadow: 0 0 26px rgba(34, 211, 238, 0.28), inset 0 0 0 1px rgba(34, 211, 238, 0.25);
+}
 .bracket-match-head {
   display: flex;
   align-items: center;
@@ -5174,7 +5201,7 @@ button.hub-orb:hover .hub-label {
 .bracket-match-slot { font-size: 0.7rem; color: var(--text-dim); }
 .bracket-match-bestof { font-size: 0.65rem; color: var(--neon-gold); }
 .bracket-match-status { margin-inline-start: auto; }
-.bracket-players { display: flex; flex-direction: column; }
+.bracket-players { display: flex; flex-direction: column; flex: 1; justify-content: center; }
 .bracket-player { display: flex; align-items: center; gap: 8px; padding: 8px 12px; }
 .bracket-player + .bracket-player { border-top: 1px solid var(--border-color); }
 .bracket-player.is-winner {
@@ -5236,7 +5263,9 @@ button.hub-orb:hover .hub-label {
   position: absolute;
   top: 50%;
   inset-inline-start: 100%;
-  inline-size: 38px;
+  /* Exactly half the gap: the feeder's stub meets the gap column's centre line
+     without overshooting it. */
+  inline-size: calc(var(--bracket-gap, 46px) / 2);
   block-size: 2px;
   background: rgba(0, 240, 255, 0.38);
   box-shadow: 0 0 6px rgba(0, 240, 255, 0.28);
@@ -6878,6 +6907,271 @@ body::before {
   .ticket-modal-footer { justify-content: stretch; }
   .ticket-modal-footer .btn-neon,
   .ticket-modal-footer .nav-link { flex: 1 1 auto; text-align: center; }
+}
+
+/* ============================================================
+   Post-Phase 8 — Account linking: two explicit choice cards
+   ============================================================ */
+.acct-link-choices {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.acct-link-choice {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 16px;
+  text-align: start;
+  font: inherit;
+  color: var(--text-primary);
+  cursor: pointer;
+  border: 1px solid var(--hub-border, rgba(255, 255, 255, 0.09));
+  border-radius: 14px;
+  background:
+    linear-gradient(160deg, rgba(255, 255, 255, 0.04), rgba(8, 14, 24, 0.5)),
+    rgba(0, 0, 0, 0.2);
+  transition: border-color 0.25s ease, transform 0.25s ease, box-shadow 0.25s ease;
+}
+.acct-link-choice:hover,
+.acct-link-choice:focus-visible {
+  border-color: rgba(34, 211, 238, 0.5);
+  transform: translateY(-3px);
+  box-shadow: 0 16px 34px rgba(0, 0, 0, 0.4), 0 0 22px rgba(34, 211, 238, 0.14);
+  outline: none;
+}
+.acct-link-choice-icon { font-size: 1.6rem; line-height: 1; }
+.acct-link-choice-title { font-weight: 800; font-size: 1rem; }
+.acct-link-choice-desc { font-size: 0.82rem; color: var(--text-dim); line-height: 1.6; }
+@media (max-width: 560px) {
+  .acct-link-choices { grid-template-columns: 1fr; }
+}
+
+/* ============================================================
+   Post-Phase 8 — dedicated registration / identity page (#/register)
+   ============================================================ */
+.register-page { position: relative; }
+.register-page-inner { max-width: 720px; margin: 0 auto; }
+.register-hero { position: relative; text-align: center; padding: 30px 0 10px; }
+.register-title { font-size: clamp(1.7rem, 4vw, 2.2rem); }
+.register-subtitle { max-width: 560px; margin: 12px auto 0; }
+.register-bridge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 18px;
+  flex-wrap: wrap;
+}
+.register-bridge-node {
+  padding: 6px 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(34, 211, 238, 0.3);
+  background: rgba(34, 211, 238, 0.06);
+  font-weight: 700;
+  font-size: 0.8rem;
+  letter-spacing: 0.02em;
+}
+.register-bridge-node.is-channel {
+  border-color: rgba(255, 221, 0, 0.35);
+  background: rgba(255, 221, 0, 0.07);
+}
+.register-bridge-node.is-player {
+  border-color: rgba(255, 0, 170, 0.35);
+  background: rgba(255, 0, 170, 0.07);
+}
+.register-bridge-link {
+  inline-size: 34px;
+  block-size: 2px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, rgba(34, 211, 238, 0.5), rgba(255, 255, 255, 0.12));
+}
+.register-note {
+  margin: 18px 0 0;
+  font-size: 0.82rem;
+  color: var(--text-dim);
+  text-align: center;
+  line-height: 1.7;
+}
+.register-back { display: block; margin: 14px auto 0; }
+.profile-register-link { display: inline-block; margin: 10px 2px 0; font-size: 0.82rem; }
+
+/* Broadcast launch control on the Tournament Detail bracket header. */
+.tournament-broadcast-btn { font-size: 0.82rem; padding: 8px 14px; white-space: nowrap; }
+
+/* ============================================================
+   Post-Phase 8 — Broadcast Bracket (#/broadcast/:tournamentId)
+   Transparent, chrome-less, interactive overlay of the SAME bracket.
+   ============================================================ */
+body.broadcast-mode {
+  background: transparent !important;
+  background-image: none !important;
+  background-color: transparent !important;
+}
+body.broadcast-mode::before,
+body.broadcast-mode::after { display: none !important; }
+
+.broadcast-root {
+  position: relative;
+  min-height: 100vh;
+  padding: 18px clamp(12px, 2.5vw, 32px) 24px;
+  background: transparent;
+  color: var(--arena-text, var(--text-primary));
+}
+.broadcast-status {
+  display: grid;
+  place-items: center;
+  font-size: 1rem;
+  color: var(--text-dim);
+}
+.broadcast-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+.broadcast-game {
+  padding: 4px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(34, 211, 238, 0.35);
+  background: rgba(8, 12, 20, 0.55);
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--neon-cyan, #22d3ee);
+}
+.broadcast-title {
+  font-size: clamp(1.2rem, 2.4vw, 1.7rem);
+  font-weight: 800;
+  text-shadow: 0 2px 18px rgba(0, 0, 0, 0.6);
+}
+.broadcast-live {
+  margin-inline-start: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 90, 90, 0.5);
+  background: rgba(255, 90, 90, 0.12);
+  color: #ff6b6b;
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+.broadcast-live::before {
+  content: '';
+  inline-size: 8px;
+  block-size: 8px;
+  border-radius: 50%;
+  background: #ff5a5a;
+  box-shadow: 0 0 10px #ff5a5a;
+  animation: broadcast-pulse 1.6s ease-in-out infinite;
+}
+@keyframes broadcast-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.45; transform: scale(0.82); }
+}
+.broadcast-hint {
+  margin: 12px 2px 0;
+  font-size: 0.78rem;
+  color: rgba(255, 255, 255, 0.55);
+}
+.broadcast-status .bracket-empty-broadcast,
+.bracket-empty-broadcast {
+  background: rgba(8, 12, 20, 0.6);
+  border: 1px solid rgba(34, 211, 238, 0.2);
+}
+
+/* Broadcast tuning of the SAME tree (geometry vars only, no new layout engine). */
+.bracket-grid-broadcast {
+  --bracket-col: 248px;
+  --bracket-gap: 58px;
+  --bracket-row: 152px;
+  --bracket-match-h: 124px;
+}
+.bracket-scroll-broadcast { padding-bottom: 4px; }
+.bracket-grid-broadcast .bracket-match {
+  background: linear-gradient(160deg, rgba(12, 16, 26, 0.9), rgba(7, 9, 15, 0.94));
+  border-color: rgba(34, 211, 238, 0.3);
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+.bracket-grid-broadcast .bracket-player-name { font-size: 0.94rem; max-width: 200px; }
+.bracket-grid-broadcast .bracket-player-meta { font-size: 0.72rem; }
+.bracket-grid-broadcast .bracket-round-head {
+  font-size: 0.92rem;
+  background: rgba(8, 12, 20, 0.6);
+  border-color: rgba(34, 211, 238, 0.28);
+}
+
+/* Selected-match detail popover (interactive broadcast). */
+.broadcast-detail {
+  position: fixed;
+  inset-inline-end: 18px;
+  bottom: 18px;
+  width: min(360px, 92vw);
+  padding: 14px 16px 16px;
+  border-radius: 16px;
+  border: 1px solid rgba(34, 211, 238, 0.35);
+  background: linear-gradient(160deg, rgba(12, 16, 26, 0.94), rgba(7, 9, 15, 0.96));
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.6), 0 0 30px rgba(34, 211, 238, 0.14);
+  backdrop-filter: blur(10px);
+}
+.broadcast-detail-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.broadcast-detail-round {
+  font-weight: 800;
+  color: var(--neon-cyan, #22d3ee);
+}
+.broadcast-detail-slot { font-size: 0.74rem; color: var(--text-dim); }
+.broadcast-detail-status {
+  margin-inline-start: auto;
+  font-size: 0.72rem;
+  padding: 2px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+}
+.broadcast-detail-close {
+  font: inherit;
+  color: var(--text-dim);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 2px 6px;
+}
+.broadcast-detail-players { display: flex; flex-direction: column; gap: 8px; }
+.broadcast-detail-empty { font-size: 0.82rem; color: var(--text-dim); }
+.broadcast-detail-player {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  background: rgba(255, 255, 255, 0.02);
+}
+.broadcast-detail-player.is-winner {
+  border-color: rgba(0, 255, 136, 0.4);
+  background: linear-gradient(90deg, rgba(0, 255, 136, 0.12), rgba(0, 255, 136, 0.03));
+}
+.broadcast-detail-player-body { min-width: 0; display: flex; flex-direction: column; }
+.broadcast-detail-player-name { font-weight: 700; }
+.broadcast-detail-player-meta {
+  display: flex;
+  gap: 8px;
+  font-size: 0.72rem;
+  color: var(--text-dim);
+}
+.broadcast-detail-winner {
+  margin-inline-start: auto;
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: var(--neon-green, #00ff88);
 }
 
 

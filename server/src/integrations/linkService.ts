@@ -1,9 +1,8 @@
 import crypto from 'crypto';
 import { getDb } from '../db/db';
 import { env } from '../config/env';
-import { findCanonicalPlayerIdByChannel } from '../identity/identityService';
+import { findCanonicalPlayerIdByChannel, findLinkedPlayerForUser } from '../identity/identityService';
 import { claimGuestForUser, type ClaimCheckOutcome } from '../auth/claiming';
-import { ensureUserCanonicalPlayer } from '../auth/socketIdentity';
 import type { SessionUser } from '../auth/session';
 import { IntegrationError } from './errors';
 import {
@@ -24,13 +23,37 @@ import {
  *
  * The website NEVER accepts a client-supplied player id, and never creates a
  * `user:<id>` Player. Live Chat is not involved.
+ *
+ * Phase 8 — two explicit operations are supported, decided ONLY after the
+ * signed attestation is verified:
+ * - LINK_EXISTING_PLAYER: the verified channel must already resolve to a Player.
+ * - REGISTER_NEW_PLAYER: create (idempotently) and claim when the verified
+ *   channel has no Player; reuse the existing Player otherwise — never duplicate.
+ * The canonical linked Player is channel-backed (`findLinkedPlayerForUser`), so
+ * a channel-less `user:<id>` artifact never blocks linking.
  */
 
 type LinkStatus = 'CREATED' | 'CHALLENGE_ISSUED' | 'VERIFIED' | 'CLAIMED' | 'FAILED';
 
+/**
+ * Phase 8 — the two explicit post-Google-login operations. The website decides
+ * which one applies ONLY after the signed YouTube attestation is verified.
+ */
+export type LinkOperation = 'LINK_EXISTING_PLAYER' | 'REGISTER_NEW_PLAYER';
+
+const LINK_OPERATIONS: readonly LinkOperation[] = ['LINK_EXISTING_PLAYER', 'REGISTER_NEW_PLAYER'];
+
+/** Coerces untrusted input to an allowlisted operation; defaults to LINK. */
+export function normalizeLinkOperation(raw: unknown): LinkOperation {
+  return typeof raw === 'string' && (LINK_OPERATIONS as readonly string[]).includes(raw)
+    ? (raw as LinkOperation)
+    : 'LINK_EXISTING_PLAYER';
+}
+
 interface LinkIntentRow {
   request_id: string;
   website_user_id: string;
+  operation: LinkOperation;
   challenge_id: string | null;
   youtube_channel_id: string | null;
   youtube_name: string | null;
@@ -49,14 +72,14 @@ function getIntent(requestId: string): LinkIntentRow | null {
   return row ?? null;
 }
 
-function insertIntent(requestId: string, userId: string): void {
+function insertIntent(requestId: string, userId: string, operation: LinkOperation): void {
   const now = Date.now();
   getDb()
     .prepare(
-      `INSERT INTO link_intents (request_id, website_user_id, status, created_at, updated_at)
-       VALUES (?, ?, 'CREATED', ?, ?)`
+      `INSERT INTO link_intents (request_id, website_user_id, operation, status, created_at, updated_at)
+       VALUES (?, ?, ?, 'CREATED', ?, ?)`
     )
-    .run(requestId, userId, now, now);
+    .run(requestId, userId, operation, now, now);
 }
 
 function updateIntent(requestId: string, fields: Record<string, unknown>): void {
@@ -93,13 +116,21 @@ export interface LinkStartResult {
   youtube_name: string | null;
 }
 
-/** Begins linking: creates a durable intent and asks the bot for a challenge. */
-export async function startLink(user: SessionUser, channel: string): Promise<LinkStartResult> {
+/**
+ * Begins linking: creates a durable intent and asks the bot for a challenge.
+ * `operation` selects LINK vs REGISTER and defaults to LINK_EXISTING_PLAYER so
+ * existing callers keep their previous behavior.
+ */
+export async function startLink(
+  user: SessionUser,
+  channel: string,
+  operation: LinkOperation = 'LINK_EXISTING_PLAYER'
+): Promise<LinkStartResult> {
   const channelInput = typeof channel === 'string' ? channel.trim() : '';
   if (!channelInput) throw new IntegrationError('invalid_channel', 400, 'channel is required');
 
   const requestId = crypto.randomUUID();
-  insertIntent(requestId, user.id);
+  insertIntent(requestId, user.id, operation);
 
   let bot;
   try {
@@ -282,9 +313,15 @@ export async function verifyLink(user: SessionUser, requestId: string): Promise<
     throw new IntegrationError('invalid_attestation_signature', 502, 'Attestation signature verification failed');
   }
 
-  // --- Resolve the EXISTING canonical Player (never create silently) -------
+  // --- Resolve the verified channel to an existing Player (read-only) -------
+  // Identity comes ONLY from the verified channel; no client-supplied player id
+  // is ever trusted. `playerId` may be null for REGISTER_NEW_PLAYER.
   const playerId = findCanonicalPlayerIdByChannel(body.youtube_channel_id);
-  if (!playerId) {
+  const operation: LinkOperation = intent.operation ?? 'LINK_EXISTING_PLAYER';
+
+  // LINK requires the Player to already exist. REGISTER creates it below, but
+  // only through the idempotent canonical resolver (never a duplicate).
+  if (operation === 'LINK_EXISTING_PLAYER' && !playerId) {
     updateIntent(id, { status: 'FAILED', error: 'player_not_found' });
     throw new IntegrationError(
       'player_not_found',
@@ -293,9 +330,12 @@ export async function verifyLink(user: SessionUser, requestId: string): Promise<
     );
   }
 
-  // --- One account <-> one Player (explicit, no silent replacement) --------
-  const existingClaimed = ensureUserCanonicalPlayer(user);
-  if (existingClaimed && existingClaimed !== playerId) {
+  // --- One account <-> one channel-backed canonical Player ------------------
+  // A channel-less synthetic `user:<id>` artifact is NOT canonical and must
+  // never block linking. An account that already owns a DIFFERENT channel-backed
+  // Player is never silently replaced.
+  const existingLinked = findLinkedPlayerForUser(user.id);
+  if (existingLinked && (!playerId || existingLinked.player_id !== playerId)) {
     updateIntent(id, { status: 'FAILED', error: 'account_already_linked' });
     throw new IntegrationError(
       'account_already_linked',
@@ -304,21 +344,30 @@ export async function verifyLink(user: SessionUser, requestId: string): Promise<
     );
   }
 
-  // --- Atomic claim (reuses the Phase 11D primitive unchanged) -------------
+  // --- Atomic claim / reconciliation ---------------------------------------
+  // claimGuestForUser creates the Player for REGISTER (idempotently), reuses it
+  // for LINK, releases this user's channel-less artifact, and claims it — all
+  // inside ONE transaction.
   let outcome: ClaimCheckOutcome;
   try {
     outcome = claimGuestForUser(user, body.youtube_channel_id, body.youtube_name || body.youtube_channel_id);
   } catch (err) {
-    // Lost a concurrent ownership race: another account claimed this Player, or
-    // this account already owns a different Player (0025 unique index). Map the
-    // known conflict to a stable 409 and finalize the intent; anything else is
-    // re-thrown unchanged so it still surfaces as a 500.
+    // Another account owns this Player: distinct, actionable 409.
+    if (err instanceof Error && err.message === 'claimedByOther') {
+      updateIntent(id, { status: 'FAILED', error: 'player_claimed_by_other' });
+      throw new IntegrationError(
+        'player_claimed_by_other',
+        409,
+        'This Player is already linked to another account; manual resolution is required'
+      );
+    }
+    // This account owns a DIFFERENT channel-backed Player (0025 unique index).
     if (isClaimOwnershipConflict(err)) {
       updateIntent(id, { status: 'FAILED', error: 'account_already_linked' });
       throw new IntegrationError(
         'account_already_linked',
         409,
-        'This Player is already linked to another account; manual resolution is required'
+        'This account is already linked to a different Player; manual resolution is required'
       );
     }
     throw err;

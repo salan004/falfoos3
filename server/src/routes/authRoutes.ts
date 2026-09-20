@@ -14,7 +14,7 @@ import {
   upsertGoogleUser,
 } from '../auth/session';
 import { checkClaim, startClaim } from '../auth/claiming';
-import { getDb } from '../db/db';
+import { isAccountLinked } from '../auth/socketIdentity';
 
 /**
  * Phase 11C — authentication routes. Fully additive: no existing route or
@@ -76,13 +76,9 @@ authRoutes.get('/google/callback', async (req, res) => {
 /** Current session lookup. Returns {user:null} rather than an error when guest. */
 authRoutes.get('/me', (req, res) => {
   const user = resolveSession(req);
-  // Phase 11D — additive flag: has this user claimed any guest identity?
-  let guestLinked = false;
-  if (user) {
-    guestLinked = !!getDb()
-      .prepare('SELECT 1 FROM guests WHERE claimed_user_id = ? LIMIT 1')
-      .get(user.id);
-  }
+  // Phase 11D / Phase 8 — has this user linked a channel-backed canonical
+  // Player? Channel-less `user:<id>` artifacts do not count.
+  const guestLinked = user ? isAccountLinked(user.id) : false;
   res.json({ user, guestLinked });
 });
 
