@@ -56,14 +56,89 @@ export interface AwardedAchievement {
   awardedAt: number;
 }
 
-export interface PlayerProfilePayload {
-  player: ProfileIdentity;
+/**
+ * Phase 2.y — RECREATIONAL (Stream Games) profile data.
+ *
+ * Everything here is derived from the stream-game history tables
+ * (`matches`/`participations`/`score_events`/`match_winners`/
+ * `player_achievements`). It is explicitly NOT competitive progression and must
+ * never feed LP, Elo, rank, competitive profiles, tournament progression or the
+ * future Global Competitive XP.
+ */
+export interface RecreationalProfilePayload {
+  /** Marks the ownership of this data unambiguously. */
+  source: 'stream_games';
   totals: PlayerTotals;
   perGame: PerGameStat[];
   recentMatches: MatchHistoryItem[];
   historyTotal: number;
   level: LevelInfo;
   achievements: AwardedAchievement[];
+}
+
+/**
+ * Phase 2.y — COMPETITIVE profile placeholder.
+ *
+ * Reserved for Phase 2.z (Global Competitive Progression). Competitive values
+ * (Global XP / Level / Progress / Matches / Wins / competitive achievements)
+ * will be populated here EXCLUSIVELY from competitive activity; they must never
+ * be derived from Stream Games or from per-game LP/Elo.
+ */
+export interface CompetitiveProgressPayload {
+  /** XP where the current level starts. */
+  current: number;
+  /** XP where the next level starts; null at max level. */
+  next: number | null;
+  /** 0–100 progress inside the current level. */
+  pct: number;
+  /** XP earned inside the current level. */
+  intoLevel: number;
+  /** XP remaining to the next level; null at max level. */
+  forNext: number | null;
+}
+
+/**
+ * Phase 2.z — GLOBAL Competitive progression (cross-game).
+ *
+ * Sourced exclusively from competitive tournament results via the global XP
+ * ledger. Never derived from Stream Games, LP, Elo or rank.
+ */
+export interface CompetitiveProfilePayload {
+  source: 'competitive_tournaments';
+  status: 'active';
+  xp: number;
+  level: number;
+  /** Visual progression tier 1–4 (levels 1–5 / 6–10 / 11–15 / 16–20). */
+  tier: number;
+  tierLabelAr: string;
+  isMax: boolean;
+  progress: CompetitiveProgressPayload;
+  matches: number;
+  wins: number;
+}
+
+export interface PlayerProfilePayload {
+  player: ProfileIdentity;
+  /**
+   * @deprecated Phase 2.y — kept ONLY for ProfilePage/API backward
+   * compatibility. These top-level aggregates are RECREATIONAL (Stream Games);
+   * prefer `recreational`. Phase 2.z will introduce `competitive` progression.
+   */
+  totals: PlayerTotals;
+  /** @deprecated recreational — see `recreational.perGame`. */
+  perGame: PerGameStat[];
+  /** @deprecated recreational — see `recreational.recentMatches`. */
+  recentMatches: MatchHistoryItem[];
+  /** @deprecated recreational — see `recreational.historyTotal`. */
+  historyTotal: number;
+  /** @deprecated recreational level — see `recreational.level`. */
+  level: LevelInfo;
+  /** @deprecated recreational achievements — see `recreational.achievements`. */
+  achievements: AwardedAchievement[];
+  /** Explicit RECREATIONAL ownership (Stream Games). */
+  recreational: RecreationalProfilePayload;
+  /** Explicit COMPETITIVE ownership — reserved for Phase 2.z. */
+  competitive: CompetitiveProfilePayload;
 }
 
 interface StatsStatements {

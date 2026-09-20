@@ -4,6 +4,13 @@
  * No schema, no persistence: the level is always computed from the same
  * aggregated totals that power the profile. Thresholds are cumulative
  * starting points per level (level N requires THRESHOLDS[N-1] points).
+ *
+ * Phase 2.y — the input `points` currently come from RECREATIONAL Stream Game
+ * scoring (`score_events.points`). This is therefore a RECREATIONAL/LEGACY
+ * level: it must NOT be treated as competitive progression and must never feed
+ * LP, Elo, rank, competitive profiles or tournament progression. Phase 2.z will
+ * introduce the Global Competitive XP/Level system separately and re-source the
+ * profile's level from competitive activity — the formula below is unchanged.
  */
 
 export interface LevelInfo {

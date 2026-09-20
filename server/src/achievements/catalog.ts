@@ -9,6 +9,11 @@ import { getPlayerTotals, type PlayerTotals } from '../db/stats';
  * rows. Evaluation is EVENT-DRIVEN — it runs only inside GameManager's
  * `game:finished` hook (never in the scoring hot path) and is idempotent via
  * the table's PK.
+ *
+ * Phase 2.y — these are RECREATIONAL (Stream Game) achievements. They are
+ * derived exclusively from Stream Game totals and must NOT be treated as
+ * competitive achievements nor influence competitive level/XP/LP/Elo/rank.
+ * A separate Competitive Achievement system may be added in a later phase.
  */
 
 export interface AchievementDef {

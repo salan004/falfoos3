@@ -30,8 +30,13 @@ export const env = {
   YOUTUBE_API_KEY: trim(process.env.YOUTUBE_API_KEY),
   YOUTUBE_POLL_MS: trim(process.env.YOUTUBE_POLL_MS),
 
-  /** Phase 3 — HMAC secret for bot purchase-event webhook. */
+  /** Phase 3 — HMAC secret for bot purchase-event webhook (bot -> website). */
   BOT_WEBHOOK_SECRET: trim(process.env.BOT_WEBHOOK_SECRET),
+
+  /** Phase 7 — shared secret for the website -> bot integration API. */
+  WEBSITE_INTEGRATION_SECRET: trim(process.env.WEBSITE_INTEGRATION_SECRET),
+  /** Phase 7 — base URL of the FalFoos bot integration server (no trailing slash). */
+  FALFOOS_BOT_URL: trim(process.env.FALFOOS_BOT_URL),
 } as const;
 
 export function isProduction(): boolean {
@@ -82,6 +87,8 @@ export function validateStartupConfig(): void {
     row('DB_PATH', !!env.DB_PATH),
     row('PORT', !!env.PORT),
     row('BOT_WEBHOOK_SECRET', !!env.BOT_WEBHOOK_SECRET),
+    row('WEBSITE_INTEGRATION_SECRET', !!env.WEBSITE_INTEGRATION_SECRET),
+    row('FALFOOS_BOT_URL', !!env.FALFOOS_BOT_URL),
   ];
   for (const r of rows) {
     console.log(`[Config] ${r.name.padEnd(20)} ${r.status}`);

@@ -14,9 +14,10 @@ import { GameDirectoryEntry } from '../types/game';
  * hardcoded: an admin creates a game in the dashboard and its card appears here
  * automatically.
  *
- * The grid is ALWAYS rendered. Real games occupy the leading slots and the
- * remaining slots stay as visual placeholders (never database records, never
- * sent to the API). Empty placeholder cards are interactive only for admins.
+ * The grid is ALWAYS rendered from real games. Administrators additionally get
+ * "Add Game" placeholder tiles that link to the dashboard; those tiles are
+ * NEVER rendered for visitors or non-admin users (and are never database
+ * records, never sent to the API).
  */
 
 /** Visual slots kept in the grid so it always reads as a game-selection area. */
@@ -57,8 +58,8 @@ export function StreamGamesPage() {
     navigate(`/stream-games/${id}`);
   };
 
-  // Visual placeholders fill the remaining slots; never more than the target
-  // grid size, and never negative when there are more real games than slots.
+  // Admin-only "Add Game" tiles fill the remaining grid slots. Non-admins
+  // (visitors and authenticated users) never see these placeholders.
   const placeholderCount = Math.max(0, PLACEHOLDER_COUNT - games.length);
 
   return (
@@ -129,8 +130,8 @@ export function StreamGamesPage() {
               </article>
             ))}
 
-            {Array.from({ length: placeholderCount }, (_, i) =>
-              isAdmin ? (
+            {isAdmin &&
+              Array.from({ length: placeholderCount }, (_, i) => (
                 <button
                   key={`placeholder-${i}`}
                   type="button"
@@ -141,13 +142,7 @@ export function StreamGamesPage() {
                   <span className="stream-game-add-plus" aria-hidden="true">+</span>
                   <span className="stream-game-add-label">إضافة لعبة</span>
                 </button>
-              ) : (
-                <div key={`placeholder-${i}`} className="card stream-game-placeholder-card sg-placeholder-card" role="presentation">
-                  <span className="stream-game-add-plus" aria-hidden="true">+</span>
-                  <span className="stream-game-add-label">متاحة لإضافة لعبة</span>
-                </div>
-              )
-            )}
+              ))}
           </>
         )}
       </div>

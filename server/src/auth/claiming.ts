@@ -1,5 +1,6 @@
 import crypto from 'crypto';
 import { getDb } from '../db/db';
+import { resolveOrCreatePlayerByYouTubeChannelId } from '../identity/identityService';
 import type { YouTubeChatService } from '../core/YouTubeChatService';
 import type { SessionUser } from './session';
 
@@ -153,27 +154,16 @@ export function claimGuestForUser(
   const now = Date.now();
 
   const outcome = db.transaction((): ClaimCheckOutcome => {
-    // Legacy rows are keyed BY their channelId; newer rows carry it in the
-    // dedicated column. Either shape may already exist.
-    let row = db
-      .prepare('SELECT player_id, claimed_user_id FROM guests WHERE youtube_channel_id = ? OR player_id = ?')
-      .get(channelId, channelId) as { player_id: string; claimed_user_id: string | null } | undefined;
+    // Resolve/reconcile through the SINGLE canonical identity service, so a
+    // bot-created row + a legacy channel-keyed row never collide on the unique
+    // youtube_channel_id index and never leave two identities behind.
+    const resolved = resolveOrCreatePlayerByYouTubeChannelId(channelId, displayName, avatarUrl);
+    const playerId = resolved.playerId;
 
-    let playerId: string;
-    if (!row) {
-      playerId = crypto.randomUUID();
-      db.prepare(
-        `INSERT INTO guests (player_id, display_name, avatar_url, first_seen, last_seen, claimed_user_id, youtube_channel_id)
-         VALUES (?, ?, ?, ?, ?, NULL, ?)`
-      ).run(playerId, displayName, avatarUrl ?? null, now, now, channelId);
-    } else {
-      playerId = row.player_id;
-      db.prepare('UPDATE guests SET last_seen = ?, display_name = ?, avatar_url = COALESCE(?, avatar_url) WHERE player_id = ?')
-        .run(now, displayName, avatarUrl ?? null, playerId);
-      // Idempotent backfill of the dedicated column on legacy rows.
-      db.prepare('UPDATE guests SET youtube_channel_id = ? WHERE player_id = ? AND youtube_channel_id IS NULL')
-        .run(channelId, playerId);
-    }
+    // The live-chat proof refreshes the display identity on the canonical row.
+    db.prepare(
+      'UPDATE guests SET last_seen = ?, display_name = ?, avatar_url = COALESCE(?, avatar_url) WHERE player_id = ?'
+    ).run(now, displayName, avatarUrl ?? null, playerId);
 
     const result = db
       .prepare('UPDATE guests SET claimed_user_id = ? WHERE player_id = ? AND claimed_user_id IS NULL')
@@ -181,7 +171,7 @@ export function claimGuestForUser(
 
     if (result.changes === 0) {
       const owner = db.prepare('SELECT claimed_user_id FROM guests WHERE player_id = ?').get(playerId) as
-        | { claimed_user_id: string }
+        | { claimed_user_id: string | null }
         | undefined;
       if (owner?.claimed_user_id === user.id) {
         return { status: 'alreadyClaimed', playerId };

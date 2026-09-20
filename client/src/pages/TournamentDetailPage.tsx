@@ -35,7 +35,7 @@ interface TournamentDetailPageProps {
 
 const STATUS_LABELS: Record<string, string> = {
   draft: 'مسودة',
-  open: 'التسجيل مفتوح',
+  open: 'مفتوحة',
   active: 'جارية',
   completed: 'مكتملة',
   cancelled: 'ملغاة',
@@ -66,13 +66,6 @@ const MATCH_STATUS_BADGE: Record<string, string> = {
   cancelled: 'badge-red',
   disputed: 'badge-red',
 };
-
-const dateFormatter = new Intl.DateTimeFormat('ar', {
-  day: 'numeric',
-  month: 'short',
-  hour: '2-digit',
-  minute: '2-digit',
-});
 
 export function TournamentDetailPage({ tournamentId }: TournamentDetailPageProps) {
   const { navigate } = useHashRoute();
@@ -238,6 +231,8 @@ export function TournamentDetailPage({ tournamentId }: TournamentDetailPageProps
 
   const championMeta = summary.championPlayerId ? playerMeta.get(summary.championPlayerId) : undefined;
   const canGenerate = isAdmin && !summary.bracketGenerated && summary.status === 'open';
+  const canCancelTournament =
+    isAdmin && (summary.status === 'draft' || summary.status === 'open' || summary.status === 'active');
 
   return (
     <main className="page tournament-detail-page">
@@ -298,85 +293,89 @@ export function TournamentDetailPage({ tournamentId }: TournamentDetailPageProps
         </section>
       )}
 
-      {/* ---------- Stats ---------- */}
-      <div className="panel tournament-stats-panel">
-        <div className="tournament-stats-row">
-          <div className="tournament-stat">
-            <div className="tournament-stat-value">
-              {summary.participantCount.toLocaleString('ar')}
-              {summary.maxParticipants ? ` / ${summary.maxParticipants.toLocaleString('ar')}` : ''}
-            </div>
-            <div className="tournament-stat-label">المشاركون</div>
-          </div>
-          <div className="tournament-stat">
-            <div className="tournament-stat-value">{summary.totalRounds.toLocaleString('ar')}</div>
-            <div className="tournament-stat-label">الأدوار</div>
-          </div>
-          <div className="tournament-stat">
-            <div className="tournament-stat-value">
-              {summary.completedMatchCount.toLocaleString('ar')} / {summary.matchCount.toLocaleString('ar')}
-            </div>
-            <div className="tournament-stat-label">المباريات المكتملة</div>
-          </div>
-          {summary.byes > 0 && (
-            <div className="tournament-stat">
-              <div className="tournament-stat-value">{summary.byes.toLocaleString('ar')}</div>
-              <div className="tournament-stat-label">تأهل تلقائي</div>
-            </div>
-          )}
-          {summary.startsAt && (
-            <div className="tournament-stat">
-              <div className="tournament-stat-value">{dateFormatter.format(new Date(summary.startsAt))}</div>
-              <div className="tournament-stat-label">البداية</div>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* ---------- Admin bracket generation ---------- */}
-      {canGenerate && (
-        <div className="panel tournament-admin-bar">
-          <span className="text-sm text-[var(--text-dim)]">التسجيل مفتوح — يمكنك توليد جدول البطولة الآن.</span>
-          <button
-            className="btn-neon"
-            disabled={busy}
-            onClick={() => runAdminAction(() => generateBracket(tournamentId))}
-          >
-            توليد جدول البطولة
-          </button>
-        </div>
-      )}
-
-      {isAdmin && (summary.status === 'draft' || summary.status === 'open' || summary.status === 'active') && (
-        <div className="panel tournament-admin-bar">
-          <span className="text-sm text-[var(--text-dim)]">
-            إلغاء البطولة يجمّدها مع الحفاظ على سجلها — لن تُحذف المباريات أو النتائج أو نقاط التصنيف.
+      {/* ---------- Tournament HUD (participants · rounds · matches) ---------- */}
+      <section className="tournament-hud" aria-label="إحصائيات البطولة">
+        <div className="tournament-hud-cell">
+          <span className="tournament-hud-icon" aria-hidden="true">👥</span>
+          <span className="tournament-hud-value">
+            {summary.participantCount.toLocaleString('ar')}
+            {summary.maxParticipants ? (
+              <span className="tournament-hud-value-sub"> / {summary.maxParticipants.toLocaleString('ar')}</span>
+            ) : null}
           </span>
-          <button
-            className="btn-neon"
-            style={{ background: 'var(--neon-red)' }}
-            disabled={busy}
-            onClick={() => {
-              if (window.confirm('هل أنت متأكد من إلغاء هذه البطولة؟')) {
-                void runAdminAction(() => cancelTournament(tournamentId));
-              }
-            }}
-          >
-            إلغاء البطولة
-          </button>
+          <span className="tournament-hud-label">المشاركون</span>
         </div>
+        <div className="tournament-hud-cell">
+          <span className="tournament-hud-icon" aria-hidden="true">⟳</span>
+          <span className="tournament-hud-value">{summary.totalRounds.toLocaleString('ar')}</span>
+          <span className="tournament-hud-label">الأدوار</span>
+        </div>
+        <div className="tournament-hud-cell">
+          <span className="tournament-hud-icon" aria-hidden="true">⚔</span>
+          <span className="tournament-hud-value">
+            {summary.completedMatchCount.toLocaleString('ar')}
+            <span className="tournament-hud-value-sub"> / {summary.matchCount.toLocaleString('ar')}</span>
+          </span>
+          <span className="tournament-hud-label">المباريات</span>
+        </div>
+      </section>
+
+      {/* ---------- Admin tournament actions — compact gaming tiles ---------- */}
+      {isAdmin && (canGenerate || canCancelTournament) && (
+        <section className="tournament-action-tiles" aria-label="إجراءات البطولة">
+          {canGenerate && (
+            <article className="tournament-action-tile">
+              <span className="tournament-action-tile-icon" aria-hidden="true">⚔️</span>
+              <div className="tournament-action-tile-copy">
+                <h3 className="tournament-action-tile-title">توليد جدول البطولة</h3>
+                <p className="tournament-action-tile-sub">إنشاء مواجهات البطولة</p>
+              </div>
+              <button
+                className="btn-neon tournament-action-tile-btn"
+                disabled={busy}
+                onClick={() => runAdminAction(() => generateBracket(tournamentId))}
+              >
+                توليد الجدول
+              </button>
+            </article>
+          )}
+          {canCancelTournament && (
+            <article className="tournament-action-tile is-destructive">
+              <span className="tournament-action-tile-icon" aria-hidden="true">✕</span>
+              <div className="tournament-action-tile-copy">
+                <h3 className="tournament-action-tile-title">إلغاء البطولة</h3>
+                <p className="tournament-action-tile-sub">إنهاء البطولة الحالية</p>
+              </div>
+              <button
+                className="btn-neon tournament-action-tile-btn is-destructive"
+                disabled={busy}
+                onClick={() => {
+                  if (window.confirm('هل أنت متأكد من إلغاء هذه البطولة؟')) {
+                    void runAdminAction(() => cancelTournament(tournamentId));
+                  }
+                }}
+              >
+                إلغاء البطولة
+              </button>
+            </article>
+          )}
+        </section>
       )}
 
       {isAdmin && adminError && <div className="panel text-[var(--neon-red)] mb-4">{adminError}</div>}
 
       {/* ---------- Participants ---------- */}
       <section className="mb-10">
-        <h2 className="section-title" style={{ textAlign: 'center', marginBottom: '16px' }}>
-          المشاركون ({roster.length.toLocaleString('ar')})
-        </h2>
+        <div className="tournament-section-head">
+          <h2 className="section-title">👥 المشاركون في البطولة</h2>
+          {roster.length > 0 && (
+            <span className="tournament-section-count">{roster.length.toLocaleString('ar')} مشاركين</span>
+          )}
+        </div>
         {roster.length === 0 ? (
-          <div className="panel text-center py-12 text-[var(--text-dim)]">
-            لا يوجد مشاركون بعد — التسجيل يتم عبر بوت الفلفوس فقط
+          <div className="tournament-empty-state">
+            <span className="tournament-empty-icon" aria-hidden="true">👥</span>
+            <p className="tournament-empty-text">لا يوجد مشاركون بعد</p>
           </div>
         ) : (
           <div className="participants-grid">
@@ -400,19 +399,25 @@ export function TournamentDetailPage({ tournamentId }: TournamentDetailPageProps
 
       {/* ---------- Bracket ---------- */}
       <section className="mb-10">
-        <h2 className="section-title" style={{ textAlign: 'center', marginBottom: '16px' }}>جدول البطولة</h2>
+        <h2 className="section-title tournament-section-title">⚔ جدول البطولة</h2>
         {bracket ? (
           <BracketView bracket={bracket} players={playerMeta} championPlayerId={summary.championPlayerId} />
         ) : (
-          <div className="panel text-center py-12 text-[var(--text-dim)]">لم يتم توليد جدول البطولة بعد</div>
+          <div className="tournament-empty-state">
+            <span className="tournament-empty-icon" aria-hidden="true">⚔</span>
+            <p className="tournament-empty-text">لم يتم إنشاء جدول البطولة حتى الآن</p>
+          </div>
         )}
       </section>
 
       {/* ---------- Matches ---------- */}
       <section className="mb-16">
-        <h2 className="section-title" style={{ textAlign: 'center', marginBottom: '16px' }}>المباريات</h2>
+        <h2 className="section-title tournament-section-title">⚔ المباريات</h2>
         {matches.length === 0 ? (
-          <div className="panel text-center py-12 text-[var(--text-dim)]">لا توجد مباريات بعد</div>
+          <div className="tournament-empty-state">
+            <span className="tournament-empty-icon" aria-hidden="true">⚔</span>
+            <p className="tournament-empty-text">لا توجد مباريات حتى الآن</p>
+          </div>
         ) : (
           <div className="tournament-matches-list">
             {matches.map((match) => (

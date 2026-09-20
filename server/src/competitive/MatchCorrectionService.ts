@@ -32,6 +32,7 @@ import { applyEloDelta } from './EloService';
 import { computeElo } from './eloEngine';
 import { getOrCreateProfile } from './CompetitiveProfileService';
 import { rebuildProfile } from './CompetitiveRebuildService';
+import { awardMatchXp, reverseMatchXp, rebuildProgression } from './GlobalProgressionService';
 import {
   getMatch,
   getMatchParticipants,
@@ -319,6 +320,26 @@ export function correctMatchResult(input: CorrectMatchResultInput): CorrectMatch
         // Materialized profile is rebuilt from the immutable ledgers so LP/Elo
         // and W/L/D always equal the deterministic reconstruction.
         rebuildProfile(playerId, match.game_id);
+
+        // Global Competitive XP: append a compensating reversal, then the
+        // corrected award. The original row is never edited/deleted; the
+        // correction-scoped keys keep the pair idempotent under replay.
+        reverseMatchXp({
+          playerId,
+          matchId: match.id,
+          idempotencyKey: `${idempotencyKey}:${playerId}:xp:reversal`,
+          reversalOf: `match:${match.id}:${playerId}:xp`,
+        });
+        awardMatchXp({
+          playerId,
+          matchId: match.id,
+          tournamentId: match.tournament_id,
+          gameId: match.game_id,
+          result: newResult,
+          eventType: 'correction',
+          idempotencyKey: `${idempotencyKey}:${playerId}:xp:correction`,
+        });
+        rebuildProgression(playerId);
       }
     }
 

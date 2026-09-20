@@ -27,6 +27,7 @@ import {
   type MatchParticipantRow,
 } from './TournamentMatchService';
 import { computeRank, type ComputedRank } from './ranks';
+import { DEFAULT_INITIAL_ELO } from './eloEngine';
 
 export interface MatchParticipantDto {
   playerId: string;
@@ -142,6 +143,8 @@ export interface PlayerTournamentStateDto {
 export interface PlayerCompetitiveProfileDto {
   gameId: string;
   gameNameAr: string | null;
+  gameSlug: string | null;
+  gameImageUrl: string | null;
   lp: number;
   elo: number;
   matchesPlayed: number;
@@ -149,6 +152,13 @@ export interface PlayerCompetitiveProfileDto {
   losses: number;
   draws: number;
   rank: ComputedRank;
+  /**
+   * True when the player has no `competitive_profiles` row for this game yet.
+   * The row is still returned (with default LP/Elo and the base rank) so the
+   * UI can render an honest "unranked" state without fabricating a profile.
+   * Only meaningful for the all-games projection.
+   */
+  unranked: boolean;
 }
 
 const PARTICIPANT_STATUSES = new Set(['registered', 'confirmed']);
@@ -580,37 +590,85 @@ export function getGameLeaderboard(
   };
 }
 
-export function getPlayerCompetitiveProfiles(playerId: string): PlayerCompetitiveProfileDto[] {
+interface PlayerCompetitiveRow {
+  game_id: string;
+  game_name_ar: string | null;
+  game_slug: string | null;
+  game_image_url: string | null;
+  lp: number | null;
+  elo: number | null;
+  matches_played: number | null;
+  wins: number | null;
+  losses: number | null;
+  draws: number | null;
+}
+
+function toPlayerCompetitiveProfile(
+  row: PlayerCompetitiveRow,
+  unranked: boolean
+): PlayerCompetitiveProfileDto {
+  const lp = row.lp ?? 0;
+  return {
+    gameId: row.game_id,
+    gameNameAr: row.game_name_ar,
+    gameSlug: row.game_slug,
+    gameImageUrl: row.game_image_url,
+    lp,
+    elo: row.elo ?? DEFAULT_INITIAL_ELO,
+    matchesPlayed: row.matches_played ?? 0,
+    wins: row.wins ?? 0,
+    losses: row.losses ?? 0,
+    draws: row.draws ?? 0,
+    rank: computeRank(lp),
+    unranked,
+  };
+}
+
+/**
+ * A player's competitive profile per game.
+ *
+ * Default: only games where a `competitive_profiles` row exists (unchanged
+ * legacy behaviour). With `{ allGames: true }`: one entry for every ACTIVE game
+ * in the catalog, LEFT JOINed to the player's profile, so the UI can present a
+ * ranked or "unranked" card for every supported game without fabricating data.
+ * Rank always comes from `computeRank(lp)` — the server stays authoritative.
+ */
+export function getPlayerCompetitiveProfiles(
+  playerId: string,
+  options?: { allGames?: boolean }
+): PlayerCompetitiveProfileDto[] {
+  if (options?.allGames) {
+    const rows = getDb()
+      .prepare(
+        `SELECT g.id AS game_id, g.name_ar AS game_name_ar,
+                g.slug AS game_slug, g.image_url AS game_image_url,
+                cp.lp AS lp, cp.elo AS elo,
+                cp.matches_played AS matches_played, cp.wins AS wins,
+                cp.losses AS losses, cp.draws AS draws
+           FROM games g
+           LEFT JOIN competitive_profiles cp
+             ON cp.game_id = g.id AND cp.player_id = ?
+          WHERE g.is_active = 1
+          ORDER BY g.sort_order ASC, g.name_ar ASC`
+      )
+      .all(playerId) as PlayerCompetitiveRow[];
+    // `lp === null` means the LEFT JOIN found no profile → unranked.
+    return rows.map((row) => toPlayerCompetitiveProfile(row, row.lp === null));
+  }
+
   const rows = getDb()
     .prepare(
       `SELECT cp.game_id AS game_id, cp.lp AS lp, cp.elo AS elo,
               cp.matches_played AS matches_played, cp.wins AS wins,
-              cp.losses AS losses, cp.draws AS draws, g.name_ar AS game_name_ar
+              cp.losses AS losses, cp.draws AS draws,
+              g.name_ar AS game_name_ar, g.slug AS game_slug,
+              g.image_url AS game_image_url
          FROM competitive_profiles cp
          LEFT JOIN games g ON g.id = cp.game_id
         WHERE cp.player_id = ?
         ORDER BY cp.game_id ASC`
     )
-    .all(playerId) as {
-    game_id: string;
-    lp: number;
-    elo: number;
-    matches_played: number;
-    wins: number;
-    losses: number;
-    draws: number;
-    game_name_ar: string | null;
-  }[];
+    .all(playerId) as PlayerCompetitiveRow[];
 
-  return rows.map((row) => ({
-    gameId: row.game_id,
-    gameNameAr: row.game_name_ar,
-    lp: row.lp,
-    elo: row.elo,
-    matchesPlayed: row.matches_played,
-    wins: row.wins,
-    losses: row.losses,
-    draws: row.draws,
-    rank: computeRank(row.lp),
-  }));
+  return rows.map((row) => toPlayerCompetitiveProfile(row, false));
 }

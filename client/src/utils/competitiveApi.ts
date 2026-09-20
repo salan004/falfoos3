@@ -71,10 +71,17 @@ export async function fetchGameLeaderboard(gameId: string, limit?: number): Prom
 
 /* --------------------------- player competitive --------------------------- */
 
+/**
+ * Player competitive profiles. With `allGames` the server returns one entry for
+ * every active game (including `unranked: true` games the player has no profile
+ * for), so the UI never fabricates competitive state.
+ */
 export async function fetchPlayerCompetitiveProfiles(
-  playerId: string
+  playerId: string,
+  allGames = false
 ): Promise<ApiResult<{ profiles: PlayerCompetitiveProfile[] }>> {
-  return jsonRequest(`/api/players/${encodeURIComponent(playerId)}/competitive`);
+  const query = allGames ? '?allGames=1' : '';
+  return jsonRequest(`/api/players/${encodeURIComponent(playerId)}/competitive${query}`);
 }
 
 export async function fetchPlayerTournaments(

@@ -53,6 +53,40 @@ export interface AchievementView {
   awardedAt: number;
 }
 
+/** Phase 2.y — RECREATIONAL (Stream Games) profile block. */
+export interface RecreationalProfileView {
+  source: 'stream_games';
+  totals: PlayerTotals;
+  perGame: PerGameStat[];
+  recentMatches: MatchHistoryItem[];
+  historyTotal: number;
+  level: LevelInfo;
+  achievements: AchievementView[];
+}
+
+export interface CompetitiveProgressView {
+  current: number;
+  next: number | null;
+  pct: number;
+  intoLevel: number;
+  forNext: number | null;
+}
+
+/** Phase 2.z — GLOBAL competitive progression (cross-game). */
+export interface CompetitiveProfileView {
+  source: 'competitive_tournaments';
+  status: 'active';
+  xp: number;
+  level: number;
+  /** Visual progression tier 1–4. */
+  tier: number;
+  tierLabelAr: string;
+  isMax: boolean;
+  progress: CompetitiveProgressView;
+  matches: number;
+  wins: number;
+}
+
 export interface PlayerProfile {
   player: ProfileIdentity;
   totals: PlayerTotals;
@@ -61,6 +95,10 @@ export interface PlayerProfile {
   historyTotal: number;
   level: LevelInfo;
   achievements: AchievementView[];
+  /** RECREATIONAL (Stream Games) — explicit ownership. */
+  recreational?: RecreationalProfileView;
+  /** GLOBAL competitive progression — explicit ownership. */
+  competitive?: CompetitiveProfileView;
 }
 
 /** Phase 13 — mirror of GET /api/leaderboard/all-time rows. */

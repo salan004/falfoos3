@@ -9,8 +9,12 @@ import type { PlayerProfile } from '../types/profile';
  *
  * `profile === null` with status 'ready' means signed-out/no identity yet
  * (server answers 200 {profile:null}) — not an error.
+ *
+ * `reloadToken` is optional: changing it re-runs the fetch so a caller (e.g.
+ * the account-linking panel once a Player is claimed) can refresh the profile
+ * through the existing mechanism without a page reload.
  */
-export function usePlayerProfile(playerId?: string, enabled = true) {
+export function usePlayerProfile(playerId?: string, enabled = true, reloadToken: unknown = 0) {
   const [profile, setProfile] = useState<PlayerProfile | null>(null);
   const [status, setStatus] = useState<'loading' | 'ready' | 'missing' | 'error'>('loading');
 
@@ -56,7 +60,7 @@ export function usePlayerProfile(playerId?: string, enabled = true) {
     return () => {
       cancelled = true;
     };
-  }, [playerId, enabled]);
+  }, [playerId, enabled, reloadToken]);
 
   return { profile, status };
 }

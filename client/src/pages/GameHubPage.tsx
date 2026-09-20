@@ -5,6 +5,7 @@ import { useScrollReveal } from '../hooks/useScrollReveal';
 import { useAuthSession } from '../hooks/useAuthSession';
 import { onCompetitiveEvent, getSocket } from '../utils/socket';
 import { TournamentCard } from '../components/TournamentCard';
+import { TicketPurchasePanel } from '../components/TicketPurchasePanel';
 import { ArenaAtmosphere } from '../components/ArenaAtmosphere';
 import { CompetitiveLeaderboard } from '../components/CompetitiveLeaderboard';
 import { CompetitivePlayers } from '../components/CompetitivePlayers';
@@ -17,10 +18,11 @@ interface GameHubPageProps {
   gameId: string;
 }
 
-type HubTab = 'tournaments' | 'leaderboard' | 'rankings' | 'players';
+type HubTab = 'tournaments' | 'tickets' | 'leaderboard' | 'rankings' | 'players';
 
 const HUB_TABS: { id: HubTab; label: string }[] = [
   { id: 'tournaments', label: '🏆 البطولات' },
+  { id: 'tickets', label: '🎟️ شراء التذاكر' },
   { id: 'leaderboard', label: '🥇 المتصدرين' },
   { id: 'rankings', label: '📊 التصنيف' },
   { id: 'players', label: '👥 اللاعبين' },
@@ -222,6 +224,9 @@ export function GameHubPage({ gameId }: GameHubPageProps) {
                 إدارة البطولات
               </button>
             )}
+            <button className="btn-neon ticket-cta" onClick={() => setActiveTab('tickets')}>
+              🎟️ شراء التذاكر
+            </button>
             <button className="btn-neon gh-hero-back" onClick={() => navigate('/stream-games')}>
               ← كل الألعاب
             </button>
@@ -275,6 +280,17 @@ export function GameHubPage({ gameId }: GameHubPageProps) {
             </div>
           )}
         </section>
+      )}
+
+      {activeTab === 'tickets' && (
+        <TicketPurchasePanel
+          gameId={gameId}
+          gameName={game?.name_ar ?? ''}
+          tournaments={tournaments}
+          loading={tournamentsLoading}
+          error={tournamentsError}
+          onRefresh={() => void loadTournaments(true)}
+        />
       )}
 
       {activeTab === 'leaderboard' && (

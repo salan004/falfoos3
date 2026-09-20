@@ -130,6 +130,10 @@ export type CompetitiveProfileMap = Map<string, GameLeaderboardEntry>;
 export interface PlayerCompetitiveProfile {
   gameId: string;
   gameNameAr: string | null;
+  /** Stable game slug (e.g. `dueling_ground`); null for a legacy game row. */
+  gameSlug: string | null;
+  /** Game artwork URL from the catalog; null when the game has no image. */
+  gameImageUrl: string | null;
   lp: number;
   elo: number;
   matchesPlayed: number;
@@ -137,6 +141,11 @@ export interface PlayerCompetitiveProfile {
   losses: number;
   draws: number;
   rank: ComputedRank;
+  /**
+   * True when the player has no competitive profile for this game yet
+   * (only present in the `?allGames=1` projection). Defaults are server-supplied.
+   */
+  unranked: boolean;
 }
 
 /** Mirror of GET /api/players/:playerId/tournaments and .../players/:playerId. */

@@ -40,16 +40,22 @@ function MatchCard({
   match,
   players,
   hasNext,
+  isFinalRound,
 }: {
   match: MatchDto;
   players: Map<string, BracketPlayerMeta>;
   hasNext: boolean;
+  isFinalRound: boolean;
 }) {
   const statusLabel = STATUS_LABELS[match.status] ?? match.status;
   const badge = STATUS_BADGE[match.status] ?? 'badge-cyan';
 
   return (
-    <div className={`bracket-match ${hasNext ? 'has-next' : ''} ${match.status === 'completed' ? 'is-completed' : ''}`}>
+    <div
+      className={`bracket-match ${hasNext ? 'has-next' : ''} ${
+        match.status === 'completed' ? 'is-completed' : ''
+      } ${match.status === 'active' ? 'is-active' : ''} ${isFinalRound ? 'is-final-round' : ''}`}
+    >
       <div className="bracket-match-head">
         <span className="bracket-match-slot">م{match.slotNo.toLocaleString('ar')}</span>
         {match.bestOf ? <span className="bracket-match-bestof">BO{match.bestOf.toLocaleString('ar')}</span> : null}
@@ -129,19 +135,37 @@ export function BracketView({ bracket, players, championPlayerId }: BracketViewP
 
   const nodes: React.ReactNode[] = [];
 
+  // Round headers share the match grid (row 1) so they can never drift out of
+  // alignment with their column. Match/connector rows all start at row 2.
+  rounds.forEach((round, ri) => {
+    nodes.push(
+      <div
+        key={`h-${round.roundNo}`}
+        className={`bracket-round-head ${ri === totalRounds - 1 ? 'is-final' : ''}`}
+        style={{ gridColumn: 2 * ri + 1, gridRow: 1 }}
+      >
+        {round.nameAr}
+      </div>
+    );
+  });
   rounds.forEach((round, ri) => {
     const span = Math.pow(2, ri);
     const hasNext = ri < totalRounds - 1;
-    round.matches.forEach((match, mi) => {
+      round.matches.forEach((match, mi) => {
       nodes.push(
         <div
           key={`m-${match.id}`}
           style={{
             gridColumn: 2 * ri + 1,
-            gridRow: `${mi * span + 1} / span ${span}`,
+            gridRow: `${mi * span + 2} / span ${span}`,
           }}
         >
-          <MatchCard match={match} players={players} hasNext={hasNext} />
+          <MatchCard
+            match={match}
+            players={players}
+            hasNext={hasNext}
+            isFinalRound={ri === totalRounds - 1}
+          />
         </div>
       );
     });
@@ -156,7 +180,7 @@ export function BracketView({ bracket, players, championPlayerId }: BracketViewP
             aria-hidden="true"
             style={{
               gridColumn: 2 * ri + 2,
-              gridRow: `${ci * 2 * span + 1} / span ${2 * span}`,
+              gridRow: `${ci * 2 * span + 2} / span ${2 * span}`,
             }}
           />
         );
@@ -170,14 +194,14 @@ export function BracketView({ bracket, players, championPlayerId }: BracketViewP
         key="c-final"
         className="bracket-conn bracket-conn-final"
         aria-hidden="true"
-        style={{ gridColumn: 2 * totalRounds, gridRow: `1 / span ${firstRoundCount}` }}
+        style={{ gridColumn: 2 * totalRounds, gridRow: `2 / span ${firstRoundCount}` }}
       />
     );
     nodes.push(
       <div
         key="champion"
         className="bracket-champion"
-        style={{ gridColumn: 2 * totalRounds + 1, gridRow: `1 / span ${firstRoundCount}` }}
+        style={{ gridColumn: 2 * totalRounds + 1, gridRow: `2 / span ${firstRoundCount}` }}
       >
         <div className="bracket-champion-crown" aria-hidden="true">🏆</div>
         <div className="bracket-champion-label">البطل</div>
@@ -210,7 +234,7 @@ export function BracketView({ bracket, players, championPlayerId }: BracketViewP
         className="bracket-grid"
         style={{
           gridTemplateColumns: columns.join(' '),
-          gridTemplateRows: `repeat(${firstRoundCount}, minmax(86px, auto))`,
+          gridTemplateRows: `auto repeat(${firstRoundCount}, minmax(86px, auto))`,
         }}
       >
         {nodes}

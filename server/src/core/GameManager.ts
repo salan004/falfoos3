@@ -226,6 +226,11 @@ export class GameManager {
    * compiling. Entries are enriched with the active game's id/sessionId at
    * score time — no scoring rules are changed here. `reason` (Phase 12A) is
    * an optional free-form code persisted with the score event.
+   *
+   * Phase 2.y — GameManager is the RECREATIONAL (Stream Games) engine. Every
+   * write here targets stream-game history only (`matches`/`participations`/
+   * `score_events`/`match_winners`/`player_achievements`). It must never touch
+   * competitive state (LP/Elo/rank/`competitive_profiles`/tournaments).
    */
   updateScore(
     playerId: string,

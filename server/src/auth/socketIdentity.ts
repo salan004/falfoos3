@@ -31,29 +31,32 @@ export interface SocketIdentity {
 }
 
 /**
- * Authenticated players score under ONE stable id:
- * - claimed user  → their CLAIMED guest row (history continuity, Option A)
- * - unclaimed user→ a dedicated `user:<id>` guests row minted on first connect
+ * Resolves the canonical Player for an authenticated account.
+ *
+ * Phase 7 change — an authenticated account with NO claimed Player is now an
+ * INCOMPLETE account: it must NOT auto-create a `user:<id>` Player. The
+ * function returns the claimed Player id, or `null` when none is linked.
+ *
+ * Accounts created before Phase 7 that already own a `user:<id>` row still
+ * match the `claimed_user_id` lookup and keep working unchanged. Only the
+ * silent creation of new synthetic Players is removed.
  *
  * Phase 12B — exported so HTTP routes (/api/me/profile) resolve the SAME
  * canonical scoring id as the socket handshake. Single source of truth.
  */
-export function ensureUserCanonicalPlayer(user: SessionUser): string {
-  const db = getDb();
-  const now = Date.now();
-
-  const claimed = db
+export function ensureUserCanonicalPlayer(user: SessionUser): string | null {
+  const claimed = getDb()
     .prepare('SELECT player_id FROM guests WHERE claimed_user_id = ? ORDER BY first_seen ASC LIMIT 1')
     .get(user.id) as { player_id: string } | undefined;
-  if (claimed) return claimed.player_id;
+  return claimed ? claimed.player_id : null;
+}
 
-  const playerId = `${USER_PLAYER_PREFIX}${user.id}`;
-  db.prepare(
-    `INSERT INTO guests (player_id, display_name, avatar_url, first_seen, last_seen, claimed_user_id)
-     VALUES (?, ?, ?, ?, ?, ?)
-     ON CONFLICT(player_id) DO NOTHING`
-  ).run(playerId, user.displayName, user.avatarUrl ?? null, now, now, user.id);
-  return playerId;
+/** True when the account already owns a canonical Player (linked/complete). */
+export function isAccountLinked(userId: string): boolean {
+  const row = getDb()
+    .prepare('SELECT 1 AS ok FROM guests WHERE claimed_user_id = ? LIMIT 1')
+    .get(userId);
+  return Boolean(row);
 }
 
 /**
@@ -71,25 +74,32 @@ export function resolveSocketIdentity(cookieHeader: string | undefined): SocketI
 
   if (user) {
     const canonicalPlayerId = ensureUserCanonicalPlayer(user);
-    return {
-      canonicalPlayerId,
-      kind: 'user',
-      userId: user.id,
-      role: user.role,
-      guestId: guestId ?? undefined,
-      displayName: user.displayName,
-      avatarUrl: user.avatarUrl,
-    };
+    if (canonicalPlayerId) {
+      return {
+        canonicalPlayerId,
+        kind: 'user',
+        userId: user.id,
+        role: user.role,
+        guestId: guestId ?? undefined,
+        displayName: user.displayName,
+        avatarUrl: user.avatarUrl,
+      };
+    }
+    // Phase 7 — incomplete account (signed in, no linked Player). Fall back
+    // to the verified guest identity; never mint a synthetic Player.
   }
+
+  // Guest identity (anonymous visitor, OR an incomplete authenticated account).
+  if (!guestId) return null;
 
   const row = getDb()
     .prepare('SELECT display_name, avatar_url FROM guests WHERE player_id = ?')
     .get(guestId) as { display_name: string; avatar_url: string | null } | undefined;
 
   return {
-    canonicalPlayerId: guestId!,
+    canonicalPlayerId: guestId,
     kind: 'guest',
-    guestId: guestId!,
+    guestId,
     displayName: row?.display_name || 'زائر',
     avatarUrl: row?.avatar_url ?? null,
   };

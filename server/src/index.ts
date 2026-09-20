@@ -21,6 +21,8 @@ import { adminGamesRoutes } from './routes/adminGamesRoutes';
 import { adminTournamentsRoutes } from './routes/adminTournamentsRoutes';
 import { gamesRoutes } from './routes/gamesRoutes';
 import { botRoutes } from './routes/botRoutes';
+import { websiteIntegrationRoutes } from './integrations/websiteIntegrationRoutes';
+import { recoverPurchaseIntents } from './integrations/purchaseService';
 import { tournamentCompetitiveRoutes } from './routes/tournamentCompetitiveRoutes';
 import { adminTournamentCompetitiveRoutes } from './routes/adminTournamentCompetitiveRoutes';
 import { onCompetitiveEvent } from './competitive/competitiveEvents';
@@ -90,6 +92,21 @@ if (incompleteMatches > 0) {
   console.log(`[Falfoos] History: ${incompleteMatches} incomplete match(es) preserved from previous runs`);
 }
 
+// Phase 7 — drive any non-terminal website purchase intents left by a previous
+// run to a terminal state. Idempotent; the website never mutates loyalty itself.
+void recoverPurchaseIntents()
+  .then((summary) => {
+    if (summary.scanned > 0) {
+      console.log(`[Falfoos] Website purchase intent recovery: ${JSON.stringify(summary)}`);
+    }
+  })
+  .catch((err) =>
+    console.warn(
+      '[Falfoos] Website purchase intent recovery skipped:',
+      err instanceof Error ? err.message : err
+    )
+  );
+
 // ---------------------------------------------------------------------------
 // Global error visibility. Node >=15 terminates on unhandled rejections by
 // default — these handlers make every failure diagnosable instead of silent.
@@ -142,6 +159,9 @@ app.use('/api/admin/tournaments', adminTournamentCompetitiveRoutes);
 
 // Phase 3 — Bot Webhook Endpoint
 app.use('/api/v1/bot', botRoutes);
+
+// Phase 7 — authenticated website integration (linking + ticket purchase).
+app.use('/api/integrations', websiteIntegrationRoutes);
 
 const server = http.createServer(app);
 const io = new SocketIOServer(server, {

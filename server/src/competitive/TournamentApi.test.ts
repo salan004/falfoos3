@@ -153,6 +153,33 @@ async function main(): Promise<void> {
       assertEqual(profile.rank.rankKey, 'bronze_3', 'derived rank');
     });
 
+    await testAsync('GET player competitive?allGames=1 lists every active game (ranked + unranked)', async () => {
+      const res = await data(`/api/players/${semiWinner}/competitive?allGames=1`);
+      assertEqual(res.status, 200, 'status');
+      const profiles = res.body.profiles as any[];
+      // Exactly the two active games seeded for this suite: DG and RL.
+      assertEqual(profiles.length, 2, 'one entry per active game');
+
+      const dg = profiles.find((p) => p.gameId === DG)!;
+      assertTrue(!!dg, 'DG entry present');
+      assertEqual(dg.unranked, false, 'DG is ranked');
+      assertEqual(dg.lp, 25, 'DG LP');
+      assertEqual(dg.elo, 1216, 'DG Elo');
+      assertEqual(dg.rank.rankKey, 'bronze_3', 'DG rank server-derived');
+
+      const rl = profiles.find((p) => p.gameId === RL)!;
+      assertTrue(!!rl, 'RL entry present');
+      assertEqual(rl.unranked, true, 'RL is unranked');
+      assertEqual(rl.lp, 0, 'RL default LP');
+      assertEqual(rl.elo, 1200, 'RL default Elo');
+      assertEqual(rl.matchesPlayed, 0, 'RL default matches');
+      assertEqual(rl.rank.rankKey, 'bronze_3', 'RL base rank server-derived');
+
+      // The all-games projection must NOT create a competitive profile row.
+      const legacy = await data(`/api/players/${semiWinner}/competitive`);
+      assertEqual((legacy.body.profiles as any[]).length, 1, 'default projection still one row');
+    });
+
     await testAsync('GET game competitive leaderboard is ordered by LP and isolated by game', async () => {
       const res = await data(`/api/games/${DG}/competitive`);
       assertEqual(res.status, 200, 'status');

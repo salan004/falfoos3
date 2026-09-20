@@ -31,6 +31,7 @@ const ADMIN = 'bot-admin-1';
 const CHANNEL = 'UC_bot_test_channel_1';
 const PLAYER = 'bot-player-1';
 const TOURNAMENT = 'bot-tournament-1';
+const TOURNAMENT_2 = 'bot-tournament-2';
 
 let server: http.Server;
 let baseUrl = '';
@@ -175,6 +176,7 @@ function reset(): void {
     db.prepare('DELETE FROM tournament_participants').run();
     db.prepare('DELETE FROM tournaments').run();
     db.prepare('DELETE FROM bot_webhook_events').run();
+    db.prepare('DELETE FROM website_purchase_intents').run();
     db.prepare('DELETE FROM guests').run();
   })();
   seedYouTubePlayer(PLAYER, CHANNEL, 'Linked YouTube Player');
@@ -223,6 +225,50 @@ function getParticipantRow(tournamentId: string, playerId: string): any {
 
 function openTournament(): void {
   seedTournament({ id: TOURNAMENT, gameId: GAME, status: 'open', createdBy: ADMIN, maxParticipants: 100 });
+}
+
+/**
+ * Seeds a `website_purchase_intents` row so the F5 refund guard can correlate
+ * the incoming `event_id` (= `ticket_event_id`) with a Website purchase.
+ */
+function seedPurchaseIntent(opts: {
+  requestId: string;
+  ticketEventId: string | null;
+  status:
+    | 'INTENT_CREATED'
+    | 'BOT_REQUESTED'
+    | 'BOT_DEBIT_CONFIRMED'
+    | 'PARTICIPANT_REGISTERED'
+    | 'FAILED'
+    | 'REFUND_REQUESTED'
+    | 'REFUNDED'
+    | 'PENDING_RECOVERY';
+  tournamentId?: string;
+  gameId?: string;
+  channelId?: string;
+  botTxId?: string | null;
+}): void {
+  const now = Date.now();
+  getDb()
+    .prepare(
+      `INSERT OR REPLACE INTO website_purchase_intents
+         (request_id, website_user_id, player_id, youtube_channel_id, tournament_id, game_id,
+          status, bot_tx_id, ticket_event_id, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    )
+    .run(
+      opts.requestId,
+      'bot-site-user-1',
+      PLAYER,
+      opts.channelId ?? CHANNEL,
+      opts.tournamentId ?? TOURNAMENT,
+      opts.gameId ?? GAME,
+      opts.status,
+      opts.botTxId ?? null,
+      opts.ticketEventId,
+      now,
+      now
+    );
 }
 
 async function main(): Promise<void> {
@@ -561,6 +607,154 @@ async function main(): Promise<void> {
     });
     assertEqual(res.status, 200, 'http status');
     assertEqual(youtubeCalls, before, 'no YouTube call for an existing Guest');
+  });
+
+  await testAsync('Test 25 — F5: REFUNDED intent blocks a delayed webhook', async () => {
+    reset();
+    openTournament();
+    seedPurchaseIntent({
+      requestId: 'req-refunded-1',
+      ticketEventId: 'evt_refunded_1',
+      status: 'REFUNDED',
+      botTxId: 'tx-evt_refunded_1',
+    });
+    const res = await postEvent(ticketPayload({ eventId: 'evt_refunded_1' }), {
+      idempotencyKey: 'evt_refunded_1',
+    });
+    assertEqual(res.status, 409, 'http status');
+    assertEqual(res.body.error, 'purchase_refunded', 'error code');
+    assertEqual(participantCount(), 0, 'no participant created');
+    assertEqual(eventStatus('evt_refunded_1'), 'error', 'event recorded as error');
+  });
+
+  await testAsync('Test 26 — F5: REFUND_REQUESTED intent blocks a delayed webhook', async () => {
+    reset();
+    openTournament();
+    seedPurchaseIntent({
+      requestId: 'req-refund-req-1',
+      ticketEventId: 'evt_refund_requested_1',
+      status: 'REFUND_REQUESTED',
+      botTxId: 'tx-evt_refund_requested_1',
+    });
+    const res = await postEvent(ticketPayload({ eventId: 'evt_refund_requested_1' }), {
+      idempotencyKey: 'evt_refund_requested_1',
+    });
+    assertEqual(res.status, 409, 'http status');
+    assertEqual(res.body.error, 'purchase_refund_requested', 'error code');
+    assertEqual(participantCount(), 0, 'no participant created');
+  });
+
+  await testAsync('Test 27 — F5: repeated refunded webhook stays blocked and idempotent', async () => {
+    reset();
+    openTournament();
+    seedPurchaseIntent({
+      requestId: 'req-refunded-dup',
+      ticketEventId: 'evt_refunded_dup',
+      status: 'REFUNDED',
+      botTxId: 'tx-evt_refunded_dup',
+    });
+    const first = await postEvent(ticketPayload({ eventId: 'evt_refunded_dup' }), {
+      idempotencyKey: 'evt_refunded_dup',
+    });
+    const second = await postEvent(ticketPayload({ eventId: 'evt_refunded_dup' }), {
+      idempotencyKey: 'evt_refunded_dup',
+    });
+    assertEqual(first.status, 409, 'first status');
+    assertEqual(second.status, 409, 'second status');
+    assertEqual(first.body.error, 'purchase_refunded', 'first error code');
+    assertEqual(second.body.error, 'purchase_refunded', 'second error code');
+    assertEqual(participantCount(), 0, 'no participant created');
+  });
+
+  await testAsync('Test 28 — F5: normal non-refunded Website intent still registers once', async () => {
+    reset();
+    openTournament();
+    seedPurchaseIntent({
+      requestId: 'req-ok-1',
+      ticketEventId: 'evt_ok_1',
+      status: 'BOT_DEBIT_CONFIRMED',
+      botTxId: 'tx-evt_ok_1',
+    });
+    const res = await postEvent(ticketPayload({ eventId: 'evt_ok_1' }), {
+      idempotencyKey: 'evt_ok_1',
+    });
+    assertEqual(res.status, 200, 'http status');
+    assertEqual(res.body.success, true, 'success flag');
+    assertEqual(participantCount(), 1, 'exactly one participant');
+    const participant = getParticipantRow(TOURNAMENT, PLAYER);
+    assertTrue(!!participant, 'participant row exists');
+    assertEqual(participant.ticket_ref, 'evt_ok_1', 'ticket_ref = event_id');
+  });
+
+  await testAsync('Test 29 — F5: intent tournament mismatch is rejected', async () => {
+    reset();
+    openTournament();
+    seedTournament({ id: TOURNAMENT_2, gameId: GAME, status: 'open', createdBy: ADMIN, maxParticipants: 100 });
+    seedPurchaseIntent({
+      requestId: 'req-mm-tour',
+      ticketEventId: 'evt_mismatch_tour',
+      status: 'BOT_DEBIT_CONFIRMED',
+      tournamentId: TOURNAMENT,
+      botTxId: 'tx-evt_mismatch_tour',
+    });
+    const res = await postEvent(
+      ticketPayload({ eventId: 'evt_mismatch_tour', tournamentId: TOURNAMENT_2 }),
+      { idempotencyKey: 'evt_mismatch_tour' }
+    );
+    assertEqual(res.status, 409, 'http status');
+    assertEqual(res.body.error, 'purchase_mismatch', 'error code');
+    assertEqual(participantCount(), 0, 'no participant created');
+  });
+
+  await testAsync('Test 30 — F5: intent channel mismatch is rejected', async () => {
+    reset();
+    openTournament();
+    seedPurchaseIntent({
+      requestId: 'req-mm-channel',
+      ticketEventId: 'evt_mismatch_channel',
+      status: 'BOT_DEBIT_CONFIRMED',
+      channelId: CHANNEL,
+      botTxId: 'tx-evt_mismatch_channel',
+    });
+    const res = await postEvent(
+      ticketPayload({ eventId: 'evt_mismatch_channel', channelId: 'UC_bot_other_channel' }),
+      { idempotencyKey: 'evt_mismatch_channel' }
+    );
+    assertEqual(res.status, 409, 'http status');
+    assertEqual(res.body.error, 'purchase_mismatch', 'error code');
+    assertEqual(participantCount(), 0, 'no participant created');
+  });
+
+  await testAsync('Test 31 — F5: intent transaction mismatch is rejected', async () => {
+    reset();
+    openTournament();
+    seedPurchaseIntent({
+      requestId: 'req-mm-tx',
+      ticketEventId: 'evt_mismatch_tx',
+      status: 'BOT_DEBIT_CONFIRMED',
+      botTxId: 'tx-expected',
+    });
+    const body = ticketPayload({ eventId: 'evt_mismatch_tx' });
+    (body.payload as Record<string, unknown>).transaction_id = 'tx-different';
+    const res = await postEvent(body, { idempotencyKey: 'evt_mismatch_tx' });
+    assertEqual(res.status, 409, 'http status');
+    assertEqual(res.body.error, 'purchase_mismatch', 'error code');
+    assertEqual(participantCount(), 0, 'no participant created');
+  });
+
+  await testAsync('Test 32 — F5: event without a Website intent keeps legacy behavior', async () => {
+    reset();
+    openTournament();
+    const legacyChannel = 'UC_bot_legacy_no_intent';
+    const res = await postEvent(
+      ticketPayload({ eventId: 'evt_no_intent_legacy', channelId: legacyChannel }),
+      { idempotencyKey: 'evt_no_intent_legacy' }
+    );
+    assertEqual(res.status, 200, 'http status');
+    assertEqual(res.body.success, true, 'success flag');
+    const guest = guestRowByChannel(legacyChannel);
+    assertTrue(!!guest, 'guest created');
+    assertTrue(!!getParticipantRow(TOURNAMENT, guest.player_id), 'participant registered');
   });
 
   await new Promise<void>((resolve) => server.close(() => resolve()));

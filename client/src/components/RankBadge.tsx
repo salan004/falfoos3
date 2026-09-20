@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { rankBadgeAsset } from '../data/rankBadges';
 
 interface RankBadgeProps {
@@ -10,13 +11,23 @@ interface RankBadgeProps {
 }
 
 /**
- * Phase 1C — renders the official Rank Badge for a tier. Uses the single
- * `rankBadgeAsset` mapping; renders nothing when no asset exists for the tier
- * (no broken images, no fabricated placeholder, no cross-tier fallback).
+ * Phase 1C / Phase 3 — renders the official Rank Badge for a tier. Uses the
+ * single `rankBadgeAsset` mapping; renders nothing when no asset exists for the
+ * tier (no broken images, no fabricated placeholder, no cross-tier fallback).
+ *
+ * Phase 3 — a broken/failed asset is also treated as "no badge": the image is
+ * dropped after a load error so a broken `<img>` icon can never remain visible.
  */
 export function RankBadge({ tierKey, label, size = 18, className }: RankBadgeProps) {
   const src = rankBadgeAsset(tierKey);
-  if (!src) return null;
+  const [failed, setFailed] = useState(false);
+
+  // Re-arm when the resolved asset changes (e.g. switching games/ranks).
+  useEffect(() => {
+    setFailed(false);
+  }, [src]);
+
+  if (!src || failed) return null;
   return (
     <img
       className={className ? `rank-badge ${className}` : 'rank-badge'}
@@ -26,6 +37,7 @@ export function RankBadge({ tierKey, label, size = 18, className }: RankBadgePro
       height={size}
       loading="lazy"
       decoding="async"
+      onError={() => setFailed(true)}
     />
   );
 }

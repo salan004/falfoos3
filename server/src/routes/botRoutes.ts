@@ -8,6 +8,8 @@ import {
 import { findPlayerByYouTubeChannelId, registerTicketPurchaseParticipant } from '../games/ParticipantService';
 import { fetchYouTubeChannelAvatarUrl } from '../games/YouTubeChannelAvatar';
 import { getTournamentById } from '../games/TournamentService';
+import { getDb } from '../db/db';
+import { getPurchaseIntentByTicketEventId } from '../integrations/purchaseService';
 
 /**
  * Phase 3 — Bot purchase event webhook endpoint.
@@ -172,14 +174,73 @@ botRoutes.post('/purchase-event', verifyBotWebhook, async (req: Request, res: Re
       avatarUrl = await fetchYouTubeChannelAvatarUrl(youtubeChannelId);
     }
 
-    const registration = registerTicketPurchaseParticipant(
-      tournamentId,
-      youtubeChannelId,
-      displayName,
-      eventId,
-      avatarUrl
-    );
+    // Phase 7 / Step 5C — F5 refund guard (Website is the authoritative boundary).
+    // A queued bot purchase event can be delivered AFTER the website refunded the
+    // purchase. When a matching `website_purchase_intents` row exists, refund
+    // states block registration entirely and any ownership mismatch is rejected.
+    // The correlation lookup + participant registration run in ONE synchronous
+    // transaction, so a concurrent refund transition cannot slip between the
+    // check and the insert (better-sqlite3 nests via savepoints). No `await` may
+    // appear between the guard decision and the registration below.
+    const guard = getDb().transaction(():
+      | { blocked: true; code: string; message: string }
+      | { blocked: false; registration: ReturnType<typeof registerTicketPurchaseParticipant> } => {
+      const intent = getPurchaseIntentByTicketEventId(eventId);
+      if (intent) {
+        if (intent.status === 'REFUND_REQUESTED') {
+          return {
+            blocked: true,
+            code: 'purchase_refund_requested',
+            message: 'Purchase refund is in progress for this event',
+          };
+        }
+        if (intent.status === 'REFUNDED') {
+          return {
+            blocked: true,
+            code: 'purchase_refunded',
+            message: 'Purchase for this event was refunded',
+          };
+        }
+        const mismatch =
+          intent.tournament_id !== tournamentId ||
+          intent.game_id !== gameId ||
+          intent.youtube_channel_id !== youtubeChannelId ||
+          (transactionId !== null && intent.bot_tx_id !== transactionId);
+        if (mismatch) {
+          return {
+            blocked: true,
+            code: 'purchase_mismatch',
+            message: 'Webhook does not match the recorded purchase intent',
+          };
+        }
+      }
+      return {
+        blocked: false,
+        registration: registerTicketPurchaseParticipant(
+          tournamentId,
+          youtubeChannelId,
+          displayName,
+          eventId,
+          avatarUrl
+        ),
+      };
+    })();
 
+    if (guard.blocked) {
+      fail(409, guard.code, guard.message);
+      return;
+    }
+
+    const registration = guard.registration;
+
+    // `registerTicketPurchaseParticipant` reports success (with
+    // `idempotent:true`) when the SAME event_id already registered this player.
+    // Reaching `!registration.success` therefore means a genuine,
+    // NON-idempotent failure: `tournament_full`, or `already_registered` from a
+    // DIFFERENT purchase. These are recorded as `error` (never success) and the
+    // website never mutates loyalty here — refunds for website-originated
+    // purchases are driven through the bot's `/purchase/refund` by the purchase
+    // intent service (server/src/integrations/purchaseService.ts).
     if (!registration.success) {
       const errorMsg = registration.error || 'registration_failed';
 

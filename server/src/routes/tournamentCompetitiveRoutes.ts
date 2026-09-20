@@ -115,5 +115,8 @@ tournamentCompetitiveRoutes.get('/players/:playerId/tournaments', (req: Request,
 tournamentCompetitiveRoutes.get('/players/:playerId/competitive', (req: Request, res: Response) => {
   const { playerId } = req.params;
   if (!isId(playerId)) return badRequest(res, 'invalid_player_id');
-  res.json({ profiles: getPlayerCompetitiveProfiles(playerId) });
+  // `allGames=1` returns one entry per ACTIVE game, including games the player
+  // has no competitive profile for (server-authoritative `unranked: true`).
+  const allGames = req.query.allGames === '1' || req.query.allGames === 'true';
+  res.json({ profiles: getPlayerCompetitiveProfiles(playerId, { allGames }) });
 });

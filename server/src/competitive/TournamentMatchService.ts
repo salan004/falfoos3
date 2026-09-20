@@ -33,6 +33,7 @@ import { getDb } from '../db/db';
 import { getTournamentById, updateTournament, type TournamentRow } from '../games/TournamentService';
 import { applyLpResult } from './LpService';
 import { applyEloResult } from './EloService';
+import { awardMatchXp } from './GlobalProgressionService';
 import { applyResultStats, getOrCreateProfile } from './CompetitiveProfileService';
 import { emitCompetitiveEvent } from './competitiveEvents';
 import type { CompetitiveResult } from './types';
@@ -409,6 +410,26 @@ export function recordMatchResult(input: RecordMatchResultInput): RecordMatchRes
     // W/L/D stats (byes and cancellations never reach here).
     applyResultStats(winner.player_id, match.game_id, 'win');
     applyResultStats(loser.player_id, match.game_id, 'loss');
+
+    // Global Competitive XP (Model C: match + result) — GLOBAL across games,
+    // independent of LP/Elo/rank, awarded exactly once per player/match inside
+    // this same transaction (the idempotency key is the duplicate guard).
+    awardMatchXp({
+      playerId: winner.player_id,
+      matchId: match.id,
+      tournamentId: match.tournament_id,
+      gameId: match.game_id,
+      result: 'win',
+      idempotencyKey: `match:${match.id}:${winner.player_id}:xp`,
+    });
+    awardMatchXp({
+      playerId: loser.player_id,
+      matchId: match.id,
+      tournamentId: match.tournament_id,
+      gameId: match.game_id,
+      result: 'loss',
+      idempotencyKey: `match:${match.id}:${loser.player_id}:xp`,
+    });
 
     // Final match → completed tournament. The champion is the final's winner.
     let tournamentCompleted = false;

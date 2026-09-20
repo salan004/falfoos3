@@ -1,5 +1,8 @@
 import { getDb } from '../db/db';
-import crypto from 'crypto';
+import {
+  findCanonicalPlayerIdByChannel,
+  resolveOrCreatePlayerByYouTubeChannelId,
+} from '../identity/identityService';
 
 /**
  * Phase 3 — Tournament Participants data access.
@@ -213,54 +216,37 @@ export function registerParticipantTransactional(
   }
 }
 
+/**
+ * Phase 2.x — canonical read-only lookup. Matches the dedicated channel column
+ * OR the legacy channel-keyed `player_id` (never an arbitrary UUID).
+ */
 export function findPlayerByYouTubeChannelId(youtubeChannelId: string): { player_id: string } | null {
-  const db = getDb();
-  const row = db.prepare('SELECT player_id FROM guests WHERE youtube_channel_id = ?').get(youtubeChannelId) as { player_id: string } | undefined;
-  return row ?? null;
+  const playerId = findCanonicalPlayerIdByChannel(youtubeChannelId);
+  return playerId ? { player_id: playerId } : null;
 }
 
 /**
- * Phase 3E — resolve a tournament player by YouTube channel id, creating an
- * unclaimed Guest when the channel is not yet known.
+ * Phase 3E / Phase 2.x — resolve a tournament player by YouTube channel id via
+ * the canonical identity service.
  *
- * Safety:
- * - `guests.youtube_channel_id` is guarded by the existing UNIQUE partial index
- *   (`idx_guests_yt_channel`), so concurrent deliveries for the same channel
- *   cannot create two rows: the losing INSERT OR IGNORE is a no-op and it
- *   re-reads the winner's player_id.
- * - `claimed_user_id` is always NULL — the webhook proves a channel made a
- *   purchase, NOT ownership of a website account. The normal live-chat claiming
- *   flow can claim this exact Guest later via youtube_channel_id.
+ * Behaviour (see `identity/identityService.ts` for the full rules):
+ * - dedicated channel row exists              → reuse its player_id
+ * - legacy channel-keyed row only             → reuse it and backfill the column
+ * - both shapes exist (a real duplicate)      → reconcile, return the survivor
+ * - unknown channel                           → create exactly one UUID guest
  *
- * `avatarUrl` is an OPTIONAL enrichment (a pre-validated http(s) channel
- * thumbnail). It is only applied to a brand-new row; existing Guests are always
- * returned untouched.
+ * Idempotent: repeated calls for one channel always return one player_id.
+ * `claimed_user_id` stays NULL (a purchase proves payment, not account
+ * ownership); the live-chat claim flow can claim the same Guest later.
+ * `avatarUrl` is applied only when a brand-new row is created.
  */
 export function findOrCreatePlayerByYouTubeChannelId(
   youtubeChannelId: string,
   displayName: string,
   avatarUrl?: string | null
 ): { player_id: string; created: boolean } {
-  const db = getDb();
-  return db.transaction((): { player_id: string; created: boolean } => {
-    const existing = findPlayerByYouTubeChannelId(youtubeChannelId);
-    if (existing) return { player_id: existing.player_id, created: false };
-
-    const playerId = crypto.randomUUID();
-    const now = Date.now();
-    const inserted = db.prepare(`
-      INSERT OR IGNORE INTO guests
-        (player_id, display_name, avatar_url, first_seen, last_seen, claimed_user_id, youtube_channel_id)
-      VALUES (?, ?, ?, ?, ?, NULL, ?)
-    `).run(playerId, displayName, avatarUrl ?? null, now, now, youtubeChannelId);
-
-    if (inserted.changes > 0) return { player_id: playerId, created: true };
-
-    // Lost a concurrent race for this channel — reuse the winning row.
-    const raced = findPlayerByYouTubeChannelId(youtubeChannelId);
-    if (raced) return { player_id: raced.player_id, created: false };
-    throw new Error('Failed to resolve or create guest for YouTube channel');
-  })();
+  const resolution = resolveOrCreatePlayerByYouTubeChannelId(youtubeChannelId, displayName, avatarUrl);
+  return { player_id: resolution.playerId, created: resolution.created };
 }
 
 /** Internal marker so registration failures trigger an outer rollback. */

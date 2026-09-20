@@ -5,6 +5,7 @@ import { useScrollReveal } from '../hooks/useScrollReveal';
 import { ArenaAtmosphere } from '../components/ArenaAtmosphere';
 import { PlayerAvatar } from '../components/PlayerAvatar';
 import { RankBadge } from '../components/RankBadge';
+import { RankProgress } from '../components/RankProgress';
 import type {
   CompetitiveRosterEntry,
   PlayerCompetitiveProfile,
@@ -246,11 +247,14 @@ export function PlayerStatsPage({ playerId, tournamentId, gameId }: PlayerStatsP
               {identity?.displayName ?? 'لاعب'}
             </h1>
             {selectedProfile && (
-              <div className="flex items-center gap-2 flex-wrap mt-2">
-                <RankBadge tierKey={selectedProfile.rank.tierKey} label={selectedProfile.rank.rankName} size={20} />
-                <span className="badge badge-cyan">{selectedProfile.rank.rankName}</span>
-                {tournamentSummary && <span className="badge badge-gold">🎮 {tournamentSummary.gameNameAr}</span>}
-              </div>
+              <>
+                <div className="rank-display rank-progress-header" style={{ '--rank-display-size': '76px' } as React.CSSProperties}>
+                  <RankBadge tierKey={selectedProfile.rank.tierKey} label={selectedProfile.rank.rankName} size={76} />
+                  <span className="rank-display-name">{selectedProfile.rank.rankName}</span>
+                  {tournamentSummary && <span className="badge badge-gold">🎮 {tournamentSummary.gameNameAr}</span>}
+                </div>
+                <RankProgress rank={selectedProfile.rank} className="rank-progress-header" />
+              </>
             )}
           </div>
         </div>

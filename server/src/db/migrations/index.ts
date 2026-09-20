@@ -20,6 +20,9 @@ export { migration0019EloTransactions } from './0019_elo_transactions';
 export { migration0020TournamentMatches } from './0020_tournament_matches';
 export { migration0021TournamentMatchParticipants } from './0021_tournament_match_participants';
 export { migration0022MatchResultCorrections } from './0022_match_result_corrections';
+export { migration0023CompetitiveProgression } from './0023_competitive_progression';
+export { migration0024WebsiteIntegration } from './0024_website_integration';
+export { migration0025GuestsClaimedUnique } from './0025_guests_claimed_unique';
 
 import { migration0001Init } from './0001_init';
 import { migration0002GuestChannel } from './0002_guest_channel';
@@ -43,6 +46,9 @@ import { migration0019EloTransactions } from './0019_elo_transactions';
 import { migration0020TournamentMatches } from './0020_tournament_matches';
 import { migration0021TournamentMatchParticipants } from './0021_tournament_match_participants';
 import { migration0022MatchResultCorrections } from './0022_match_result_corrections';
+import { migration0023CompetitiveProgression } from './0023_competitive_progression';
+import { migration0024WebsiteIntegration } from './0024_website_integration';
+import { migration0025GuestsClaimedUnique } from './0025_guests_claimed_unique';
 
 /**
  * Ordered migration registry. New migrations are appended here in order —
@@ -71,4 +77,7 @@ export const migrations: { id: string; sql: string }[] = [
   migration0020TournamentMatches,
   migration0021TournamentMatchParticipants,
   migration0022MatchResultCorrections,
+  migration0023CompetitiveProgression,
+  migration0024WebsiteIntegration,
+  migration0025GuestsClaimedUnique,
 ];

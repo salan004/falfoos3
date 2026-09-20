@@ -4243,6 +4243,130 @@ button.hub-orb:hover .hub-label {
   color: var(--text-primary);
 }
 
+/* ---------- Phase 2 — per-game competitive rankings ---------- */
+.game-ranks-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px;
+}
+.game-rank-card {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  border-radius: 16px;
+  border: 1px solid var(--hub-border);
+  background:
+    radial-gradient(120% 90% at 100% 0%, rgba(0, 240, 255, 0.1) 0%, transparent 55%),
+    linear-gradient(160deg, rgba(148, 184, 220, 0.08) 0%, rgba(8, 14, 24, 0.62) 60%);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+}
+.game-rank-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(0, 240, 255, 0.35);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 8px 22px rgba(0, 0, 0, 0.35),
+    0 0 16px rgba(0, 240, 255, 0.16);
+}
+.game-rank-card.is-unranked {
+  background: linear-gradient(160deg, rgba(148, 184, 220, 0.05) 0%, rgba(8, 14, 24, 0.55) 60%);
+}
+.game-rank-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.game-rank-icon {
+  width: 40px;
+  height: 40px;
+  flex: 0 0 40px;
+  display: grid;
+  place-items: center;
+  font-size: 1.15rem;
+  border-radius: 12px;
+  border: 1px solid rgba(0, 240, 255, 0.28);
+  background: rgba(0, 0, 0, 0.28);
+  overflow: hidden;
+}
+.game-rank-icon img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.game-rank-name {
+  font-weight: 800;
+  font-size: 1rem;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.game-rank-tier {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 28px;
+}
+.game-rank-tier-name {
+  font-weight: 800;
+  font-size: 1.02rem;
+  color: var(--text-primary);
+  text-shadow: 0 0 14px rgba(0, 240, 255, 0.22);
+}
+.game-rank-unranked {
+  font-weight: 800;
+  font-size: 1rem;
+  color: var(--text-dim);
+  letter-spacing: 0.02em;
+}
+.game-rank-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin: 0;
+  padding-top: 10px;
+  border-top: 1px solid var(--border-color);
+}
+.game-rank-stats > div {
+  text-align: center;
+}
+.game-rank-stats dt {
+  font-size: 0.68rem;
+  color: var(--text-muted);
+}
+.game-rank-stats dd {
+  margin: 2px 0 0;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+/* ---------- Phase 2.z — global competitive progression tiers ---------- */
+.profile-hero.comp-tier-2 { border-color: rgba(0, 240, 255, 0.32); }
+.profile-hero.comp-tier-3 { border-color: rgba(150, 120, 255, 0.42); }
+.profile-hero.comp-tier-4 { border-color: rgba(255, 150, 60, 0.5); }
+.comp-tier-3 .profile-level-chip { border-color: rgba(150, 120, 255, 0.5); }
+.comp-tier-4 .profile-level-chip {
+  border-color: rgba(255, 150, 60, 0.65);
+  background: linear-gradient(90deg, rgba(255, 120, 40, 0.22), rgba(255, 200, 90, 0.22));
+}
+.comp-tier-4 .level-progress-fill { background: linear-gradient(90deg, #ff7a2f, #ffd166); }
+.comp-max .profile-name {
+  text-shadow: 0 0 20px rgba(255, 140, 50, 0.7), 0 2px 22px rgba(0, 0, 0, 0.72);
+}
+.comp-max .player-avatar {
+  border-color: rgba(255, 160, 70, 0.75);
+  box-shadow: 0 0 0 3px rgba(255, 140, 50, 0.22), 0 0 26px rgba(255, 140, 50, 0.4);
+}
+
 /* Match history */
 .history-list {
   display: flex;
@@ -4876,38 +5000,189 @@ button.hub-orb:hover .hub-label {
 .rank-tier-bg-diamond { background: linear-gradient(90deg, #4a6fd0, #7aa8ff); }
 .rank-tier-bg-legendary { background: linear-gradient(90deg, #c23f95, #ff7ac6); }
 
+/* ---------- Phase 3 — rank badge + rank progression ---------- */
+.rank-badge {
+  display: inline-block;
+  object-fit: contain;
+  flex-shrink: 0;
+  vertical-align: middle;
+  border-radius: 4px;
+  filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.45));
+}
+
+/* Vertical rank presentation: large emblem with the rank name beneath it. */
+.rank-display {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  text-align: center;
+}
+.rank-display .rank-badge {
+  width: var(--rank-display-size, 72px);
+  height: var(--rank-display-size, 72px);
+  max-width: 100%;
+  border-radius: 0;
+  filter: drop-shadow(0 2px 10px rgba(0, 0, 0, 0.55));
+}
+.rank-display-name {
+  font-size: 0.95rem;
+  font-weight: 700;
+  line-height: 1.3;
+  color: var(--text-primary);
+  text-shadow: 0 0 14px rgba(0, 240, 255, 0.18);
+}
+.rank-display-compact {
+  gap: 5px;
+}
+.rank-display-compact .rank-display-name {
+  font-size: 0.85rem;
+}
+/* Compact variant used inside the tournament participant card rank cell. */
+.rank-display-card {
+  gap: 4px;
+}
+.rank-display-card .rank-display-name {
+  font-size: 0.78rem;
+  line-height: 1.25;
+}
+@media (max-width: 480px) {
+  /* Direct override (not the var) so the emblem scales down on small screens. */
+  .rank-display .rank-badge {
+    width: 60px;
+    height: 60px;
+  }
+  .rank-display-compact .rank-badge {
+    width: 56px;
+    height: 56px;
+  }
+  .rank-display-card .rank-badge {
+    width: 40px;
+    height: 40px;
+  }
+}
+
+.rank-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  max-width: 320px;
+}
+.rank-progress-compact {
+  gap: 5px;
+}
+.rank-progress-header {
+  margin-top: 12px;
+}
+.rank-progress-bar {
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.07);
+  overflow: hidden;
+}
+.rank-progress-compact .rank-progress-bar {
+  height: 6px;
+}
+.rank-progress-fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #00a6c4, var(--neon-cyan));
+  transition: width 0.3s ease;
+}
+.rank-progress-hint {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  font-size: 0.76rem;
+  color: var(--text-dim);
+  line-height: 1.5;
+}
+.rank-progress-compact .rank-progress-hint {
+  font-size: 0.72rem;
+}
+.rank-progress-lp {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+.rank-progress-remain {
+  color: var(--text-dim);
+}
+.rank-progress-max {
+  justify-content: flex-start;
+  font-weight: 800;
+  color: #ffd166;
+}
+
 /* ---------- Bracket ---------- */
 .bracket-scroll { overflow-x: auto; padding-bottom: 10px; }
+.bracket-round-head {
+  align-self: end;
+  margin-bottom: 8px;
+  text-align: center;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  color: var(--text-dim);
+  padding: 6px 10px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.02);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.bracket-round-head.is-final {
+  color: var(--neon-cyan);
+  border-color: rgba(0, 240, 255, 0.4);
+  background: rgba(0, 240, 255, 0.07);
+  box-shadow: 0 0 14px rgba(0, 240, 255, 0.12);
+}
 .bracket-grid { display: grid; align-items: stretch; min-width: max-content; }
 .bracket-match {
   position: relative;
   align-self: center;
   width: 100%;
   margin: 6px 0;
-  border: 1px solid var(--border-color);
+  border: 1px solid rgba(0, 240, 255, 0.14);
   border-radius: 10px;
-  background: linear-gradient(160deg, rgba(30, 34, 42, 0.92), rgba(18, 21, 27, 0.94));
+  background: linear-gradient(160deg, rgba(30, 34, 42, 0.94), rgba(15, 17, 21, 0.96));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
   overflow: hidden;
   transition: border-color 0.25s ease, box-shadow 0.25s ease;
 }
-.bracket-match:hover { border-color: rgba(0, 240, 255, 0.35); box-shadow: 0 0 16px rgba(0, 240, 255, 0.08); }
+.bracket-match:hover { border-color: rgba(0, 240, 255, 0.4); box-shadow: 0 0 16px rgba(0, 240, 255, 0.1); }
+.bracket-match.is-active {
+  border-color: rgba(255, 221, 0, 0.5);
+  box-shadow: 0 0 18px rgba(255, 221, 0, 0.14);
+}
+.bracket-match.is-final-round { border-color: rgba(0, 240, 255, 0.32); }
+.bracket-match.is-completed { border-color: rgba(0, 255, 136, 0.22); }
 .bracket-match-head {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 6px 10px;
+  padding: 7px 12px;
   border-bottom: 1px solid var(--border-color);
-  background: rgba(255, 255, 255, 0.02);
+  background: rgba(255, 255, 255, 0.025);
 }
 .bracket-match-slot { font-size: 0.7rem; color: var(--text-dim); }
 .bracket-match-bestof { font-size: 0.65rem; color: var(--neon-gold); }
 .bracket-match-status { margin-inline-start: auto; }
 .bracket-players { display: flex; flex-direction: column; }
-.bracket-player { display: flex; align-items: center; gap: 8px; padding: 7px 10px; }
+.bracket-player { display: flex; align-items: center; gap: 8px; padding: 8px 12px; }
 .bracket-player + .bracket-player { border-top: 1px solid var(--border-color); }
-.bracket-player.is-winner { background: rgba(0, 255, 136, 0.08); }
+.bracket-player.is-winner {
+  background: linear-gradient(90deg, rgba(0, 255, 136, 0.12), rgba(0, 255, 136, 0.04));
+  box-shadow: inset 2px 0 0 var(--neon-green);
+}
 .bracket-player.is-winner .bracket-player-name { color: var(--neon-green); font-weight: 700; }
-.bracket-player.is-defeated { opacity: 0.5; }
+.bracket-player.is-defeated { opacity: 0.45; }
 .bracket-player-body { min-width: 0; display: flex; flex-direction: column; }
 .bracket-player-name {
   font-size: 0.82rem;
@@ -4920,8 +5195,17 @@ button.hub-orb:hover .hub-label {
 .bracket-player-meta { display: flex; gap: 6px; font-size: 0.66rem; color: var(--text-dim); }
 .bracket-player-rank { color: var(--neon-cyan); }
 .bracket-player-seed { margin-inline-start: auto; font-size: 0.68rem; color: var(--text-dim); }
-.bracket-player-empty { color: var(--text-dim); font-size: 0.78rem; justify-content: center; }
-.bracket-player-bye { color: var(--text-dim); font-size: 0.75rem; justify-content: center; font-style: italic; }
+.bracket-player-empty,
+.bracket-player-bye {
+  min-height: 46px;
+  justify-content: center;
+  color: var(--text-muted);
+  font-size: 0.76rem;
+  letter-spacing: 0.01em;
+}
+.bracket-player-bye { font-style: normal; }
+.bracket-player-empty .bracket-player-name,
+.bracket-player-bye .bracket-player-name { color: var(--text-muted); }
 
 .bracket-conn { position: relative; }
 .bracket-conn::before {
@@ -4932,7 +5216,8 @@ button.hub-orb:hover .hub-label {
   bottom: 25%;
   width: 2px;
   transform: translateX(-50%);
-  background: var(--border-color);
+  background: rgba(0, 240, 255, 0.38);
+  box-shadow: 0 0 6px rgba(0, 240, 255, 0.28);
 }
 .bracket-conn::after {
   content: '';
@@ -4941,7 +5226,8 @@ button.hub-orb:hover .hub-label {
   inset-inline-start: 50%;
   inline-size: 50%;
   block-size: 2px;
-  background: var(--border-color);
+  background: rgba(0, 240, 255, 0.38);
+  box-shadow: 0 0 6px rgba(0, 240, 255, 0.28);
 }
 .bracket-conn-final::before { display: none; }
 .bracket-conn-final::after { inset-inline-start: 0; inline-size: 100%; }
@@ -4952,7 +5238,8 @@ button.hub-orb:hover .hub-label {
   inset-inline-start: 100%;
   inline-size: 38px;
   block-size: 2px;
-  background: var(--border-color);
+  background: rgba(0, 240, 255, 0.38);
+  box-shadow: 0 0 6px rgba(0, 240, 255, 0.28);
 }
 
 .bracket-champion {
@@ -5005,6 +5292,69 @@ button.hub-orb:hover .hub-label {
 .tournament-champion-label { font-size: 0.75rem; letter-spacing: 0.2em; text-transform: uppercase; color: var(--neon-gold); }
 .tournament-champion-name { font-size: 1.4rem; font-weight: 800; }
 .tournament-champion-stats { color: var(--text-dim); font-size: 0.85rem; }
+
+/* ---------- Phase 6 — Tournament HUD (3-cell esports stat panel) ---------- */
+.tournament-hud {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: stretch;
+  width: 100%;
+  max-width: 640px;
+  margin: 0 auto 22px;
+  border: 1px solid rgba(0, 240, 255, 0.22);
+  border-radius: 14px;
+  background:
+    linear-gradient(180deg, rgba(0, 240, 255, 0.06), rgba(0, 240, 255, 0) 55%),
+    linear-gradient(160deg, rgba(27, 30, 36, 0.92), rgba(15, 17, 21, 0.94));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    0 0 24px rgba(0, 240, 255, 0.08);
+  overflow: hidden;
+}
+.tournament-hud-cell {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 16px 10px;
+  text-align: center;
+}
+/* Vertical dividers between cells (RTL-safe: divider on the inner edge). */
+.tournament-hud-cell + .tournament-hud-cell { border-inline-start: 1px solid var(--border-color); }
+.tournament-hud-icon {
+  font-size: 1rem;
+  line-height: 1;
+  opacity: 0.85;
+}
+.tournament-hud-value {
+  font-size: 1.5rem;
+  font-weight: 800;
+  line-height: 1.1;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 0 16px rgba(0, 240, 255, 0.18);
+}
+.tournament-hud-value-sub {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--text-dim);
+  text-shadow: none;
+}
+.tournament-hud-label {
+  font-size: 0.74rem;
+  letter-spacing: 0.02em;
+  color: var(--text-dim);
+}
+@media (max-width: 420px) {
+  .tournament-hud-value { font-size: 1.3rem; }
+  .tournament-hud-icon { font-size: 0.9rem; }
+  .tournament-hud-cell { padding: 13px 6px; }
+  .tournament-hud-label { font-size: 0.68rem; }
+}
+
 .tournament-stats-panel { margin-bottom: 22px; }
 .tournament-stats-row { display: flex; flex-wrap: wrap; gap: 22px; justify-content: center; text-align: center; }
 .tournament-stat-value { font-size: 1.15rem; font-weight: 800; }
@@ -6001,6 +6351,533 @@ body::before {
 }
 .tournament-detail-page .tournament-detail-image img {
   box-shadow: 0 24px 56px rgba(0, 0, 0, 0.5), 0 0 40px rgba(34, 211, 238, 0.12);
+}
+
+/* ============================================================
+   TOURNAMENT DETAIL — action tiles, section heads, empty states
+   (UI refinement only; every rule is scoped to .tournament-detail-page)
+   ============================================================ */
+.tournament-detail-page .tournament-section-title {
+  text-align: center;
+  margin-bottom: 16px;
+}
+.tournament-detail-page .tournament-section-head {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  text-align: center;
+  margin-bottom: 16px;
+}
+.tournament-detail-page .tournament-section-head .section-title { margin: 0; }
+.tournament-detail-page .tournament-section-count {
+  font-size: 0.8rem;
+  color: var(--text-dim);
+}
+
+/* --- Compact admin action tiles --- */
+.tournament-detail-page .tournament-action-tiles {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin: 0 auto 24px;
+}
+.tournament-detail-page .tournament-action-tile {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px 18px;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 16px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0) 88px),
+    rgba(12, 15, 28, 0.62);
+  box-shadow:
+    0 14px 34px rgba(0, 0, 0, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  transition: transform 0.22s ease, border-color 0.22s ease, box-shadow 0.22s ease;
+}
+.tournament-detail-page .tournament-action-tile:hover,
+.tournament-detail-page .tournament-action-tile:focus-within {
+  transform: translateY(-3px);
+  border-color: rgba(34, 211, 238, 0.4);
+  box-shadow:
+    0 20px 46px rgba(0, 0, 0, 0.45),
+    0 0 24px rgba(34, 211, 238, 0.14);
+}
+.tournament-detail-page .tournament-action-tile-icon {
+  flex-shrink: 0;
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  font-size: 1.15rem;
+  border-radius: 12px;
+  border: 1px solid rgba(34, 211, 238, 0.3);
+  background: rgba(0, 0, 0, 0.25);
+  color: var(--neon-cyan);
+}
+.tournament-detail-page .tournament-action-tile-copy { flex: 1; min-width: 0; }
+.tournament-detail-page .tournament-action-tile-title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 800;
+  color: var(--text-primary);
+}
+.tournament-detail-page .tournament-action-tile-sub {
+  margin: 2px 0 0;
+  font-size: 0.78rem;
+  color: var(--text-dim);
+}
+.tournament-detail-page .tournament-action-tile-btn { flex-shrink: 0; font-size: 0.85rem; }
+
+/* Destructive variant — red accents on the icon + action button only. */
+.tournament-detail-page .tournament-action-tile.is-destructive .tournament-action-tile-icon {
+  border-color: rgba(255, 51, 85, 0.35);
+  color: var(--neon-red);
+}
+.tournament-detail-page .tournament-action-tile.is-destructive:hover,
+.tournament-detail-page .tournament-action-tile.is-destructive:focus-within {
+  border-color: rgba(255, 51, 85, 0.4);
+  box-shadow:
+    0 20px 46px rgba(0, 0, 0, 0.45),
+    0 0 24px rgba(255, 51, 85, 0.14);
+}
+.tournament-detail-page .tournament-action-tile-btn.is-destructive { background: var(--neon-red); }
+.tournament-detail-page .tournament-action-tile-btn.is-destructive:hover {
+  box-shadow:
+    0 0 22px rgba(255, 51, 85, 0.4),
+    inset 0 0 12px rgba(255, 51, 85, 0.12);
+}
+
+/* --- Lightweight empty states --- */
+.tournament-detail-page .tournament-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 26px 18px;
+  text-align: center;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 16px;
+  background:
+    radial-gradient(90% 120% at 50% 0%, rgba(124, 58, 237, 0.08), transparent 70%),
+    rgba(12, 15, 28, 0.4);
+}
+.tournament-detail-page .tournament-empty-icon {
+  font-size: 1.5rem;
+  line-height: 1;
+  opacity: 0.7;
+  color: var(--neon-cyan);
+  filter: drop-shadow(0 0 10px rgba(34, 211, 238, 0.3));
+}
+.tournament-detail-page .tournament-empty-text {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--text-dim);
+}
+
+@media (max-width: 640px) {
+  .tournament-detail-page .tournament-action-tiles { grid-template-columns: 1fr; }
+  .tournament-detail-page .tournament-action-tile { flex-wrap: wrap; }
+  .tournament-detail-page .tournament-action-tile-btn { width: 100%; }
+}
+
+/* ============================================================
+   Phase 7 / Step 2 — Account <-> Player linking panel
+   ============================================================ */
+.acct-link {
+  margin-top: 16px;
+  padding: 18px;
+  border-radius: 16px;
+  border: 1px solid var(--hub-border, rgba(255, 255, 255, 0.09));
+  background:
+    radial-gradient(120% 90% at 100% 0%, rgba(0, 240, 255, 0.08), transparent 55%),
+    linear-gradient(160deg, rgba(148, 184, 220, 0.06) 0%, rgba(8, 14, 24, 0.6) 60%);
+}
+.acct-link.is-linked {
+  border-color: rgba(0, 255, 136, 0.28);
+  background:
+    radial-gradient(120% 90% at 100% 0%, rgba(0, 255, 136, 0.09), transparent 55%),
+    linear-gradient(160deg, rgba(148, 184, 220, 0.06) 0%, rgba(8, 14, 24, 0.6) 60%);
+}
+.acct-link-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.acct-link-icon {
+  flex-shrink: 0;
+  width: 46px;
+  height: 46px;
+  display: grid;
+  place-items: center;
+  font-size: 1.5rem;
+  border-radius: 12px;
+  border: 1px solid var(--hub-border, rgba(255, 255, 255, 0.09));
+  background: rgba(0, 0, 0, 0.25);
+}
+.acct-link-heading { min-width: 0; }
+.acct-link-title {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: var(--text-primary);
+}
+.acct-link-sub {
+  margin: 2px 0 0;
+  font-size: 0.82rem;
+  color: var(--text-dim);
+  line-height: 1.6;
+}
+.acct-link-loading {
+  margin: 16px 0 0;
+  font-size: 0.85rem;
+  color: var(--text-dim);
+}
+.acct-link-body {
+  margin-top: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.acct-link-text {
+  margin: 0;
+  font-size: 0.88rem;
+  color: var(--text-dim);
+  line-height: 1.7;
+}
+.acct-link-btn { align-self: flex-start; }
+.acct-link-error {
+  margin: 0;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--neon-red);
+}
+.acct-link-steps {
+  margin: 0;
+  padding-inline-start: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.85rem;
+  color: var(--text-dim);
+  line-height: 1.6;
+}
+.acct-link-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.acct-link-field-label {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+.acct-link-input {
+  width: 100%;
+  padding: 10px 12px;
+  font-size: 0.9rem;
+}
+.acct-link-instruction {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: var(--text-primary);
+}
+.acct-link-code {
+  margin: 0;
+  padding: 12px;
+  font-family: monospace;
+  font-size: 1.5rem;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  color: var(--neon-cyan);
+  text-align: center;
+  user-select: all;
+  word-break: break-all;
+  border-radius: 12px;
+  border: 1px dashed rgba(0, 240, 255, 0.35);
+  background: rgba(0, 240, 255, 0.05);
+}
+.acct-link-hint {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--text-dim);
+  line-height: 1.6;
+}
+.acct-link-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.acct-linked {
+  margin-top: 14px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.acct-linked-info {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  flex: 1;
+}
+.acct-linked-name {
+  font-weight: 800;
+  font-size: 1rem;
+  color: var(--text-primary);
+}
+.acct-linked-channel {
+  font-size: 0.78rem;
+  color: var(--text-dim);
+  direction: ltr;
+  word-break: break-all;
+}
+.acct-linked-badge { align-self: flex-start; }
+@media (max-width: 640px) {
+  .acct-link-btn { align-self: stretch; }
+}
+
+/* ============================================================
+   Phase 7 / Step 3 — Tournament Ticket Purchase UI
+   ============================================================ */
+.ticket-section-game {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--text-dim);
+  padding: 4px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--arena-border, var(--border-color));
+  background: rgba(255, 255, 255, 0.03);
+}
+
+/* --- gating (auth / link / errors) --- */
+.ticket-gate {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  text-align: center;
+  padding: 34px 20px;
+  border: 1px solid var(--arena-border, var(--border-color));
+  border-radius: 16px;
+}
+.ticket-gate-icon { font-size: 1.9rem; line-height: 1; }
+.ticket-gate-title {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: var(--text-primary);
+}
+.ticket-gate-text {
+  margin: 0;
+  max-width: 46ch;
+  font-size: 0.9rem;
+  line-height: 1.7;
+  color: var(--text-dim);
+}
+
+/* --- tournament ticket cards --- */
+.ticket-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+  border: 1px solid var(--arena-border, var(--border-color));
+  border-radius: 16px;
+  background:
+    radial-gradient(120% 90% at 100% 0%, rgba(0, 240, 255, 0.08), transparent 55%),
+    linear-gradient(160deg, rgba(148, 184, 220, 0.06) 0%, rgba(8, 14, 24, 0.6) 60%);
+}
+.ticket-card-top { display: flex; flex-wrap: wrap; gap: 8px; }
+.ticket-card-title {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: var(--text-primary);
+}
+.ticket-card-game {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--text-dim);
+}
+.ticket-card-price {
+  flex: 1;
+  margin: 0;
+  font-size: 0.82rem;
+  line-height: 1.6;
+  color: var(--text-dim);
+}
+.ticket-card-actions { display: flex; margin-top: 4px; }
+.ticket-buy-btn { width: 100%; }
+
+/* --- confirmation / state dialog --- */
+.ticket-modal {
+  border: none;
+  border-radius: 16px;
+  background: transparent;
+  padding: 0;
+  max-width: 480px;
+  width: calc(100% - 32px);
+  max-height: 88vh;
+  box-shadow:
+    0 22px 60px rgba(0, 0, 0, 0.55),
+    0 0 40px rgba(0, 240, 255, 0.14);
+  animation: ff-fade-up 0.22s ease-out;
+}
+.ticket-modal::backdrop {
+  background: rgba(5, 6, 10, 0.72);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+.ticket-modal-content {
+  display: flex;
+  flex-direction: column;
+  max-height: 88vh;
+  overflow-y: auto;
+  border: 1px solid var(--arena-border, var(--border-color));
+  border-radius: 16px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.02), transparent 60%),
+    var(--bg-panel);
+}
+.ticket-modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 18px 20px 14px;
+  border-bottom: 1px solid var(--border-color);
+}
+.ticket-modal-title {
+  margin: 0;
+  font-size: 1.2rem;
+  font-weight: 800;
+  color: var(--text-primary);
+  text-shadow: 0 0 16px rgba(0, 240, 255, 0.18);
+}
+.ticket-modal-close {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1px solid var(--border-color);
+  background: var(--bg-card);
+  color: var(--text-dim);
+  cursor: pointer;
+}
+.ticket-modal-close:hover { color: var(--text-primary); border-color: var(--arena-cyan, var(--neon-cyan)); }
+.ticket-modal-rows {
+  margin: 0;
+  padding: 18px 20px 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.ticket-modal-rows > div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 14px;
+}
+.ticket-modal-rows dt {
+  font-size: 0.82rem;
+  color: var(--text-dim);
+}
+.ticket-modal-rows dd {
+  margin: 0;
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  text-align: left;
+}
+.ticket-modal-note {
+  margin: 14px 20px 0;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(0, 240, 255, 0.2);
+  background: rgba(0, 240, 255, 0.05);
+  font-size: 0.84rem;
+  line-height: 1.7;
+  color: var(--text-dim);
+}
+.ticket-modal-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  text-align: center;
+  padding: 26px 24px 6px;
+}
+.ticket-modal-glyph {
+  width: 52px;
+  height: 52px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  font-size: 1.6rem;
+  font-weight: 800;
+  border: 1px solid var(--arena-border, var(--border-color));
+  background: rgba(0, 0, 0, 0.25);
+}
+.ticket-modal-state.is-success .ticket-modal-glyph {
+  color: var(--neon-green);
+  border-color: rgba(0, 255, 136, 0.4);
+}
+.ticket-modal-state.is-error .ticket-modal-glyph {
+  color: var(--neon-red);
+  border-color: rgba(255, 51, 85, 0.4);
+}
+.ticket-modal-state.is-recovery .ticket-modal-glyph {
+  color: var(--neon-yellow);
+  border-color: rgba(255, 221, 0, 0.4);
+}
+.ticket-modal-text {
+  margin: 0;
+  font-size: 0.95rem;
+  line-height: 1.7;
+  color: var(--text-primary);
+}
+.ticket-modal-meta {
+  margin: 0;
+  font-size: 0.84rem;
+  color: var(--text-dim);
+}
+.ticket-modal-footer {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  padding: 18px 20px 20px;
+  margin-top: 18px;
+  border-top: 1px solid var(--border-color);
+}
+.ticket-spinner {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 3px solid rgba(0, 240, 255, 0.25);
+  border-top-color: var(--neon-cyan);
+  animation: ticket-spin 0.8s linear infinite;
+}
+@keyframes ticket-spin {
+  to { transform: rotate(360deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ticket-spinner { animation-duration: 2s; }
+}
+@media (max-width: 640px) {
+  .ticket-modal-footer { justify-content: stretch; }
+  .ticket-modal-footer .btn-neon,
+  .ticket-modal-footer .nav-link { flex: 1 1 auto; text-align: center; }
 }
 
 
