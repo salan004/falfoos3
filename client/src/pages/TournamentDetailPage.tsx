@@ -1,5 +1,6 @@
 import { useCallback, useState } from 'react';
 import { useHashRoute } from '../hooks/useHashRoute';
+import { resolveImageUrl } from '../utils/api';
 import { useScrollReveal } from '../hooks/useScrollReveal';
 import { useAuthSession } from '../hooks/useAuthSession';
 import { useTournamentBracket } from '../hooks/useTournamentBracket';
@@ -7,6 +8,7 @@ import { BracketView, type BracketPlayerMeta } from '../components/BracketView';
 import { ArenaAtmosphere } from '../components/ArenaAtmosphere';
 import { CompetitiveParticipantCard } from '../components/CompetitiveParticipantCard';
 import { PlayerAvatar } from '../components/PlayerAvatar';
+import { RankBadge } from '../components/RankBadge';
 import type { MatchDto } from '../types/competitive';
 import {
   generateBracket,
@@ -81,6 +83,8 @@ export function TournamentDetailPage({ tournamentId }: TournamentDetailPageProps
 
   const [adminError, setAdminError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // F3 — a broken banner URL must never render a broken image.
+  const [heroImageFailed, setHeroImageFailed] = useState(false);
 
   const runAdminAction = useCallback(
     async (action: () => Promise<{ ok: boolean; error: string | null }>) => {
@@ -123,54 +127,69 @@ export function TournamentDetailPage({ tournamentId }: TournamentDetailPageProps
           pages. The internal structure below is unchanged. */}
       <ArenaAtmosphere />
 
-      {/* ---------- Header ---------- */}
-      <div ref={headerRef} className="reveal tournament-detail-header" style={{ textAlign: 'center', padding: '32px 0 20px' }}>
-        {summary.imageUrl && (
-          <div className="tournament-detail-image" style={{ marginBottom: '16px', maxWidth: 600, margin: '0 auto 16px' }}>
-            <img
-              src={summary.imageUrl}
-              alt={summary.nameAr}
-              loading="lazy"
-              decoding="async"
-              style={{ width: '100%', borderRadius: 'var(--radius)' }}
+      {/* ---------- Tournament Hero — banner image + centered title ---------- */}
+      <header
+        ref={headerRef}
+        className={`tournament-hero reveal${
+          summary.imageUrl && !heroImageFailed ? '' : ' is-fallback'
+        }`}
+      >
+        {summary.imageUrl && !heroImageFailed && (
+          <img
+            className="tournament-hero-bg"
+            src={resolveImageUrl(summary.imageUrl)}
+            alt={summary.nameAr}
+            loading="eager"
+            decoding="async"
+            onError={() => setHeroImageFailed(true)}
+          />
+        )}
+        <div className="tournament-hero-content">
+          <div className="brand-kicker">🏆 الفلفوسيين المصنفين</div>
+          <h1 className="hero-title tournament-hero-title">{summary.nameAr}</h1>
+          <div className="tournament-hero-meta">
+            <span className={`badge ${STATUS_BADGE[summary.status] ?? 'badge-cyan'}`}>
+              {STATUS_LABELS[summary.status] ?? summary.status}
+            </span>
+            <button
+              className="badge badge-cyan"
+              style={{ cursor: 'pointer', border: 'none' }}
+              onClick={() => navigate(`/stream-games/${summary.gameId}`)}
+              title="فتح مركز اللعبة"
+            >
+              🎮 {summary.gameNameAr}
+            </button>
+          </div>
+          {summary.descriptionAr && (
+            <p className="hero-subtitle tournament-hero-desc">{summary.descriptionAr}</p>
+          )}
+        </div>
+      </header>
+
+      {/* ---------- Championship Hero — shown only for a completed tournament ---------- */}
+      {summary.status === 'completed' && summary.championPlayerId && (
+        <section className="tournament-champion" aria-label="بطل البطولة">
+          <div className="tournament-champion-frame" aria-hidden="true">
+            <div className="tournament-champion-cup">
+              <span className="tournament-champion-cup-bowl" />
+              <span className="tournament-champion-cup-stem" />
+              <span className="tournament-champion-cup-base" />
+            </div>
+          </div>
+          <div className="tournament-champion-label">البطل</div>
+          <div className="tournament-champion-avatar">
+            <PlayerAvatar
+              id={summary.championPlayerId}
+              name={championMeta?.name ?? 'البطل'}
+              avatarUrl={championMeta?.avatarUrl ?? undefined}
+              size={120}
             />
           </div>
-        )}
-        <div className="brand-kicker">🏆 الفلفوسيين المصنفين</div>
-        <h1 className="hero-title" style={{ fontSize: '2rem' }}>{summary.nameAr}</h1>
-        <div className="flex items-center justify-center gap-3 flex-wrap mt-4">
-          <span className={`badge ${STATUS_BADGE[summary.status] ?? 'badge-cyan'}`}>
-            {STATUS_LABELS[summary.status] ?? summary.status}
-          </span>
-          <button
-            className="badge badge-cyan"
-            style={{ cursor: 'pointer', border: 'none' }}
-            onClick={() => navigate(`/stream-games/${summary.gameId}`)}
-            title="فتح مركز اللعبة"
-          >
-            🎮 {summary.gameNameAr}
-          </button>
-        </div>
-        {summary.descriptionAr && <p className="hero-subtitle mt-4">{summary.descriptionAr}</p>}
-      </div>
-
-      {/* ---------- Champion ---------- */}
-      {summary.championPlayerId && (
-        <section className="panel tournament-champion-panel">
-          <div className="tournament-champion-crown" aria-hidden="true">🏆</div>
-          <div className="tournament-champion-label">البطل</div>
-          <PlayerAvatar
-            id={summary.championPlayerId}
-            name={championMeta?.name ?? 'البطل'}
-            avatarUrl={championMeta?.avatarUrl ?? undefined}
-            size={72}
-          />
           <h2 className="tournament-champion-name">{championMeta?.name ?? 'البطل'}</h2>
-          {championMeta?.rankName && <span className="badge badge-cyan">{championMeta.rankName}</span>}
-          {typeof championMeta?.lp === 'number' && (
-            <div className="tournament-champion-stats">
-              {championMeta.lp.toLocaleString('ar')} LP
-              {typeof championMeta.elo === 'number' ? ` • ${championMeta.elo.toLocaleString('ar')} Elo` : ''}
+          {championMeta?.rankName && (
+            <div className="tournament-champion-rank">
+              <RankBadge tierKey={championMeta?.tierKey} label={championMeta.rankName} size={22} />
+              {championMeta.rankName}
             </div>
           )}
         </section>

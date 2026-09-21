@@ -12,11 +12,11 @@ import { HomePage } from './pages/HomePage';
 import { GamesPage } from './pages/GamesPage';
 import { StreamGamesPage } from './pages/StreamGamesPage';
 import { GameHubPage } from './pages/GameHubPage';
-import { GameTournamentsPage } from './pages/GameTournamentsPage';
 import { TournamentDetailPage } from './pages/TournamentDetailPage';
 import { PlayerStatsPage } from './pages/PlayerStatsPage';
 import { AdminGamesPage } from './pages/AdminGamesPage';
 import { AdminTournamentsPage } from './pages/AdminTournamentsPage';
+import { AdminControlCenter } from './components/admin/AdminControlCenter';
 import { LeaderboardPage } from './pages/LeaderboardPage';
 import { LinksPage } from './pages/LinksPage';
 import { ProfilePage } from './pages/ProfilePage';
@@ -25,7 +25,7 @@ import { BroadcastBracketPage } from './pages/BroadcastBracketPage';
 import { TriviaQuestionsPage } from './pages/TriviaQuestionsPage';
 import { GAMES_CATALOG, PHASE_LABELS_AR, resolveGameName } from './data/gamesCatalog';
 import { useGameState } from './hooks/useGameState';
-import { useHashRoute, matchGameRoute, matchProfileRoute, matchTournamentRoute, matchGameTournamentsRoute, matchAdminGamesRoute, matchAdminTournamentsRoute, matchStreamGamesRoute, matchPlayerRoute, matchRegisterRoute, matchBroadcastRoute } from './hooks/useHashRoute';
+import { useHashRoute, matchGameRoute, matchProfileRoute, matchTournamentRoute, matchGameTournamentsRoute, matchAdminGamesRoute, matchAdminTournamentsRoute, matchAdminLiveRoute, matchStreamGamesRoute, matchPlayerRoute, matchRegisterRoute, matchBroadcastRoute } from './hooks/useHashRoute';
 import { useGameSounds } from './hooks/useGameSounds';
 
 // Phase 12F — the /connect route was consolidated into the Games page
@@ -181,6 +181,7 @@ const gameRoute = matchGameRoute(path);
   const streamGamesRoute = matchStreamGamesRoute(path);
   const adminGamesRoute = matchAdminGamesRoute(path);
   const adminTournamentsRoute = matchAdminTournamentsRoute(path);
+  const adminLiveRoute = matchAdminLiveRoute(path);
   const registerRoute = matchRegisterRoute(path);
 
   return (
@@ -212,11 +213,12 @@ const gameRoute = matchGameRoute(path);
           gameId={playerRoute.gameId}
         />
       )}
-      {path === '/dashboard' && <Dashboard game={game} />}
+      {path === '/dashboard' && <AdminControlCenter />}
+      {path === '/dashboard/live' && <Dashboard game={game} />}
       {adminGamesRoute && <AdminGamesPage />}
-      {adminTournamentsRoute && <AdminTournamentsPage />}
+      {adminTournamentsRoute && <AdminTournamentsPage gameId={adminTournamentsRoute.gameId} />}
       {path === '/dashboard/trivia-questions' && <TriviaQuestionsPage />}
-      {!['/', '/games', '/stream-games', '/leaderboard', '/links', '/connect', '/register', '/dashboard'].includes(path) &&
+      {!['/', '/games', '/stream-games', '/leaderboard', '/links', '/connect', '/register', '/dashboard', '/dashboard/live'].includes(path) &&
         !gameRoute &&
         !streamGamesRoute &&
         !gameTournamentsRoute &&
@@ -224,7 +226,7 @@ const gameRoute = matchGameRoute(path);
         !profileRoute &&
         !playerRoute &&
         !adminGamesRoute &&
-        !adminTournamentsRoute && (
+        !adminTournamentsRoute && !adminLiveRoute && (
           <main className="page">
             <h2 className="page-title">الصفحة غير موجودة</h2>
           </main>

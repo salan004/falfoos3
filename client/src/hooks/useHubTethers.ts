@@ -21,9 +21,33 @@ import { useEffect } from 'react';
  *
  * Perf contract unchanged: initial post-paint rAF + ResizeObserver +
  * resize + fonts.ready. No JS animation loops.
+ *
+ * Phase F1 — additive configuration. The public HomePage calls this with no
+ * arguments and keeps the EXACT original behavior. The Admin Control Center
+ * passes an explicit config (different stage/core classes and orb key prefix)
+ * so its own hub can reuse the same engine without touching public geometry.
  */
 
+/** Default public HomePage hub keys (unchanged). */
 const ORB_KEYS = ['games', 'leaderboard', 'links', 'stream-games'] as const;
+
+export interface HubTetherConfig {
+  keys: readonly string[];
+  stageSelector: string;
+  coreSelector: string;
+  /** Prefix used to find an orb button by key, e.g. `hub-orb-` + `games`. */
+  orbPrefix: string;
+  /** Class of the tether SVG carrying `data-to="<key>"`. */
+  tetherClass: string;
+}
+
+const DEFAULT_CONFIG: HubTetherConfig = {
+  keys: ORB_KEYS,
+  stageSelector: '.hub-stage',
+  coreSelector: '.hub-core',
+  orbPrefix: 'hub-orb-',
+  tetherClass: 'hub-tether',
+};
 
 /** Straight radial connectors: slim constant box height (stroke + glow fit;
  *  overflow:visible lets them extend without clipping). */
@@ -43,9 +67,9 @@ function parseBobOffset(computedTranslate: string): { x: number; y: number } {
   };
 }
 
-function measureAndApply(): void {
-  const stage = document.querySelector<HTMLElement>('.hub-stage');
-  const core = document.querySelector<HTMLElement>('.hub-core');
+function measureAndApply(config: HubTetherConfig): void {
+  const stage = document.querySelector<HTMLElement>(config.stageSelector);
+  const core = document.querySelector<HTMLElement>(config.coreSelector);
   if (!stage || !core) return;
 
   const stageRect = stage.getBoundingClientRect();
@@ -54,9 +78,11 @@ function measureAndApply(): void {
   const cx = coreRect.left + coreRect.width / 2 - stageRect.left;
   const cy = coreRect.top + coreRect.height / 2 - stageRect.top;
 
-  for (const key of ORB_KEYS) {
-    const button = document.querySelector<HTMLElement>(`.hub-orb-${key}`);
-    const tether = document.querySelector<SVGSVGElement>(`.hub-tether[data-to="${key}"]`);
+  for (const key of config.keys) {
+    const button = document.querySelector<HTMLElement>(`.${config.orbPrefix}${key}`);
+    const tether = document.querySelector<SVGSVGElement>(
+      `.${config.tetherClass}[data-to="${key}"]`
+    );
     const ring = button?.querySelector<HTMLElement>('.hub-ring');
     if (!button || !tether || !ring) continue;
 
@@ -128,22 +154,27 @@ function measureAndApply(): void {
   }
 }
 
-export function useHubTethers(): void {
+export function useHubTethers(config?: Partial<HubTetherConfig>): void {
   useEffect(() => {
-    let raf = 0;
-    raf = requestAnimationFrame(measureAndApply);
+    const resolved: HubTetherConfig = { ...DEFAULT_CONFIG, ...config };
 
-    const stage = document.querySelector<HTMLElement>('.hub-stage');
-    const observer = typeof ResizeObserver !== 'undefined' && stage ? new ResizeObserver(measureAndApply) : null;
+    let raf = 0;
+    const run = () => measureAndApply(resolved);
+    raf = requestAnimationFrame(run);
+
+    const stage = document.querySelector<HTMLElement>(resolved.stageSelector);
+    const observer = typeof ResizeObserver !== 'undefined' && stage ? new ResizeObserver(run) : null;
     if (observer && stage) observer.observe(stage);
 
-    window.addEventListener('resize', measureAndApply);
-    if (document.fonts?.ready) void document.fonts.ready.then(measureAndApply).catch(() => undefined);
+    window.addEventListener('resize', run);
+    if (document.fonts?.ready) void document.fonts.ready.then(run).catch(() => undefined);
 
     return () => {
       cancelAnimationFrame(raf);
       observer?.disconnect();
-      window.removeEventListener('resize', measureAndApply);
+      window.removeEventListener('resize', run);
     };
+    // `config` is always a stable module-level object at the call sites.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 }

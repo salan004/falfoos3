@@ -16,7 +16,11 @@ const PAGE_TITLES: Record<string, string> = {
   '/links': 'الروابط',
   '/connect': 'ربط البث',
   '/register': 'تسجيل الهوية',
-  '/dashboard': 'لوحة التحكم',
+  '/dashboard': 'مركز التحكم',
+  '/dashboard/live': 'لوحة الجلسة المباشرة',
+  '/dashboard/games': 'إدارة الألعاب',
+  '/dashboard/tournaments': 'إدارة البطولات',
+  '/dashboard/trivia-questions': 'إدارة أسئلة التريفيا',
 };
 
 interface PageHeaderProps {
@@ -73,9 +77,10 @@ export function PageHeader({ youtubeStatus }: PageHeaderProps) {
     };
   }, [gameId]);
 
+  const pathname = path.split('?')[0];
   const pageTitle = gameId
     ? gameName ?? 'مركز اللعبة'
-    : PAGE_TITLES[path] ??
+    : PAGE_TITLES[pathname] ??
       (path.startsWith('/game/')
         ? 'غرفة اللعبة'
         : path.startsWith('/tournaments/')
@@ -132,7 +137,7 @@ export function PageHeader({ youtubeStatus }: PageHeaderProps) {
         )}
         {!isLoading && isRoleAdmin && (
           <button
-            className={`header-icon-btn ${path === '/dashboard' ? 'is-active-page' : ''}`}
+            className={`header-icon-btn ${path === '/dashboard' || path.startsWith('/dashboard/') ? 'is-active-page' : ''}`}
             onClick={() => navigate('/dashboard')}
             title="لوحة التحكم"
             aria-label="لوحة التحكم"

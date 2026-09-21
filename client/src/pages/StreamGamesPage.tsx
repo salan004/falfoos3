@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { apiFetch } from '../utils/api';
+import { apiFetch, resolveImageUrl } from '../utils/api';
 import { useHashRoute } from '../hooks/useHashRoute';
 import { useScrollReveal } from '../hooks/useScrollReveal';
 import { useAuthSession } from '../hooks/useAuthSession';
@@ -113,7 +113,7 @@ export function StreamGamesPage() {
               >
                 <div className="sg-card-media">
                   {g.image_url ? (
-                    <img src={g.image_url} alt={g.name_ar} loading="lazy" decoding="async" />
+                    <img src={resolveImageUrl(g.image_url)} alt={g.name_ar} loading="lazy" decoding="async" />
                   ) : (
                     <div className="sg-card-placeholder">
                       <span className="sg-card-icon">🎮</span>

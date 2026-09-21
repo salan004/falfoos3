@@ -31,15 +31,21 @@ const STATUS_LABELS: Record<string, string> = {
   disputed: 'نزاع',
 };
 
-const STATUS_BADGE: Record<string, string> = {
-  pending: 'badge-cyan',
-  scheduled: 'badge-cyan',
-  active: 'badge-yellow',
-  completed: 'badge-green',
-  cancelled: 'badge-red',
-  disputed: 'badge-red',
-};
+interface MatchRange {
+  /** Zero-based first row (leaf slot) this match occupies. */
+  start: number;
+  /** Number of first-round leaf slots this match covers. */
+  span: number;
+}
 
+/**
+ * Phase F2 — one competitor-focused match unit.
+ *
+ * The competitor NAME is the primary visual element. Match chrome (slot number,
+ * BO, status) is compact; LP/Elo are intentionally not shown here (the bracket
+ * is not a player card). Winner state and an advancement chevron point toward
+ * the next round (leftward in RTL).
+ */
 function MatchCard({
   match,
   players,
@@ -58,15 +64,17 @@ function MatchCard({
   onSelect?: (match: MatchDto) => void;
 }) {
   const statusLabel = STATUS_LABELS[match.status] ?? match.status;
-  const badge = STATUS_BADGE[match.status] ?? 'badge-cyan';
+  const isCompleted = match.status === 'completed';
+  const showBestOf = typeof match.bestOf === 'number' && match.bestOf > 1;
 
   return (
     <div
       className={`bracket-match ${hasNext ? 'has-next' : ''} ${
-        match.status === 'completed' ? 'is-completed' : ''
+        isCompleted ? 'is-completed' : ''
       } ${match.status === 'active' ? 'is-active' : ''} ${isFinalRound ? 'is-final-round' : ''} ${
         interactive ? 'is-interactive' : ''
       } ${selected ? 'is-selected' : ''}`}
+      data-status={match.status}
       role={interactive ? 'button' : undefined}
       tabIndex={interactive ? 0 : undefined}
       aria-pressed={interactive ? selected : undefined}
@@ -82,46 +90,65 @@ function MatchCard({
           : undefined
       }
     >
-      <div className="bracket-match-head">
+      <div className="bracket-match-topline">
         <span className="bracket-match-slot">م{match.slotNo.toLocaleString('ar')}</span>
-        {match.bestOf ? <span className="bracket-match-bestof">BO{match.bestOf.toLocaleString('ar')}</span> : null}
-        <span className={`badge ${badge} bracket-match-status`}>{statusLabel}</span>
+        {showBestOf ? (
+          <span className="bracket-match-bestof">BO{match.bestOf!.toLocaleString('ar')}</span>
+        ) : null}
+        <span className="bracket-match-status">{statusLabel}</span>
       </div>
+
       <div className="bracket-players">
         {match.players.length === 0 ? (
           <div className="bracket-player bracket-player-empty">
             <span className="bracket-player-name">بانتظار الفائزين</span>
           </div>
         ) : (
-          match.players.map((p) => {
-            const meta = players.get(p.playerId);
-            const isWinner = match.winnerPlayerId === p.playerId;
-            return (
-              <div
-                key={`${p.slot}-${p.playerId}`}
-                className={`bracket-player ${isWinner ? 'is-winner' : ''} ${
-                  match.status === 'completed' && match.winnerPlayerId !== null && !isWinner ? 'is-defeated' : ''
-                }`}
-              >
-                <PlayerAvatar id={p.playerId} name={meta?.name ?? 'لاعب'} avatarUrl={meta?.avatarUrl ?? undefined} size={24} />
-                <div className="bracket-player-body">
-                  <span className="bracket-player-name">{meta?.name ?? 'لاعب'}</span>
-                  <span className="bracket-player-meta">
-                    <RankBadge tierKey={meta?.tierKey} label={meta?.rankName} size={14} />
-                    {meta?.rankName ? <span className="bracket-player-rank">{meta.rankName}</span> : null}
-                    {typeof meta?.lp === 'number' ? <span>{meta.lp.toLocaleString('ar')} LP</span> : null}
-                    {typeof meta?.elo === 'number' ? <span>Elo {meta.elo.toLocaleString('ar')}</span> : null}
-                  </span>
+          <>
+            {match.players.map((p) => {
+              const meta = players.get(p.playerId);
+              const name = meta?.name ?? 'لاعب';
+              const isWinner = match.winnerPlayerId === p.playerId;
+              const isDefeated = isCompleted && match.winnerPlayerId !== null && !isWinner;
+              return (
+                <div
+                  key={`${p.slot}-${p.playerId}`}
+                  className={`bracket-player ${isWinner ? 'is-winner' : ''} ${
+                    isDefeated ? 'is-defeated' : ''
+                  }`}
+                >
+                  <PlayerAvatar
+                    id={p.playerId}
+                    name={name}
+                    avatarUrl={meta?.avatarUrl ?? undefined}
+                    size={28}
+                  />
+                  <div className="bracket-player-body">
+                    <span className="bracket-player-name" title={name}>
+                      {name}
+                    </span>
+                    <span className="bracket-player-sub">
+                      {typeof p.seed === 'number' ? (
+                        <span className="bracket-player-seed">#{p.seed.toLocaleString('ar')}</span>
+                      ) : null}
+                      {meta?.rankName ? (
+                        <span className="bracket-player-rank">
+                          <RankBadge tierKey={meta?.tierKey} label={meta.rankName} size={13} />
+                          {meta.rankName}
+                        </span>
+                      ) : null}
+                    </span>
+                  </div>
+                  {isWinner ? <span className="bracket-player-advance" aria-hidden="true" /> : null}
                 </div>
-                {typeof p.seed === 'number' ? <span className="bracket-player-seed">#{p.seed.toLocaleString('ar')}</span> : null}
+              );
+            })}
+            {match.players.length === 1 ? (
+              <div className="bracket-player bracket-player-waiting">
+                <span className="bracket-player-name">بانتظار الفائز</span>
               </div>
-            );
-          })
-        )}
-        {match.players.length === 1 && (
-          <div className="bracket-player bracket-player-bye">
-            <span className="bracket-player-name">تأهل تلقائي</span>
-          </div>
+            ) : null}
+          </>
         )}
       </div>
     </div>
@@ -129,18 +156,21 @@ function MatchCard({
 }
 
 /**
- * Phase 4E / Post-Phase 8 — visual single-elimination bracket rendered purely
- * from the Phase 4D bracket DTO. Round 1 is the outer column (right in RTL),
- * later rounds move inward, and the final sits next to the champion.
+ * Phase 4E / Post-Phase 8 / Phase F2 — Tournament Arena single-elimination tree.
  *
- * Geometry: every match column is a fixed track and every gap column has a
- * fixed width, so the connector lines land exactly on each match's vertical
- * centre. A single uniform row unit (`--bracket-row`) keeps every round's
- * matches on a predictable grid; a match always centres inside the rows it
- * spans, so its centre is mathematically the midpoint of its two feeders.
+ * Rendered purely from the Phase 4D bracket DTO. Round 1 is the outer column
+ * (right in RTL), later rounds move inward, the final sits next to the champion.
+ *
+ * Geometry: the tree is laid out on a leaf-slot grid of `bracketSize / 2` rows.
+ * Each match's row range is derived from the server-provided advancement graph
+ * (`nextMatchId` / `nextMatchSlot`) walking back from the final, so brackets
+ * WITH BYES render correctly (a bye leaves an empty leaf slot instead of
+ * shifting every later match). Connectors are drawn per next-round match and
+ * adapt to one or two feeders. The frontend never computes progression, LP, Elo
+ * or winners — the server remains authoritative.
  *
  * The `broadcast` variant reuses the exact same tree and geometry with
- * overlay-tuned styling. The frontend never calculates progression.
+ * overlay-tuned styling.
  */
 export function BracketView({
   bracket,
@@ -152,7 +182,11 @@ export function BracketView({
 }: BracketViewProps) {
   if (!bracket || bracket.rounds.length === 0) {
     return (
-      <div className={`panel text-center py-12 text-[var(--text-dim)]${variant === 'broadcast' ? ' bracket-empty-broadcast' : ''}`}>
+      <div
+        className={`panel text-center py-12 text-[var(--text-dim)]${
+          variant === 'broadcast' ? ' bracket-empty-broadcast' : ''
+        }`}
+      >
         لم يتم توليد جدول البطولة بعد
       </div>
     );
@@ -160,24 +194,68 @@ export function BracketView({
 
   const rounds = bracket.rounds;
   const totalRounds = rounds.length;
-  const firstRoundCount = rounds[0].matches.length;
+  const leafCount = Math.max(1, Math.floor(bracket.bracketSize / 2));
   const championMeta = championPlayerId ? players.get(championPlayerId) : undefined;
   const interactive = typeof onSelectMatch === 'function';
 
+  // ---- Advancement graph (server-provided ids only) -----------------------
+  const feedersByNext = new Map<string, { matchId: string; slot: number }[]>();
+  for (const round of rounds) {
+    for (const match of round.matches) {
+      if (!match.nextMatchId) continue;
+      const list = feedersByNext.get(match.nextMatchId) ?? [];
+      list.push({ matchId: match.id, slot: match.nextMatchSlot ?? 1 });
+      feedersByNext.set(match.nextMatchId, list);
+    }
+  }
+
+  // Assign each match its leaf-slot range by walking back from the final.
+  const ranges = new Map<string, MatchRange>();
+  const finalMatch = rounds[totalRounds - 1]?.matches[0];
+  if (finalMatch) {
+    const assign = (matchId: string, start: number, span: number) => {
+      if (ranges.has(matchId)) return;
+      ranges.set(matchId, { start, span });
+      const half = span / 2;
+      for (const feeder of feedersByNext.get(matchId) ?? []) {
+        assign(feeder.matchId, feeder.slot === 2 ? start + half : start, half);
+      }
+    };
+    assign(finalMatch.id, 0, leafCount);
+  }
+  // Defensive fallback for any unreachable match (never expected).
+  rounds.forEach((round, ri) => {
+    const span = Math.pow(2, ri);
+    round.matches.forEach((match, mi) => {
+      if (!ranges.has(match.id)) ranges.set(match.id, { start: mi * span, span });
+    });
+  });
+
   const columns: string[] = [];
   for (let ri = 0; ri < totalRounds; ri++) {
-    columns.push('minmax(var(--bracket-col, 210px), 1fr)');
-    if (ri < totalRounds - 1) columns.push('var(--bracket-gap, 46px)');
+    columns.push('minmax(var(--bracket-col, 240px), 1fr)');
+    if (ri < totalRounds - 1) columns.push('var(--bracket-gap, 64px)');
   }
   if (championPlayerId) {
-    columns.push('var(--bracket-gap, 46px)');
-    columns.push('minmax(180px, 0.9fr)');
+    columns.push('var(--bracket-gap, 64px)');
+    columns.push('minmax(200px, 0.9fr)');
   }
 
   const nodes: React.ReactNode[] = [];
 
-  // Round headers share the match grid (row 1) so they can never drift out of
-  // alignment with their column. Match/connector rows all start at row 2.
+  // Round rails sit BEHIND the matches and never affect connector geometry.
+  rounds.forEach((round, ri) => {
+    nodes.push(
+      <div
+        key={`rail-${round.roundNo}`}
+        className={`bracket-rail ${ri === totalRounds - 1 ? 'is-final' : ''}`}
+        aria-hidden="true"
+        style={{ gridColumn: 2 * ri + 1, gridRow: `1 / span ${leafCount + 1}` }}
+      />
+    );
+  });
+
+  // Round headers share the match grid (row 1) so they cannot drift.
   rounds.forEach((round, ri) => {
     nodes.push(
       <div
@@ -189,23 +267,25 @@ export function BracketView({
       </div>
     );
   });
+
+  // Matches — placed by their graph-derived leaf range.
   rounds.forEach((round, ri) => {
-    const span = Math.pow(2, ri);
     const hasNext = ri < totalRounds - 1;
-    round.matches.forEach((match, mi) => {
+    round.matches.forEach((match) => {
+      const range = ranges.get(match.id)!;
       nodes.push(
         <div
           key={`m-${match.id}`}
           className="bracket-slot"
           style={{
             gridColumn: 2 * ri + 1,
-            gridRow: `${mi * span + 2} / span ${span}`,
+            gridRow: `${range.start + 2} / span ${range.span}`,
           }}
         >
           <MatchCard
             match={match}
             players={players}
-            hasNext={hasNext}
+            hasNext={hasNext && !!match.nextMatchId}
             isFinalRound={ri === totalRounds - 1}
             interactive={interactive}
             selected={selectedMatchId === match.id}
@@ -214,39 +294,55 @@ export function BracketView({
         </div>
       );
     });
-
-    if (hasNext) {
-      const nextCount = rounds[ri + 1].matches.length;
-      for (let ci = 0; ci < nextCount; ci++) {
-        nodes.push(
-          <div
-            key={`c-${ri}-${ci}`}
-            className="bracket-conn"
-            aria-hidden="true"
-            style={{
-              gridColumn: 2 * ri + 2,
-              gridRow: `${ci * 2 * span + 2} / span ${2 * span}`,
-            }}
-          />
-        );
-      }
-    }
   });
 
-  if (championPlayerId) {
+  // Connectors — one per next-round match, spanning that match's leaf range.
+  for (let ri = 0; ri < totalRounds - 1; ri++) {
+    for (const nextMatch of rounds[ri + 1].matches) {
+      const feeders = feedersByNext.get(nextMatch.id) ?? [];
+      if (feeders.length === 0) continue;
+      const range = ranges.get(nextMatch.id)!;
+      let singleClass = '';
+      if (feeders.length === 1) {
+        const feederRange = ranges.get(feeders[0].matchId)!;
+        const isTop = feederRange.start < range.start + range.span / 2;
+        singleClass = ` is-single ${isTop ? 'is-top' : 'is-bottom'}`;
+      }
+      nodes.push(
+        <div
+          key={`c-${nextMatch.id}`}
+          className={`bracket-conn${singleClass}`}
+          aria-hidden="true"
+          style={{
+            gridColumn: 2 * ri + 2,
+            gridRow: `${range.start + 2} / span ${range.span}`,
+          }}
+        />
+      );
+    }
+  }
+
+  if (championPlayerId && finalMatch) {
+    const finalRange = ranges.get(finalMatch.id)!;
     nodes.push(
       <div
         key="c-final"
         className="bracket-conn bracket-conn-final"
         aria-hidden="true"
-        style={{ gridColumn: 2 * totalRounds, gridRow: `2 / span ${firstRoundCount}` }}
+        style={{
+          gridColumn: 2 * totalRounds,
+          gridRow: `${finalRange.start + 2} / span ${finalRange.span}`,
+        }}
       />
     );
     nodes.push(
       <div
         key="champion"
         className="bracket-champion"
-        style={{ gridColumn: 2 * totalRounds + 1, gridRow: `2 / span ${firstRoundCount}` }}
+        style={{
+          gridColumn: 2 * totalRounds + 1,
+          gridRow: `${finalRange.start + 2} / span ${finalRange.span}`,
+        }}
       >
         <div className="bracket-champion-crown" aria-hidden="true">🏆</div>
         <div className="bracket-champion-label">البطل</div>
@@ -259,14 +355,8 @@ export function BracketView({
         <div className="bracket-champion-name">{championMeta?.name ?? 'البطل'}</div>
         {championMeta?.rankName ? (
           <div className="bracket-champion-rank">
-            <RankBadge tierKey={championMeta?.tierKey} label={championMeta?.rankName} size={18} />
+            <RankBadge tierKey={championMeta?.tierKey} label={championMeta.rankName} size={18} />
             {championMeta.rankName}
-          </div>
-        ) : null}
-        {typeof championMeta?.lp === 'number' ? (
-          <div className="bracket-champion-stats">
-            {championMeta.lp.toLocaleString('ar')} LP
-            {typeof championMeta.elo === 'number' ? ` • ${championMeta.elo.toLocaleString('ar')} Elo` : ''}
           </div>
         ) : null}
       </div>
@@ -274,15 +364,23 @@ export function BracketView({
   }
 
   return (
-    <div className={`bracket-scroll bracket-scroll-${variant}`} dir="rtl">
-      <div
-        className={`bracket-grid bracket-grid-${variant}`}
-        style={{
-          gridTemplateColumns: columns.join(' '),
-          gridTemplateRows: `auto repeat(${firstRoundCount}, var(--bracket-row, 132px))`,
-        }}
-      >
-        {nodes}
+    <div className={`bracket-frame bracket-frame-${variant}`}>
+      {variant !== 'broadcast' ? (
+        <p className="bracket-scroll-hint" aria-hidden="true">
+          <span className="bracket-scroll-hint-arrows">↔</span>
+          اسحب لاستعراض جميع الجولات
+        </p>
+      ) : null}
+      <div className={`bracket-scroll bracket-scroll-${variant}`} dir="rtl">
+        <div
+          className={`bracket-grid bracket-grid-${variant}`}
+          style={{
+            gridTemplateColumns: columns.join(' '),
+            gridTemplateRows: `auto repeat(${leafCount}, var(--bracket-row, 150px))`,
+          }}
+        >
+          {nodes}
+        </div>
       </div>
     </div>
   );

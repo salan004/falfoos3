@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { apiFetch } from '../utils/api';
+import { apiFetch, resolveImageUrl } from '../utils/api';
 import { useHashRoute } from '../hooks/useHashRoute';
 import { useScrollReveal } from '../hooks/useScrollReveal';
 import { useAuthSession } from '../hooks/useAuthSession';
@@ -165,7 +165,7 @@ export function GameHubPage({ gameId }: GameHubPageProps) {
 
   const openTournament = (id: string) => navigate(`/tournaments/${id}`);
 
-  const gameImage = game?.image_url || null;
+  const gameImage = resolveImageUrl(game?.image_url);
   const subtitle = useMemo(() => game?.description_ar || 'المنصة التنافسية للعبة', [game]);
 
   // Real, derived status only — never invented. Reflects the game's tournaments.

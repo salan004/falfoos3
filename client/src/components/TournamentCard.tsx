@@ -1,4 +1,5 @@
 import { TournamentWithGame } from '../types/game';
+import { resolveImageUrl } from '../utils/api';
 
 type TournamentStatus = 'draft' | 'open' | 'active' | 'completed' | 'cancelled';
 
@@ -27,7 +28,7 @@ const STATUS_BADGE: Record<TournamentStatus, string> = {
 export function TournamentCard({ tournament, gameImageUrl, onClick }: TournamentCardProps) {
   const statusLabel = STATUS_LABELS[tournament.status] || tournament.status;
   const badgeClass = STATUS_BADGE[tournament.status] || 'badge-cyan';
-  const imageUrl = tournament.image_url || gameImageUrl;
+  const imageUrl = resolveImageUrl(tournament.image_url || gameImageUrl);
 
   return (
     <article

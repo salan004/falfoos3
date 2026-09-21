@@ -9,7 +9,6 @@ import {
   type AccountLinkOperation,
   type LinkStartResult,
 } from '../utils/accountLinkApi';
-import { PlayerAvatar } from './PlayerAvatar';
 
 /**
  * Phase 7 / Step 2 — Account <-> EXISTING Player linking UI.
@@ -78,7 +77,7 @@ function mapLinkError(status: number, code: string): string {
 }
 
 export function AccountLinkPanel({ onLinked }: AccountLinkPanelProps) {
-  const { user, isLoading: sessionLoading } = useAuthSession();
+  const { user, isLoading: sessionLoading, markClaimed } = useAuthSession();
   const [status, setStatus] = useState<StatusPhase>('loading');
   const [account, setAccount] = useState<AccountLinkStatus | null>(null);
   const [flow, setFlow] = useState<FlowPhase>('intro');
@@ -110,7 +109,7 @@ export function AccountLinkPanel({ onLinked }: AccountLinkPanelProps) {
 
   async function handleStart(): Promise<void> {
     if (!operation) {
-      setError('اختر نوع العملية أولاً.');
+      setError('اختر هوية اللاعب أولاً.');
       return;
     }
     const value = channel.trim();
@@ -144,6 +143,10 @@ export function AccountLinkPanel({ onLinked }: AccountLinkPanelProps) {
       setChannel('');
       setOperation(null);
       await loadStatus();
+      // F8-FIX — the server already confirmed the link; mirror that into the
+      // shared session so the Header "ربط" action disappears immediately
+      // (no full page reload). No player identity is sent from the browser.
+      markClaimed();
       onLinked?.();
       return;
     }
@@ -168,16 +171,16 @@ export function AccountLinkPanel({ onLinked }: AccountLinkPanelProps) {
   return (
     <section
       className={`panel acct-link${linkedPlayer ? ' is-linked' : ''}`}
-      aria-label="ربط الحساب باللاعب"
+      aria-label="ربط الحساب بهوية اللاعب"
     >
       <header className="acct-link-head">
         <span className="acct-link-icon" aria-hidden="true">{linkedPlayer ? '🔗' : '🧩'}</span>
         <div className="acct-link-heading">
-          <h2 className="acct-link-title">ربط الحساب بلاعب FalFoos</h2>
+          <h2 className="acct-link-title">ربط الحساب بهوية اللاعب</h2>
           <p className="acct-link-sub">
             {linkedPlayer
               ? 'حساب Google مرتبط بهوية لاعب FalFoos.'
-              : 'اربط حساب Google الخاص بك بهوية لاعبك الحالية — دون إنشاء لاعب جديد.'}
+              : 'اربط حسابك بهوية لاعب على فلفوس. عند ربط هوية موجودة تبقى هويتها وسجلها كما هي وتُضاف إلى حسابك.'}
           </p>
         </div>
       </header>
@@ -201,20 +204,17 @@ export function AccountLinkPanel({ onLinked }: AccountLinkPanelProps) {
           </button>
         </div>
       ) : linkedPlayer ? (
-        <div className="acct-linked">
-          <PlayerAvatar id={linkedPlayer.player_id} name={linkedName} size={52} />
-          <div className="acct-linked-info">
-            <span className="acct-linked-name">{linkedName}</span>
-            <span className="acct-linked-channel" dir="ltr">
-              {linkedPlayer.youtube_channel_id}
-            </span>
-            <span className="badge badge-green acct-linked-badge">مرتبط ✓</span>
-          </div>
+        <div className="acct-linked-inline" role="status">
+          <span className="acct-linked-inline-status">
+            <span className="acct-linked-inline-check" aria-hidden="true">✓</span>
+            تم ربط الحساب بنجاح
+          </span>
+          <span className="acct-linked-inline-player">{linkedName}</span>
           <a
-            className="btn-neon acct-link-btn"
+            className="acct-linked-inline-action"
             href={`#/profile/${encodeURIComponent(linkedPlayer.player_id)}`}
           >
-            عرض ملف اللاعب
+            عرض ملف اللاعب ←
           </a>
         </div>
       ) : (
@@ -242,7 +242,7 @@ export function AccountLinkPanel({ onLinked }: AccountLinkPanelProps) {
             </>
           ) : operation === null ? (
             <>
-              <p className="acct-link-instruction">اختر نوع العملية</p>
+              <p className="acct-link-instruction">اختر هوية اللاعب</p>
               <div className="acct-link-choices">
                 <button
                   type="button"
@@ -253,9 +253,9 @@ export function AccountLinkPanel({ onLinked }: AccountLinkPanelProps) {
                   }}
                 >
                   <span className="acct-link-choice-icon" aria-hidden="true">🔗</span>
-                  <span className="acct-link-choice-title">ربط لاعب موجود</span>
+                  <span className="acct-link-choice-title">ربط بهوية لاعب موجودة</span>
                   <span className="acct-link-choice-desc">
-                    لديك لاعب FalFoos من مشتريات البطولات؟ اربطه بحسابك.
+                    اربط حسابك بهوية لاعب موجودة على فلفوس مع الحفاظ على سجلها ونقاطها وتصنيفها.
                   </span>
                 </button>
                 <button
@@ -267,9 +267,9 @@ export function AccountLinkPanel({ onLinked }: AccountLinkPanelProps) {
                   }}
                 >
                   <span className="acct-link-choice-icon" aria-hidden="true">🆕</span>
-                  <span className="acct-link-choice-title">تسجيل لاعب جديد</span>
+                  <span className="acct-link-choice-title">تسجيل هوية لاعب جديدة</span>
                   <span className="acct-link-choice-desc">
-                    لا تملك لاعباً؟ وثّق قناتك وأنشئ لاعباً جديداً.
+                    أنشئ هوية لاعب جديدة مرتبطة بقناتك، ثم اربطها بحسابك.
                   </span>
                 </button>
               </div>
@@ -278,7 +278,7 @@ export function AccountLinkPanel({ onLinked }: AccountLinkPanelProps) {
           ) : (
             <>
               <p className="acct-link-instruction">
-                {operation === 'LINK_EXISTING_PLAYER' ? '🔗 ربط لاعب موجود' : '🆕 تسجيل لاعب جديد'}
+                {operation === 'LINK_EXISTING_PLAYER' ? '🔗 ربط هوية لاعب موجودة' : '🆕 تسجيل هوية لاعب جديدة'}
               </p>
               <ol className="acct-link-steps">
                 <li>ابدأ العملية وأدخل رابط قناتك.</li>
@@ -287,8 +287,8 @@ export function AccountLinkPanel({ onLinked }: AccountLinkPanelProps) {
                 <li>عُد إلى الموقع واضغط «تحقق الآن».</li>
                 <li>
                   {operation === 'LINK_EXISTING_PLAYER'
-                    ? 'سيُربط لاعبك الحالي بحسابك تلقائياً.'
-                    : 'سيُنشأ لاعبك الجديد ويُربط بحسابك تلقائياً.'}
+                    ? 'سيتم ربط هوية اللاعب الحالية بحسابك.'
+                    : 'سيتم إنشاء هوية اللاعب وربطها بحسابك.'}
                 </li>
               </ol>
               <label className="acct-link-field" htmlFor="acct-link-channel">

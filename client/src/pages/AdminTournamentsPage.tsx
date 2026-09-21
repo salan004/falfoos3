@@ -1,11 +1,81 @@
-import { useEffect, useState } from 'react';
-import { apiFetch } from '../utils/api';
+import { useEffect, useMemo, useState } from 'react';
+import { apiFetch, resolveImageUrl } from '../utils/api';
 import { useAuthSession } from '../hooks/useAuthSession';
+import { useHashRoute } from '../hooks/useHashRoute';
 import { AdminGate } from '../components/AdminGate';
+import { AdminAccessDenied } from '../components/admin/AdminAccessDenied';
+import { ImageUploadField } from '../components/admin/ImageUploadField';
 import { TournamentWithGame, TournamentStatus } from '../types/game';
 
-export function AdminTournamentsPage() {
+interface TournamentFormData {
+  game_id: string;
+  name_ar: string;
+  description_ar: string;
+  image_url: string;
+  max_participants: string;
+  /** Initial status only — lifecycle changes happen from the list actions. */
+  status: 'draft' | 'open';
+}
+
+const EMPTY_FORM: TournamentFormData = {
+  game_id: '',
+  name_ar: '',
+  description_ar: '',
+  image_url: '',
+  max_participants: '',
+  status: 'draft',
+};
+
+const STATUS_LABELS: Record<TournamentStatus, string> = {
+  draft: 'مسودة',
+  open: 'مفتوحة',
+  active: 'نشطة',
+  completed: 'مكتملة',
+  cancelled: 'ملغاة',
+};
+
+const STATUS_COLORS: Record<TournamentStatus, string> = {
+  draft: 'badge-cyan',
+  open: 'badge-green',
+  active: 'badge-yellow',
+  completed: 'badge-cyan',
+  cancelled: 'badge-red',
+};
+
+/**
+ * Actions mirror the backend lifecycle (`TournamentService.validateStatusTransition`).
+ * Only valid transitions from the current status are offered.
+ */
+interface StatusAction {
+  to: TournamentStatus;
+  label: string;
+  destructive?: boolean;
+}
+
+const STATUS_ACTIONS: Record<TournamentStatus, StatusAction[]> = {
+  draft: [
+    { to: 'open', label: 'فتح التسجيل' },
+    { to: 'cancelled', label: 'إلغاء البطولة', destructive: true },
+  ],
+  open: [
+    { to: 'active', label: 'بدء البطولة' },
+    { to: 'cancelled', label: 'إلغاء البطولة', destructive: true },
+  ],
+  active: [
+    { to: 'completed', label: 'إكمال البطولة' },
+    { to: 'cancelled', label: 'إلغاء البطولة', destructive: true },
+  ],
+  completed: [],
+  cancelled: [],
+};
+
+interface AdminTournamentsPageProps {
+  gameId?: string;
+}
+
+export function AdminTournamentsPage({ gameId }: AdminTournamentsPageProps) {
   const { user, isLoading } = useAuthSession();
+  const { navigate } = useHashRoute();
   const [tournaments, setTournaments] = useState<TournamentWithGame[]>([]);
   const [games, setGames] = useState<{ id: string; name_ar: string }[]>([]);
   const [loading, setLoading] = useState(true);
@@ -13,24 +83,9 @@ export function AdminTournamentsPage() {
   const [editingTournament, setEditingTournament] = useState<TournamentWithGame | null>(null);
   const [viewingParticipants, setViewingParticipants] = useState<string | null>(null);
   const [participants, setParticipants] = useState<any[]>([]);
-  const [formData, setFormData] = useState<any>({
-    game_id: '',
-    name_ar: '',
-    description_ar: '',
-    image_url: '',
-    max_participants: '',
-    starts_at: '',
-    ends_at: '',
-    status: 'draft',
-  });
+  const [formData, setFormData] = useState<TournamentFormData>(EMPTY_FORM);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-
-  useEffect(() => {
-    if (isLoading) return;
-    loadTournaments();
-    loadGames();
-  }, [isLoading]);
 
   const loadTournaments = async () => {
     try {
@@ -51,10 +106,33 @@ export function AdminTournamentsPage() {
       const res = await apiFetch('/api/admin/games');
       const data = await res.json();
       if (res.ok) {
-        setGames(data.games.filter((g: any) => g.is_active).map((g: any) => ({ id: g.id, name_ar: g.name_ar })));
+        setGames(
+          data.games
+            .filter((g: any) => g.is_active)
+            .map((g: any) => ({ id: g.id, name_ar: g.name_ar }))
+        );
       }
-    } catch {}
+    } catch {
+      /* the game select is non-critical for the list view */
+    }
   };
+
+  useEffect(() => {
+    if (isLoading) return;
+    void loadTournaments();
+    void loadGames();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLoading]);
+
+  const visibleTournaments = useMemo(
+    () => (gameId ? tournaments.filter((t) => t.game_id === gameId) : tournaments),
+    [tournaments, gameId]
+  );
+
+  const filteredGameName = useMemo(
+    () => (gameId ? games.find((g) => g.id === gameId)?.name_ar ?? null : null),
+    [gameId, games]
+  );
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -62,31 +140,30 @@ export function AdminTournamentsPage() {
     setSubmitting(true);
 
     try {
-      const payload = {
+      const base = {
         game_id: formData.game_id,
-        name_ar: formData.name_ar,
-        description_ar: formData.description_ar,
-        image_url: formData.image_url || undefined,
-        max_participants: formData.max_participants ? parseInt(formData.max_participants) : undefined,
-        starts_at: formData.starts_at ? new Date(formData.starts_at).getTime() : undefined,
-        ends_at: formData.ends_at ? new Date(formData.ends_at).getTime() : undefined,
-        status: formData.status,
+        name_ar: formData.name_ar.trim(),
+        description_ar: formData.description_ar.trim(),
+        // Empty string clears the image on edit; on create it renders as the
+        // placeholder (the public card falls back to the game image).
+        image_url: formData.image_url,
+        max_participants: formData.max_participants
+          ? parseInt(formData.max_participants, 10)
+          : undefined,
       };
 
-      let res;
-      if (editingTournament) {
-        res = await apiFetch(`/api/admin/tournaments/${editingTournament.id}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-        });
-      } else {
-        res = await apiFetch('/api/admin/tournaments', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-        });
-      }
+      // dates (starts_at / ends_at) are deliberately not sent — UI removal only.
+      const res = editingTournament
+        ? await apiFetch(`/api/admin/tournaments/${editingTournament.id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(base),
+          })
+        : await apiFetch('/api/admin/tournaments', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ...base, status: formData.status }),
+          });
 
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -94,10 +171,8 @@ export function AdminTournamentsPage() {
         return;
       }
 
-      setShowForm(false);
-      setEditingTournament(null);
-      resetForm();
-      loadTournaments();
+      closeForm();
+      void loadTournaments();
     } catch {
       setError('فشل الاتصال بالخادم');
     } finally {
@@ -112,61 +187,53 @@ export function AdminTournamentsPage() {
       name_ar: tournament.name_ar,
       description_ar: tournament.description_ar || '',
       image_url: tournament.image_url || '',
-      max_participants: tournament.max_participants || '',
-      starts_at: tournament.starts_at ? new Date(tournament.starts_at).toISOString().slice(0, 16) : '',
-      ends_at: tournament.ends_at ? new Date(tournament.ends_at).toISOString().slice(0, 16) : '',
-      status: tournament.status,
+      max_participants: tournament.max_participants ? String(tournament.max_participants) : '',
+      status: 'draft',
     });
     setShowForm(true);
+    setError(null);
   };
 
   const startCreate = () => {
     setEditingTournament(null);
-    resetForm();
+    setFormData({ ...EMPTY_FORM, game_id: gameId ?? '' });
     setShowForm(true);
+    setError(null);
   };
 
-  const resetForm = () => {
-    setFormData({
-      game_id: '',
-      name_ar: '',
-      description_ar: '',
-      image_url: '',
-      max_participants: '',
-      starts_at: '',
-      ends_at: '',
-      status: 'draft',
-    });
+  const closeForm = () => {
+    setShowForm(false);
+    setEditingTournament(null);
+    setFormData(EMPTY_FORM);
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('تأكيد حذف البطولة؟ (فقط البطولات في حالة مسودة)')) return;
+  const changeStatus = async (tournament: TournamentWithGame, action: StatusAction) => {
+    if (action.destructive && !confirm(`تأكيد ${action.label}؟`)) return;
+    setError(null);
     try {
-      const res = await apiFetch(`/api/admin/tournaments/${id}`, { method: 'DELETE' });
-      if (res.ok) loadTournaments();
-    } catch {
-      setError('فشل الحذف');
-    }
-  };
-
-  // Phase 1D — non-destructive cancellation: reuses the existing admin PATCH
-  // (status lifecycle) and never deletes participants/matches/results.
-  const handleCancel = async (id: string) => {
-    if (!confirm('هل أنت متأكد من إلغاء هذه البطولة؟')) return;
-    try {
-      const res = await apiFetch(`/api/admin/tournaments/${id}`, {
+      const res = await apiFetch(`/api/admin/tournaments/${tournament.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: 'cancelled' }),
+        body: JSON.stringify({ status: action.to }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setError(data.error || 'فشل إلغاء البطولة');
+        setError(data.error || 'فشل تغيير الحالة');
         return;
       }
-      loadTournaments();
+      void loadTournaments();
     } catch {
       setError('فشل الاتصال بالخادم');
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!confirm('تأكيد حذف البطولة؟ (المسودات فقط)')) return;
+    try {
+      const res = await apiFetch(`/api/admin/tournaments/${id}`, { method: 'DELETE' });
+      if (res.ok) void loadTournaments();
+    } catch {
+      setError('فشل الحذف');
     }
   };
 
@@ -187,49 +254,36 @@ export function AdminTournamentsPage() {
     }
   };
 
-  const handleAddParticipant = async (tournamentId: string, playerId: string, source: 'admin' | 'qualifier') => {
-    try {
-      const res = await apiFetch(`/api/admin/tournaments/${tournamentId}/participants`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ player_id: playerId, source, ticket_ref: undefined }),
-      });
-      if (res.ok) {
-        handleViewParticipants(tournamentId);
-      }
-    } catch {
-      setError('فشل إضافة المشارك');
-    }
-  };
+  if (isLoading) {
+    return (
+      <main className="page admin-page">
+        <div className="panel text-center py-12 loading-pulse text-[var(--text-dim)]">
+          جارٍ التحقق من الصلاحية…
+        </div>
+      </main>
+    );
+  }
 
-  const statusLabels: Record<TournamentStatus, string> = {
-    draft: 'مسودة',
-    open: 'مفتوحة',
-    active: 'نشطة',
-    completed: 'مكتملة',
-    cancelled: 'ملغاة',
-  };
-
-  const statusColors: Record<TournamentStatus, string> = {
-    draft: 'badge-cyan',
-    open: 'badge-green',
-    active: 'badge-yellow',
-    completed: 'badge-cyan',
-    cancelled: 'badge-red',
-  };
-
-  if (isLoading || !user || user.role !== 'admin') {
-    return null;
+  if (!user || user.role !== 'admin') {
+    return <AdminAccessDenied />;
   }
 
   return (
-    <main className="page" style={{ maxWidth: 1200 }}>
-      <div className="flex items-center justify-between gap-4 mb-6">
+    <main className="page admin-page">
+      <div className="admin-page-head">
         <div>
-          <h1 className="page-title">إدارة البطولات</h1>
-          <p className="hero-subtitle">إنشاء وتعديل البطولات وعرض المشاركين</p>
+          <span className="admin-page-kicker">🏆 إدارة البطولات</span>
+          <h1 className="page-title">البطولات</h1>
+          <p className="hero-subtitle">
+            {filteredGameName ? `بطولات: ${filteredGameName}` : 'إنشاء وتعديل البطولات وعرض المشاركين'}
+          </p>
         </div>
-        <AdminGate />
+        <div className="flex items-center gap-2">
+          <button className="btn-neon text-sm" onClick={() => navigate('/dashboard')}>
+            ← مركز التحكم
+          </button>
+          <AdminGate />
+        </div>
       </div>
 
       {error && <div className="panel text-[var(--neon-red)] mb-4">{error}</div>}
@@ -243,52 +297,74 @@ export function AdminTournamentsPage() {
           {loading ? (
             <div className="panel text-center py-8">جارٍ التحميل…</div>
           ) : (
-            <div className="space-y-3">
-              {tournaments.map((t) => (
-                <div key={t.id} className="panel flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-4">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div>
-                      <div className="font-bold">{t.name_ar}</div>
-                      <div className="text-sm text-[var(--text-dim)]">
-                        {t.game_name_ar} | {statusLabels[t.status] || t.status} | مشاركين: {t.participant_count}{t.max_participants ? ` / ${t.max_participants}` : ''}
+            <div className="admin-list">
+              {visibleTournaments.map((t) => (
+                <div key={t.id} className="panel admin-list-row">
+                  <div className="admin-list-row-main">
+                    <div className="admin-list-thumb">
+                      {t.image_url || t.game_image_url ? (
+                        <img
+                          src={resolveImageUrl(t.image_url || t.game_image_url)}
+                          alt={t.name_ar}
+                          loading="lazy"
+                          decoding="async"
+                        />
+                      ) : (
+                        <span aria-hidden="true">🏆</span>
+                      )}
+                    </div>
+                    <div className="min-w-0">
+                      <div className="admin-list-title">{t.name_ar}</div>
+                      <div className="admin-list-meta">
+                        <span className={`badge ${STATUS_COLORS[t.status]}`}>
+                          {STATUS_LABELS[t.status]}
+                        </span>
+                        <span className="admin-list-meta-item">{t.game_name_ar}</span>
+                        <span className="admin-list-meta-item">
+                          مشاركون: {t.participant_count}
+                          {t.max_participants ? ` / ${t.max_participants}` : ''}
+                        </span>
                       </div>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2 shrink-0">
+                  <div className="admin-list-row-actions">
                     <button className="btn-neon text-sm" onClick={() => handleViewParticipants(t.id)}>
-                      {viewingParticipants === t.id ? 'إخفاء المشاركين' : 'المشاركين'}
+                      {viewingParticipants === t.id ? 'إخفاء المشاركين' : 'المشاركون'}
                     </button>
                     <button className="btn-neon text-sm" onClick={() => startEdit(t)}>
                       تعديل
                     </button>
-                    {(t.status === 'draft' || t.status === 'open' || t.status === 'active') && (
+                    {STATUS_ACTIONS[t.status].map((action) => (
                       <button
-                        className="btn-neon text-sm"
-                        style={{ background: 'var(--neon-red)' }}
-                        onClick={() => handleCancel(t.id)}
+                        key={action.to}
+                        className={`btn-neon text-sm${action.destructive ? ' admin-btn-danger' : ''}`}
+                        onClick={() => changeStatus(t, action)}
                       >
-                        إلغاء البطولة
+                        {action.label}
                       </button>
-                    )}
+                    ))}
                     {t.status === 'draft' && (
-                      <button className="btn-neon text-sm" style={{ background: 'var(--neon-red)' }} onClick={() => handleDelete(t.id)}>
+                      <button
+                        className="btn-neon text-sm admin-btn-danger"
+                        onClick={() => handleDelete(t.id)}
+                      >
                         حذف
                       </button>
                     )}
                   </div>
                 </div>
               ))}
-              {tournaments.length === 0 && (
+              {visibleTournaments.length === 0 && (
                 <div className="panel text-center py-8 text-[var(--text-dim)]">
-                  لا توجد بطولات — ابدأ بإنشاء واحدة
+                  لا توجد بطولات — ابدأ بإنشاء واحدة.
                 </div>
               )}
             </div>
           )}
         </div>
       ) : viewingParticipants ? (
-        <div className="panel" style={{ maxWidth: 800 }}>
-          <div className="flex items-center justify-between mb-4">
+        <div className="panel admin-form-card">
+          <div className="admin-form-head">
             <h2 className="page-title">المشاركون</h2>
             <button className="btn-neon" onClick={() => setViewingParticipants(null)}>
               ← رجوع
@@ -296,16 +372,18 @@ export function AdminTournamentsPage() {
           </div>
 
           {participants.length === 0 ? (
-            <div className="text-center py-8 text-[var(--text-dim)]">
-              لا يوجد مشاركين بعد
-            </div>
+            <div className="text-center py-8 text-[var(--text-dim)]">لا يوجد مشاركون بعد</div>
           ) : (
             <div className="space-y-2">
-              {participants.map((p, i) => (
+              {participants.map((p) => (
                 <div key={p.player_id} className="flex items-center justify-between p-3 panel">
                   <div className="flex items-center gap-3">
                     {p.youtube_avatar_url ? (
-                      <img src={p.youtube_avatar_url} alt={p.youtube_name || ''} className="w-10 h-10 rounded-full" />
+                      <img
+                        src={p.youtube_avatar_url}
+                        alt={p.youtube_name || ''}
+                        className="w-10 h-10 rounded-full"
+                      />
                     ) : (
                       <div className="w-10 h-10 rounded-full bg-[var(--neon-cyan)] flex items-center justify-center text-[var(--dark)] font-bold">
                         {p.youtube_name?.charAt(0) || '؟'}
@@ -317,127 +395,124 @@ export function AdminTournamentsPage() {
                         {p.source === 'purchase' && '🎫 تذكرة'}
                         {p.source === 'admin' && '👑 إدارة'}
                         {p.source === 'qualifier' && '⭐ تأهيل'}
-                        {' · '}{p.status}
+                        {' · '}
+                        {p.status}
                       </div>
                     </div>
                   </div>
-                  {p.status !== 'cancelled' && (
-                    <button className="btn-neon text-sm" style={{ background: 'var(--neon-red)' }} onClick={() => {}}>
-                      إلغاء
-                    </button>
-                  )}
                 </div>
               ))}
             </div>
           )}
         </div>
       ) : (
-        <div className="panel" style={{ maxWidth: 700 }}>
-          <h2 className="page-title mb-4">{editingTournament ? 'تعديل البطولة' : 'إنشاء بطولة جديدة'}</h2>
+        <div className="panel admin-form-card">
+          <h2 className="page-title mb-4">
+            {editingTournament ? 'تعديل البطولة' : 'إنشاء بطولة جديدة'}
+          </h2>
 
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium mb-1">اللعبة *</label>
-              <select
-                value={formData.game_id}
-                onChange={(e) => setFormData({ ...formData, game_id: e.target.value })}
-                required
-                className="w-full input-field"
-              >
-                <option value="">اختر اللعبة</option>
-                {games.map((g) => <option key={g.id} value={g.id}>{g.name_ar}</option>)}
-              </select>
-            </div>
+          <form onSubmit={handleSubmit} className="admin-form">
+            <section className="admin-form-section">
+              <h3 className="admin-form-section-title">بيانات البطولة</h3>
 
-            <div>
-              <label className="block text-sm font-medium mb-1">اسم البطولة *</label>
-              <input
-                type="text"
-                value={formData.name_ar}
-                onChange={(e) => setFormData({ ...formData, name_ar: e.target.value })}
-                required
-                className="w-full input-field"
-                placeholder="مثال: بطولة Dueling Grounds #1"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium mb-1">الوصف</label>
-              <textarea
-                value={formData.description_ar}
-                onChange={(e) => setFormData({ ...formData, description_ar: e.target.value })}
-                className="w-full input-field"
-                rows={3}
-                placeholder="وصف البطولة…"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium mb-1">رابط الصورة (اختياري)</label>
-              <input
-                type="text"
-                value={formData.image_url}
-                onChange={(e) => setFormData({ ...formData, image_url: e.target.value })}
-                className="w-full input-field"
-                placeholder="/assets/images/tournaments/dueling_grounds_1.webp"
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium mb-1">الحد الأقصى للمشاركين</label>
-                <input
-                  type="number"
-                  value={formData.max_participants}
-                  onChange={(e) => setFormData({ ...formData, max_participants: e.target.value })}
-                  className="w-full input-field"
-                  min="1"
-                  placeholder="اترك فارغاً للا حد"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">الحالة</label>
+              <div className="admin-field">
+                <label className="admin-field-label" htmlFor="tournament-game">اللعبة *</label>
                 <select
-                  value={formData.status}
-                  onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                  id="tournament-game"
+                  value={formData.game_id}
+                  onChange={(e) => setFormData({ ...formData, game_id: e.target.value })}
+                  required
+                  disabled={!!editingTournament}
                   className="w-full input-field"
                 >
-                  <option value="draft">مسودة</option>
-                  <option value="open">مفتوحة للتسجيل</option>
-                  <option value="active">نشطة</option>
-                  <option value="completed">مكتملة</option>
-                  <option value="cancelled">ملغاة</option>
+                  <option value="">اختر اللعبة</option>
+                  {games.map((g) => (
+                    <option key={g.id} value={g.id}>
+                      {g.name_ar}
+                    </option>
+                  ))}
                 </select>
               </div>
-            </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium mb-1">تاريخ البداية</label>
+              <div className="admin-field">
+                <label className="admin-field-label" htmlFor="tournament-name">اسم البطولة *</label>
                 <input
-                  type="datetime-local"
-                  value={formData.starts_at}
-                  onChange={(e) => setFormData({ ...formData, starts_at: e.target.value })}
+                  id="tournament-name"
+                  type="text"
+                  value={formData.name_ar}
+                  onChange={(e) => setFormData({ ...formData, name_ar: e.target.value })}
+                  required
+                  maxLength={150}
                   className="w-full input-field"
+                  placeholder="اكتب اسم البطولة"
                 />
               </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">تاريخ النهاية (اختياري)</label>
-                <input
-                  type="datetime-local"
-                  value={formData.ends_at}
-                  onChange={(e) => setFormData({ ...formData, ends_at: e.target.value })}
+
+              <div className="admin-field">
+                <label className="admin-field-label" htmlFor="tournament-description">الوصف</label>
+                <textarea
+                  id="tournament-description"
+                  value={formData.description_ar}
+                  onChange={(e) => setFormData({ ...formData, description_ar: e.target.value })}
                   className="w-full input-field"
+                  rows={3}
+                  placeholder="وصف البطولة"
                 />
               </div>
-            </div>
+            </section>
 
-            <div className="flex gap-2 justify-end pt-4 border-t border-[var(--border-color)]">
-              <button type="button" className="btn-neon" onClick={() => { setShowForm(false); setEditingTournament(null); resetForm(); }}>
+            <section className="admin-form-section">
+              <h3 className="admin-form-section-title">الصورة</h3>
+              <ImageUploadField
+                label="صورة البطولة"
+                category="tournaments"
+                value={formData.image_url}
+                onChange={(url) => setFormData((prev) => ({ ...prev, image_url: url }))}
+                disabled={submitting}
+              />
+            </section>
+
+            <section className="admin-form-section">
+              <h3 className="admin-form-section-title">الإعدادات</h3>
+              <div className="admin-form-grid">
+                <div className="admin-field">
+                  <label className="admin-field-label" htmlFor="tournament-max">عدد المشاركين</label>
+                  <input
+                    id="tournament-max"
+                    type="number"
+                    value={formData.max_participants}
+                    onChange={(e) => setFormData({ ...formData, max_participants: e.target.value })}
+                    className="w-full input-field"
+                    min="1"
+                    placeholder="اتركه فارغًا للا حد"
+                  />
+                </div>
+                {!editingTournament && (
+                  <div className="admin-field">
+                    <label className="admin-field-label" htmlFor="tournament-status">حالة الإنشاء</label>
+                    <select
+                      id="tournament-status"
+                      value={formData.status}
+                      onChange={(e) =>
+                        setFormData({ ...formData, status: e.target.value as 'draft' | 'open' })
+                      }
+                      className="w-full input-field"
+                    >
+                      <option value="draft">مسودة</option>
+                      <option value="open">مفتوحة للتسجيل</option>
+                    </select>
+                    <p className="admin-field-hint">تُدار بقية الحالات من أزرار دورة الحياة في القائمة.</p>
+                  </div>
+                )}
+              </div>
+            </section>
+
+            <div className="admin-form-actions">
+              <button type="button" className="btn-neon" onClick={closeForm}>
                 إلغاء
               </button>
               <button type="submit" className="btn-neon" disabled={submitting}>
-                {submitting ? 'جاري الحفظ…' : (editingTournament ? 'حفظ التعديلات' : 'إنشاء البطولة')}
+                {submitting ? 'جاري الحفظ…' : editingTournament ? 'حفظ التعديلات' : 'إنشاء البطولة'}
               </button>
             </div>
           </form>

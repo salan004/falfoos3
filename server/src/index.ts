@@ -25,6 +25,8 @@ import { websiteIntegrationRoutes } from './integrations/websiteIntegrationRoute
 import { recoverPurchaseIntents } from './integrations/purchaseService';
 import { tournamentCompetitiveRoutes } from './routes/tournamentCompetitiveRoutes';
 import { adminTournamentCompetitiveRoutes } from './routes/adminTournamentCompetitiveRoutes';
+import { adminUploadRoutes } from './routes/adminUploadRoutes';
+import { uploadsRootDir } from './uploads/uploadService';
 import { onCompetitiveEvent } from './competitive/competitiveEvents';
 import { captureRawBody } from './middleware/verifyBotWebhook';
 import { setCurrentChatService } from './auth/claiming';
@@ -156,6 +158,17 @@ app.use('/api/admin/tournaments', adminTournamentsRoutes);
 
 // Phase 4D — Admin bracket / match / result controls (new sub-paths only)
 app.use('/api/admin/tournaments', adminTournamentCompetitiveRoutes);
+
+// Phase F1 — admin image uploads (session-admin protected) and the controlled
+// static route that serves persisted uploads. Uploads live outside the client
+// bundle under server/data/uploads so production rebuilds cannot delete them.
+app.use('/api/admin/uploads', adminUploadRoutes);
+app.use('/api/uploads', express.static(uploadsRootDir(), {
+  dotfiles: 'ignore',
+  index: false,
+  fallthrough: true,
+  maxAge: '7d',
+}));
 
 // Phase 3 — Bot Webhook Endpoint
 app.use('/api/v1/bot', botRoutes);

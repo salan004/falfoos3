@@ -19,28 +19,34 @@ export function Dashboard({ game }: DashboardProps) {
     <div className="dash-shell">
       <header className="panel dash-toolbar">
         <div className="flex items-center gap-3">
-          <span className="badge badge-cyan">لوحة التحكم</span>
+          <span className="badge badge-cyan">لوحة الجلسة المباشرة</span>
           <span className="text-[var(--text-dim)] text-xs">
             إدارة الجلسة والألعاب النشطة
           </span>
           <AdminGate />
         </div>
 
-        {/* Stream Games administration — reuses the existing admin pages and
-            APIs; no separate dashboard, auth or authorization. */}
-        <nav className="flex items-center gap-2 flex-wrap" aria-label="إدارة العاب البث">
-          <span className="text-[var(--text-dim)] text-xs font-bold">🎮 العاب البث</span>
+        {/* Management shortcuts — reuses the existing admin pages/APIs; no
+            separate dashboard, auth or authorization. */}
+        <nav className="flex items-center gap-2 flex-wrap" aria-label="اختصارات الإدارة">
+          <span className="text-[var(--text-dim)] text-xs font-bold">الإدارة</span>
+          <button
+            className="btn-neon text-sm"
+            onClick={() => navigate('/dashboard')}
+          >
+            مركز التحكم
+          </button>
           <button
             className="btn-neon text-sm"
             onClick={() => navigate('/dashboard/games')}
           >
-            الألعاب
+            إدارة الألعاب
           </button>
           <button
             className="btn-neon text-sm"
             onClick={() => navigate('/dashboard/tournaments')}
           >
-            البطولات
+            إدارة البطولات
           </button>
         </nav>
 

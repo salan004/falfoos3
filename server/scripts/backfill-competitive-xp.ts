@@ -42,10 +42,39 @@ const pendingAwards = (
     )
     .get() as { n: number }
 ).n;
+// Already-processed award slots: a completed-match participant whose
+// deterministic key already exists in the ledger (idempotency guard).
+const alreadyProcessed = (
+  db
+    .prepare(
+      `SELECT COUNT(*) AS n
+         FROM tournament_match_participants tmp
+         JOIN tournament_matches tm ON tm.id = tmp.match_id
+         JOIN competitive_xp_transactions x
+           ON x.match_id = tmp.match_id AND x.player_id = tmp.player_id
+          AND x.idempotency_key = 'match:' || tmp.match_id || ':' || tmp.player_id || ':xp'
+        WHERE tm.status = 'completed'`
+    )
+    .get() as { n: number }
+).n;
+// Completed matches that the backfill will SKIP (never 2 participants: byes /
+// malformed) — mirrors the service's own guard, reported for transparency.
+const invalidIncomplete = (
+  db
+    .prepare(
+      `SELECT COUNT(*) AS n
+         FROM tournament_matches tm
+        WHERE tm.status = 'completed'
+          AND (SELECT COUNT(*) FROM tournament_match_participants p WHERE p.match_id = tm.id) <> 2`
+    )
+    .get() as { n: number }
+).n;
 
 console.log(`[backfill] database: ${info.dbPath}`);
-console.log(`[backfill] completed tournament matches: ${completed}`);
+console.log(`[backfill] eligible completed matches: ${completed}`);
 console.log(`[backfill] pending XP awards (no ledger row yet): ${pendingAwards}`);
+console.log(`[backfill] already processed awards: ${alreadyProcessed}`);
+console.log(`[backfill] skipped (completed matches without exactly 2 players): ${invalidIncomplete}`);
 
 if (process.env.CONFIRM_BACKFILL !== 'yes') {
   console.log('[backfill] DRY RUN — set CONFIRM_BACKFILL=yes to execute (idempotent).');

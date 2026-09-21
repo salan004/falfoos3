@@ -78,8 +78,23 @@ export function matchAdminGamesRoute(path: string): boolean {
   return path === '/dashboard/games';
 }
 
-export function matchAdminTournamentsRoute(path: string): boolean {
-  return path === '/dashboard/tournaments';
+/**
+ * Phase F1 — the live-session control panel moved off the Admin Control Center
+ * landing route. Its behavior is unchanged; only the path moved.
+ */
+export function matchAdminLiveRoute(path: string): boolean {
+  return path === '/dashboard/live';
+}
+
+/**
+ * Phase F1 — tournament management, with an optional `?gameId=` filter so the
+ * Games branch can deep-link into a single game's tournaments.
+ */
+export function matchAdminTournamentsRoute(path: string): { gameId?: string } | null {
+  const m = path.match(/^\/dashboard\/tournaments(?:\?(.*))?$/);
+  if (!m) return null;
+  const params = new URLSearchParams(m[1] ?? '');
+  return { gameId: params.get('gameId') || undefined };
 }
 
 export function matchStreamGamesRoute(path: string): { gameId: string } | null {

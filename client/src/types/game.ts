@@ -22,7 +22,8 @@ export interface GameDirectoryEntry {
 
 /** Phase 3 — Admin input types for game management */
 export interface CreateGameInput {
-  slug: string;
+  /** Phase F1 — optional: the server generates it from `name_ar` when omitted. */
+  slug?: string;
   name_ar: string;
   description_ar?: string;
   image_url?: string;

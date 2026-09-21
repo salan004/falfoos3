@@ -5127,124 +5127,206 @@ button.hub-orb:hover .hub-label {
   color: #ffd166;
 }
 
-/* ---------- Bracket ---------- */
-.bracket-scroll { overflow-x: auto; padding-bottom: 10px; }
+/* ---------- Bracket (Tournament Arena) ---------- */
+.bracket-frame { position: relative; }
+.bracket-scroll { overflow-x: auto; padding-bottom: 10px; scrollbar-width: thin; }
+
+/* Scroll discoverability — shown only on narrow viewports where the tree
+   cannot fit; never covers names or connectors (it sits above the scroll area). */
+.bracket-scroll-hint { display: none; }
+
+/* Round rail — a quiet vertical band behind each round column. Purely visual:
+   it never overlaps the connector gap columns and does not affect geometry. */
+.bracket-rail {
+  position: relative;
+  z-index: 0;
+  margin-top: 34px;
+  border-radius: 12px;
+  background: linear-gradient(180deg, rgba(34, 211, 238, 0.05), rgba(34, 211, 238, 0.012) 62%, transparent);
+  border-inline: 1px solid rgba(34, 211, 238, 0.06);
+  pointer-events: none;
+}
+.bracket-rail.is-final {
+  background: linear-gradient(180deg, rgba(245, 196, 81, 0.06), rgba(245, 196, 81, 0.012) 62%, transparent);
+  border-inline-color: rgba(245, 196, 81, 0.12);
+}
+
+/* Round headers read as arena labels, not as another match card. */
 .bracket-round-head {
   align-self: end;
-  margin-bottom: 8px;
+  z-index: 2;
+  margin-bottom: 10px;
   text-align: center;
-  font-size: 0.78rem;
-  font-weight: 700;
-  letter-spacing: 0.03em;
-  color: var(--text-dim);
-  padding: 6px 10px;
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.02);
+  font-size: 0.92rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  color: var(--text-primary);
+  padding: 4px 10px 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.bracket-round-head.is-final {
-  color: var(--neon-cyan);
-  border-color: rgba(0, 240, 255, 0.4);
-  background: rgba(0, 240, 255, 0.07);
-  box-shadow: 0 0 14px rgba(0, 240, 255, 0.12);
+.bracket-round-head::after {
+  content: '';
+  display: block;
+  width: 44px;
+  height: 2px;
+  margin: 7px auto 0;
+  border-radius: 2px;
+  background: linear-gradient(90deg, transparent, rgba(34, 211, 238, 0.75), transparent);
 }
+.bracket-round-head.is-final { color: var(--neon-gold, #f5c451); }
+.bracket-round-head.is-final::after {
+  background: linear-gradient(90deg, transparent, var(--neon-gold, #f5c451), transparent);
+}
+
 .bracket-grid {
-  /* Deterministic tree geometry: fixed match track, fixed gap and one uniform
-     row unit. A match always centres inside the rows it spans, so every match's
-     vertical centre is exactly the midpoint of its two feeders and the connector
-     lines land on the match centres. */
-  --bracket-col: 210px;
-  --bracket-gap: 46px;
-  --bracket-row: 132px;
-  --bracket-match-h: 112px;
+  /* Leaf-slot tree geometry: fixed match track, fixed gap and one uniform row
+     unit. Each match's row range is derived from the server advancement graph,
+     so byes leave empty leaf slots and every match centre still lands exactly
+     between its feeders. */
+  --bracket-col: 240px;
+  --bracket-gap: 64px;
+  --bracket-row: 150px;
+  --bracket-match-h: 124px;
   display: grid;
   align-items: stretch;
   min-width: max-content;
 }
-.bracket-slot { display: flex; align-items: center; min-width: 0; }
+.bracket-slot { position: relative; z-index: 1; display: flex; align-items: center; min-width: 0; }
 .bracket-match {
   position: relative;
   width: 100%;
-  height: var(--bracket-match-h, 112px);
+  height: var(--bracket-match-h, 124px);
   display: flex;
   flex-direction: column;
-  border: 1px solid rgba(0, 240, 255, 0.14);
-  border-radius: 10px;
-  background: linear-gradient(160deg, rgba(30, 34, 42, 0.94), rgba(15, 17, 21, 0.96));
+  border: 1px solid rgba(34, 211, 238, 0.16);
+  border-radius: 12px;
+  background: linear-gradient(160deg, rgba(26, 30, 40, 0.96), rgba(13, 15, 21, 0.97));
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
   overflow: hidden;
   transition: border-color 0.25s ease, box-shadow 0.25s ease;
 }
-.bracket-match:hover { border-color: rgba(0, 240, 255, 0.4); box-shadow: 0 0 16px rgba(0, 240, 255, 0.1); }
-.bracket-match.is-active {
-  border-color: rgba(255, 221, 0, 0.5);
-  box-shadow: 0 0 18px rgba(255, 221, 0, 0.14);
+/* Compact status accent strip replaces the old heavy header bar. */
+.bracket-match::before {
+  content: '';
+  position: absolute;
+  inset-inline: 0;
+  top: 0;
+  height: 3px;
+  background: rgba(148, 163, 184, 0.22);
 }
-.bracket-match.is-final-round { border-color: rgba(0, 240, 255, 0.32); }
-.bracket-match.is-completed { border-color: rgba(0, 255, 136, 0.22); }
+.bracket-match[data-status='active']::before { background: var(--neon-yellow, #ffdd00); }
+.bracket-match[data-status='completed']::before { background: var(--neon-green, #00ff88); }
+.bracket-match[data-status='cancelled']::before,
+.bracket-match[data-status='disputed']::before { background: var(--neon-red); }
+.bracket-match:hover { border-color: rgba(34, 211, 238, 0.4); }
+.bracket-match.is-final-round { border-color: rgba(245, 196, 81, 0.32); }
 .bracket-match.is-interactive { cursor: pointer; }
 .bracket-match.is-selected {
   border-color: rgba(34, 211, 238, 0.85);
   box-shadow: 0 0 26px rgba(34, 211, 238, 0.28), inset 0 0 0 1px rgba(34, 211, 238, 0.25);
 }
-.bracket-match-head {
+.bracket-match-topline {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 7px 12px;
-  border-bottom: 1px solid var(--border-color);
-  background: rgba(255, 255, 255, 0.025);
+  gap: 8px;
+  padding: 8px 11px 3px;
+  min-height: 24px;
 }
-.bracket-match-slot { font-size: 0.7rem; color: var(--text-dim); }
-.bracket-match-bestof { font-size: 0.65rem; color: var(--neon-gold); }
-.bracket-match-status { margin-inline-start: auto; }
-.bracket-players { display: flex; flex-direction: column; flex: 1; justify-content: center; }
-.bracket-player { display: flex; align-items: center; gap: 8px; padding: 8px 12px; }
-.bracket-player + .bracket-player { border-top: 1px solid var(--border-color); }
+.bracket-match-slot { font-size: 0.66rem; font-weight: 700; color: var(--text-dim); letter-spacing: 0.04em; }
+.bracket-match-bestof { font-size: 0.62rem; font-weight: 700; color: var(--neon-gold, #f5c451); }
+.bracket-match-status {
+  margin-inline-start: auto;
+  font-size: 0.62rem;
+  font-weight: 700;
+  color: var(--text-dim);
+}
+.bracket-match-status::before {
+  content: '';
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-inline-end: 5px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.75;
+}
+.bracket-match[data-status='active'] .bracket-match-status { color: var(--neon-yellow, #ffdd00); }
+.bracket-match[data-status='completed'] .bracket-match-status { color: var(--neon-green, #00ff88); }
+.bracket-match[data-status='cancelled'] .bracket-match-status,
+.bracket-match[data-status='disputed'] .bracket-match-status { color: var(--neon-red); }
+
+.bracket-players {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  justify-content: center;
+  padding: 0 5px 5px;
+}
+.bracket-player { display: flex; align-items: center; gap: 9px; padding: 6px 8px; border-radius: 8px; }
+.bracket-player + .bracket-player { border-top: 1px solid rgba(255, 255, 255, 0.06); }
 .bracket-player.is-winner {
-  background: linear-gradient(90deg, rgba(0, 255, 136, 0.12), rgba(0, 255, 136, 0.04));
-  box-shadow: inset 2px 0 0 var(--neon-green);
+  background: linear-gradient(90deg, rgba(0, 255, 136, 0.14), rgba(0, 255, 136, 0.02));
+  box-shadow: inset 3px 0 0 var(--neon-green);
 }
-.bracket-player.is-winner .bracket-player-name { color: var(--neon-green); font-weight: 700; }
-.bracket-player.is-defeated { opacity: 0.45; }
-.bracket-player-body { min-width: 0; display: flex; flex-direction: column; }
+.bracket-player.is-winner .bracket-player-name { color: var(--neon-green); font-weight: 800; }
+.bracket-player.is-defeated { opacity: 0.42; }
+.bracket-player-body { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 2px; }
+/* Competitor name is the hero: larger, up to two lines, never one-line ellipsis. */
 .bracket-player-name {
-  font-size: 0.82rem;
-  font-weight: 600;
-  white-space: nowrap;
+  font-size: 0.95rem;
+  font-weight: 700;
+  line-height: 1.35;
+  color: var(--text-primary);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
   overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 150px;
+  overflow-wrap: anywhere;
 }
-.bracket-player-meta { display: flex; gap: 6px; font-size: 0.66rem; color: var(--text-dim); }
-.bracket-player-rank { color: var(--neon-cyan); }
-.bracket-player-seed { margin-inline-start: auto; font-size: 0.68rem; color: var(--text-dim); }
+.bracket-player-sub { display: flex; align-items: center; gap: 8px; font-size: 0.66rem; color: var(--text-dim); }
+.bracket-player-seed { font-weight: 700; color: var(--text-dim); }
+.bracket-player-rank { display: inline-flex; align-items: center; gap: 4px; color: var(--neon-cyan); }
+/* Advancement chevron — points toward the next round (left in RTL). */
+.bracket-player-advance {
+  flex: 0 0 auto;
+  width: 0;
+  height: 0;
+  border-top: 5px solid transparent;
+  border-bottom: 5px solid transparent;
+  border-right: 7px solid var(--neon-green, #00ff88);
+}
 .bracket-player-empty,
-.bracket-player-bye {
-  min-height: 46px;
+.bracket-player-waiting {
+  min-height: 40px;
   justify-content: center;
   color: var(--text-muted);
-  font-size: 0.76rem;
-  letter-spacing: 0.01em;
+  font-size: 0.78rem;
 }
-.bracket-player-bye { font-style: normal; }
 .bracket-player-empty .bracket-player-name,
-.bracket-player-bye .bracket-player-name { color: var(--text-muted); }
+.bracket-player-waiting .bracket-player-name {
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  font-weight: 600;
+  -webkit-line-clamp: 1;
+}
 
-.bracket-conn { position: relative; }
+/* Connectors use logical properties throughout so RTL geometry is exact.
+   The radial-gradient paints a small junction dot at the cell centre. */
+.bracket-conn {
+  position: relative;
+  z-index: 0;
+  background: radial-gradient(circle at 50% 50%, rgba(34, 211, 238, 0.85) 0 3px, transparent 3.5px);
+}
 .bracket-conn::before {
   content: '';
   position: absolute;
-  left: 50%;
+  inset-inline-start: calc(50% - 1px);
   top: 25%;
   bottom: 25%;
   width: 2px;
-  transform: translateX(-50%);
-  background: rgba(0, 240, 255, 0.38);
-  box-shadow: 0 0 6px rgba(0, 240, 255, 0.28);
+  background: rgba(34, 211, 238, 0.45);
 }
 .bracket-conn::after {
   content: '';
@@ -5253,9 +5335,12 @@ button.hub-orb:hover .hub-label {
   inset-inline-start: 50%;
   inline-size: 50%;
   block-size: 2px;
-  background: rgba(0, 240, 255, 0.38);
-  box-shadow: 0 0 6px rgba(0, 240, 255, 0.28);
+  background: rgba(34, 211, 238, 0.45);
 }
+/* Single-feeder (bye) connector: an L-shape instead of a full junction. */
+.bracket-conn.is-single.is-top::before { top: 25%; bottom: 50%; }
+.bracket-conn.is-single.is-bottom::before { top: 50%; bottom: 25%; }
+.bracket-conn-final { background: none; }
 .bracket-conn-final::before { display: none; }
 .bracket-conn-final::after { inset-inline-start: 0; inline-size: 100%; }
 .bracket-match.has-next::after {
@@ -5265,10 +5350,9 @@ button.hub-orb:hover .hub-label {
   inset-inline-start: 100%;
   /* Exactly half the gap: the feeder's stub meets the gap column's centre line
      without overshooting it. */
-  inline-size: calc(var(--bracket-gap, 46px) / 2);
+  inline-size: calc(var(--bracket-gap, 64px) / 2);
   block-size: 2px;
-  background: rgba(0, 240, 255, 0.38);
-  box-shadow: 0 0 6px rgba(0, 240, 255, 0.28);
+  background: rgba(34, 211, 238, 0.45);
 }
 
 .bracket-champion {
@@ -5290,6 +5374,25 @@ button.hub-orb:hover .hub-label {
 .bracket-champion-rank { font-size: 0.78rem; color: var(--neon-cyan); }
 .bracket-champion-stats { font-size: 0.72rem; color: var(--text-dim); }
 
+/* Scroll discoverability on narrow viewports: the tree keeps its structure and
+   scrolls horizontally; this quiet hint signals that more rounds exist. */
+@media (max-width: 1023px) {
+  .bracket-scroll-hint {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 0 2px 10px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: var(--text-dim);
+  }
+  .bracket-scroll-hint-arrows {
+    color: var(--neon-cyan);
+    font-size: 0.9rem;
+    line-height: 1;
+  }
+}
+
 /* ---------- Competitive participant card ---------- */
 .competitive-participant-card { display: flex; flex-direction: column; gap: 12px; }
 .competitive-participant-card.is-champion { border-color: rgba(255, 215, 0, 0.55); box-shadow: 0 0 24px rgba(255, 215, 0, 0.12); }
@@ -5305,22 +5408,213 @@ button.hub-orb:hover .hub-label {
 
 /* ---------- Tournament detail ---------- */
 .tournament-detail-page { width: min(1200px, calc(100% - 24px)); margin: 0 auto; }
-.tournament-champion-panel {
+
+/* F3 — Tournament Hero: the tournament banner is the scene and the title is the
+   focal text. No inner card, no large trophy in this section. */
+.tournament-hero {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: clamp(230px, 34vw, 400px);
+  padding: clamp(30px, 6vw, 68px) clamp(16px, 5vw, 48px);
+  margin: 0 0 26px;
+  border: 1px solid rgba(34, 211, 238, 0.18);
+  border-radius: 20px;
+  text-align: center;
+}
+.tournament-hero-bg {
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+}
+/* Light, professional darkening so the Arabic title always reads over the art. */
+.tournament-hero::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    linear-gradient(180deg, rgba(8, 10, 18, 0.32) 0%, rgba(8, 10, 18, 0.5) 52%, rgba(8, 10, 18, 0.78) 100%),
+    radial-gradient(62% 62% at 50% 44%, rgba(8, 10, 18, 0.12), rgba(8, 10, 18, 0.55));
+}
+/* Elegant fallback when the tournament has no banner (or it failed to load). */
+.tournament-hero.is-fallback {
+  background:
+    radial-gradient(70% 84% at 50% 0%, rgba(124, 58, 237, 0.22), transparent 70%),
+    radial-gradient(58% 70% at 82% 100%, rgba(34, 211, 238, 0.14), transparent 72%),
+    linear-gradient(180deg, #101321, #080a12);
+}
+.tournament-hero.is-fallback::after { background: none; }
+.tournament-hero-content {
+  position: relative;
+  z-index: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
-  text-align: center;
-  max-width: 520px;
-  margin: 0 auto 22px;
-  border-color: rgba(255, 215, 0, 0.4);
-  background: radial-gradient(circle at 50% 0%, rgba(255, 215, 0, 0.15), rgba(21, 24, 29, 0.9) 70%);
-  box-shadow: 0 0 40px rgba(255, 215, 0, 0.12);
+  gap: 12px;
+  max-width: 900px;
 }
-.tournament-champion-crown { font-size: 2.6rem; }
-.tournament-champion-label { font-size: 0.75rem; letter-spacing: 0.2em; text-transform: uppercase; color: var(--neon-gold); }
-.tournament-champion-name { font-size: 1.4rem; font-weight: 800; }
-.tournament-champion-stats { color: var(--text-dim); font-size: 0.85rem; }
+.tournament-detail-page .tournament-hero-title {
+  margin: 0;
+  font-size: clamp(1.9rem, 5.4vw, 3.4rem);
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+  max-width: 22ch;
+  overflow-wrap: anywhere;
+}
+.tournament-hero-meta {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.tournament-detail-page .tournament-hero-desc {
+  margin: 0;
+  max-width: 62ch;
+}
+
+/* F3 — Championship Hero: a single victory presentation, not a dashboard card.
+   Shown only for a completed tournament with a champion. */
+.tournament-champion {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  max-width: 720px;
+  margin: 0 auto 28px;
+  padding: clamp(24px, 4.5vw, 44px) clamp(18px, 4vw, 36px);
+  border: 1px solid rgba(245, 196, 81, 0.28);
+  border-radius: 22px;
+  background:
+    radial-gradient(72% 92% at 50% 0%, rgba(245, 196, 81, 0.14), transparent 70%),
+    linear-gradient(180deg, rgba(30, 26, 15, 0.66), rgba(12, 12, 16, 0.8));
+  box-shadow:
+    0 24px 60px rgba(0, 0, 0, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  text-align: center;
+}
+.tournament-champion::before {
+  content: '';
+  position: absolute;
+  inset-inline: 0;
+  top: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, rgba(245, 196, 81, 0.85), transparent);
+}
+
+/* Professional trophy frame — CSS/markup only, no external asset, no emoji. */
+.tournament-champion-frame {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: clamp(150px, 38vw, 210px);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  border: 1px solid rgba(245, 196, 81, 0.35);
+  background: radial-gradient(circle at 50% 34%, rgba(245, 196, 81, 0.22), rgba(245, 196, 81, 0.04) 56%, transparent 74%);
+  box-shadow:
+    inset 0 0 42px rgba(245, 196, 81, 0.12),
+    0 0 52px rgba(245, 196, 81, 0.14);
+}
+.tournament-champion-frame::before {
+  content: '';
+  position: absolute;
+  inset: 10px;
+  border-radius: 50%;
+  border: 1px dashed rgba(245, 196, 81, 0.28);
+}
+.tournament-champion-cup {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  filter: drop-shadow(0 10px 22px rgba(245, 196, 81, 0.35));
+}
+.tournament-champion-cup-bowl {
+  position: relative;
+  width: 68px;
+  height: 54px;
+  border-radius: 8px 8px 34px 34px;
+  background: linear-gradient(180deg, #ffe9a8 0%, #f5c451 44%, #b8860b 100%);
+  box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.55), inset 0 -8px 12px rgba(120, 80, 0, 0.35);
+}
+.tournament-champion-cup-bowl::before,
+.tournament-champion-cup-bowl::after {
+  content: '';
+  position: absolute;
+  top: 7px;
+  width: 20px;
+  height: 26px;
+  border: 5px solid #e0a92f;
+  border-radius: 50%;
+}
+.tournament-champion-cup-bowl::before { left: -15px; border-right-color: transparent; }
+.tournament-champion-cup-bowl::after { right: -15px; border-left-color: transparent; }
+.tournament-champion-cup-stem {
+  width: 14px;
+  height: 14px;
+  background: linear-gradient(180deg, #e0a92f, #a9770f);
+}
+.tournament-champion-cup-base {
+  width: 46px;
+  height: 10px;
+  border-radius: 3px;
+  background: linear-gradient(180deg, #f5c451, #a9770f);
+  box-shadow: 0 2px 0 rgba(0, 0, 0, 0.35);
+}
+
+.tournament-champion-label {
+  font-size: 0.9rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: #f5c451;
+}
+.tournament-champion-avatar {
+  line-height: 0;
+  padding: 5px;
+  border-radius: 50%;
+  background: conic-gradient(from 210deg, #f5c451, #fff3c4, #b8860b, #f5c451);
+  box-shadow: 0 0 30px rgba(245, 196, 81, 0.3);
+}
+.tournament-champion-avatar .player-avatar { border-radius: 50%; overflow: hidden; }
+.tournament-champion-name {
+  margin: 0;
+  font-size: clamp(1.8rem, 5vw, 2.8rem);
+  font-weight: 800;
+  line-height: 1.2;
+  max-width: 20ch;
+  overflow-wrap: anywhere;
+  background: linear-gradient(180deg, #fff6d8 0%, #f5c451 55%, #c9971f 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 3px 14px rgba(245, 196, 81, 0.35));
+}
+.tournament-champion-rank {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 1rem;
+  font-weight: 700;
+  color: #ffe9a8;
+}
+
+@media (max-width: 640px) {
+  .tournament-hero { min-height: 220px; border-radius: 16px; }
+  .tournament-detail-page .tournament-hero-title { max-width: 100%; }
+  .tournament-champion { border-radius: 18px; }
+}
 
 /* ---------- Phase 6 — Tournament HUD (3-cell esports stat panel) ---------- */
 .tournament-hud {
@@ -6378,9 +6672,6 @@ body::before {
   font-weight: 800;
   text-shadow: 0 3px 28px rgba(124, 58, 237, 0.35);
 }
-.tournament-detail-page .tournament-detail-image img {
-  box-shadow: 0 24px 56px rgba(0, 0, 0, 0.5), 0 0 40px rgba(34, 211, 238, 0.12);
-}
 
 /* ============================================================
    TOURNAMENT DETAIL — action tiles, section heads, empty states
@@ -6645,34 +6936,54 @@ body::before {
   flex-wrap: wrap;
   align-items: center;
 }
-.acct-linked {
+/* F5 — compact linked confirmation (replaces the former large success card). */
+.acct-linked-inline {
   margin-top: 14px;
   display: flex;
   align-items: center;
-  gap: 14px;
   flex-wrap: wrap;
-}
-.acct-linked-info {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  min-width: 0;
-  flex: 1;
-}
-.acct-linked-name {
-  font-weight: 800;
-  font-size: 1rem;
-  color: var(--text-primary);
-}
-.acct-linked-channel {
-  font-size: 0.78rem;
+  gap: 6px 14px;
+  font-size: 0.88rem;
   color: var(--text-dim);
-  direction: ltr;
-  word-break: break-all;
 }
-.acct-linked-badge { align-self: flex-start; }
+.acct-linked-inline-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-weight: 700;
+  color: var(--neon-green, #00ff88);
+}
+.acct-linked-inline-check {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: var(--neon-green, #00ff88);
+  border: 1px solid rgba(0, 255, 136, 0.4);
+  background: rgba(0, 255, 136, 0.1);
+}
+.acct-linked-inline-player {
+  min-width: 0;
+  font-weight: 800;
+  color: var(--text-primary);
+  overflow-wrap: anywhere;
+}
+.acct-linked-inline-action {
+  margin-inline-start: auto;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--neon-cyan);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.acct-linked-inline-action:hover { text-decoration: underline; }
 @media (max-width: 640px) {
   .acct-link-btn { align-self: stretch; }
+  .acct-linked-inline-action { margin-inline-start: 0; }
 }
 
 /* ============================================================
@@ -6956,6 +7267,15 @@ body::before {
 .register-hero { position: relative; text-align: center; padding: 30px 0 10px; }
 .register-title { font-size: clamp(1.7rem, 4vw, 2.2rem); }
 .register-subtitle { max-width: 560px; margin: 12px auto 0; }
+/* F7 — concise "why link?" explanation (list reuses .acct-link-steps). */
+.register-why { max-width: 640px; margin: 22px auto 0; text-align: start; }
+.register-why-title {
+  margin: 0 0 10px;
+  text-align: center;
+  font-size: 1rem;
+  font-weight: 800;
+  color: var(--text-primary);
+}
 .register-bridge {
   display: flex;
   align-items: center;
@@ -7086,10 +7406,10 @@ body.broadcast-mode::after { display: none !important; }
 
 /* Broadcast tuning of the SAME tree (geometry vars only, no new layout engine). */
 .bracket-grid-broadcast {
-  --bracket-col: 248px;
-  --bracket-gap: 58px;
-  --bracket-row: 152px;
-  --bracket-match-h: 124px;
+  --bracket-col: 264px;
+  --bracket-gap: 72px;
+  --bracket-row: 168px;
+  --bracket-match-h: 140px;
 }
 .bracket-scroll-broadcast { padding-bottom: 4px; }
 .bracket-grid-broadcast .bracket-match {
@@ -7097,13 +7417,9 @@ body.broadcast-mode::after { display: none !important; }
   border-color: rgba(34, 211, 238, 0.3);
   box-shadow: 0 14px 34px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.05);
 }
-.bracket-grid-broadcast .bracket-player-name { font-size: 0.94rem; max-width: 200px; }
-.bracket-grid-broadcast .bracket-player-meta { font-size: 0.72rem; }
-.bracket-grid-broadcast .bracket-round-head {
-  font-size: 0.92rem;
-  background: rgba(8, 12, 20, 0.6);
-  border-color: rgba(34, 211, 238, 0.28);
-}
+.bracket-grid-broadcast .bracket-player-name { font-size: 1.05rem; }
+.bracket-grid-broadcast .bracket-player-sub { font-size: 0.72rem; }
+.bracket-grid-broadcast .bracket-round-head { font-size: 1.02rem; }
 
 /* Selected-match detail popover (interactive broadcast). */
 .broadcast-detail {
@@ -7172,6 +7488,221 @@ body.broadcast-mode::after { display: none !important; }
   font-size: 0.72rem;
   font-weight: 800;
   color: var(--neon-green, #00ff88);
+}
+
+/* ============================================================
+   PHASE F1 — ADMIN CONTROL CENTER
+   Namespaced admin-only additions. The public hub geometry,
+   `.hub-*` rules and `useHubTethers` defaults are untouched:
+   the admin hub simply reuses those surfaces with its own
+   `.admin-hub-*` position classes.
+   ============================================================ */
+
+/* ---------- Admin hub (logo → three icon branches) ---------- */
+.admin-hub-shell {
+  position: relative;
+  padding-bottom: 78px;
+}
+
+.admin-hub-orb-games {
+  left: -3%;
+  top: 50%;
+  transform: translate(0, -58%);
+  animation-delay: -1.8s;
+}
+.admin-hub-orb-tournaments {
+  right: -3%;
+  top: 50%;
+  transform: translate(0, -52%);
+  animation-delay: -3.5s;
+}
+.admin-hub-orb-development {
+  bottom: -6%;
+  left: 50%;
+  transform: translate(-46%, 0);
+  animation-delay: -5.2s;
+}
+
+/* Locked branch — same size, deliberately quiet, non-navigating. */
+.admin-hub-orb--locked { cursor: default; user-select: none; }
+.admin-hub-orb--locked .hub-ring {
+  border-style: dashed;
+  border-color: rgba(255, 255, 255, 0.13);
+  background:
+    radial-gradient(120% 90% at 50% 0%, rgba(255, 255, 255, 0.04), transparent 55%),
+    rgba(19, 22, 27, 0.45);
+  box-shadow:
+    0 10px 26px rgba(0, 0, 0, 0.32),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  filter: saturate(0.35) brightness(0.82);
+}
+.admin-hub-orb--locked .hub-label { color: var(--text-muted); }
+.admin-hub-orb--locked .hub-tether-line {
+  stroke: rgba(226, 232, 240, 0.26);
+  stroke-width: 2;
+  stroke-dasharray: 5 9;
+  filter: none;
+}
+.admin-hub-orb--locked .hub-tether-halo,
+.admin-hub-orb--locked .hub-tether-pulse { display: none; }
+.admin-hub-orb--locked:hover .hub-ring,
+.admin-hub-orb--locked:focus-visible .hub-ring {
+  scale: 1;
+  translate: 0 0;
+  border-color: rgba(255, 255, 255, 0.13);
+  box-shadow:
+    0 10px 26px rgba(0, 0, 0, 0.32),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+.admin-hub-orb--locked:hover .hub-tether-line,
+.admin-hub-orb--locked:focus-visible .hub-tether-line {
+  stroke: rgba(226, 232, 240, 0.26);
+}
+
+.admin-hub-secondary {
+  position: absolute;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 5;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+  padding: 0 12px;
+}
+.admin-hub-secondary-link {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--arena-text-dim, #8f96aa);
+  font-size: 0.82rem;
+  font-weight: 600;
+  padding: 6px 12px;
+  border-radius: 10px;
+  transition: color 0.2s ease, background 0.2s ease;
+}
+.admin-hub-secondary-link:hover { color: var(--arena-text, #f5f7ff); background: rgba(255, 255, 255, 0.05); }
+.admin-hub-secondary-link:focus-visible { outline: 2px solid rgba(34, 211, 238, 0.65); outline-offset: 2px; }
+
+/* ---------- Access-denied state ---------- */
+.admin-access-denied {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  text-align: center;
+  padding: 40px 24px;
+}
+.admin-access-denied-icon { font-size: 2.4rem; }
+.admin-access-denied-title { font-size: 1.3rem; font-weight: 800; }
+.admin-access-denied-text { color: var(--text-dim); max-width: 40ch; }
+
+/* ---------- Admin management pages ---------- */
+.admin-page { max-width: 1000px; }
+.admin-page-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 22px;
+}
+.admin-page-kicker {
+  display: inline-block;
+  font-size: 0.8rem;
+  font-weight: 800;
+  color: var(--neon-gold, #f5c451);
+  letter-spacing: 0.02em;
+  margin-bottom: 6px;
+}
+
+.admin-list { display: flex; flex-direction: column; gap: 12px; }
+.admin-list-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+  padding: 14px 16px;
+}
+.admin-list-row-main { display: flex; align-items: center; gap: 14px; min-width: 0; }
+.admin-list-thumb {
+  width: 52px;
+  height: 52px;
+  border-radius: 12px;
+  overflow: hidden;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border-color);
+  font-size: 1.4rem;
+}
+.admin-list-thumb img { width: 100%; height: 100%; object-fit: cover; }
+.admin-list-title { font-weight: 800; font-size: 1.02rem; }
+.admin-list-meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 6px; }
+.admin-list-meta-item { font-size: 0.8rem; color: var(--text-dim); }
+.admin-list-row-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+
+.admin-form-card { max-width: 680px; }
+.admin-form { display: flex; flex-direction: column; gap: 22px; }
+.admin-form-section {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding-top: 18px;
+  border-top: 1px solid var(--border-color);
+}
+.admin-form-section:first-of-type { padding-top: 0; border-top: none; }
+.admin-form-section-title { font-size: 0.95rem; font-weight: 800; color: var(--text-primary); }
+.admin-form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.admin-form-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
+.admin-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding-top: 18px;
+  border-top: 1px solid var(--border-color);
+}
+.admin-field { display: flex; flex-direction: column; gap: 6px; }
+.admin-field-label { font-size: 0.85rem; font-weight: 700; }
+.admin-field-hint { font-size: 0.75rem; color: var(--text-dim); }
+.admin-field-error { font-size: 0.8rem; color: var(--neon-red); }
+.admin-btn-danger { background: var(--neon-red) !important; }
+
+.admin-image-field { display: flex; flex-direction: column; gap: 8px; }
+.admin-image-field-body { display: flex; gap: 16px; align-items: flex-start; flex-wrap: wrap; }
+.admin-image-preview {
+  width: 132px;
+  height: 88px;
+  border-radius: 12px;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px dashed var(--border-color);
+  flex: 0 0 auto;
+}
+.admin-image-preview img { width: 100%; height: 100%; object-fit: cover; }
+.admin-image-preview-empty { font-size: 1.6rem; opacity: 0.7; }
+.admin-image-field-actions { display: flex; flex-direction: column; gap: 8px; align-items: flex-start; flex: 1 1 200px; }
+.admin-image-input { display: none; }
+.admin-image-remove {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-dim);
+  font-size: 0.78rem;
+  text-decoration: underline;
+  padding: 0;
+}
+.admin-image-remove:hover { color: var(--neon-red); }
+.admin-image-remove:disabled { cursor: not-allowed; opacity: 0.5; }
+
+@media (max-width: 560px) {
+  .admin-form-grid { grid-template-columns: 1fr; }
+  .admin-list-row-actions { width: 100%; }
 }
 
 

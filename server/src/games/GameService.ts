@@ -18,7 +18,12 @@ export interface GameRow {
 }
 
 export interface CreateGameInput {
-  slug: string;
+  /**
+   * Phase F1 — optional. When omitted the slug is generated from `name_ar`
+   * and a uniqueness suffix. Existing callers may still supply an explicit
+   * slug for backward compatibility.
+   */
+  slug?: string;
   name_ar: string;
   description_ar?: string;
   image_url?: string;
@@ -66,6 +71,33 @@ function validateNameAr(nameAr: string): void {
   }
 }
 
+/**
+ * Phase F1 — derive an ASCII slug base from a game name. Arabic names yield an
+ * empty base, so callers fall back to the generic `game` base and rely on the
+ * uniqueness loop below. The result always satisfies `validateSlug`.
+ */
+function slugifyGameName(nameAr: string): string {
+  const base = nameAr
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .slice(0, 40);
+  return base.length > 0 ? base : 'game';
+}
+
+/** Appends a numeric suffix until the slug is unique across `games`. */
+function generateUniqueSlug(base: string): string {
+  const db = getDb();
+  let candidate = base;
+  let suffix = 1;
+  while (db.prepare('SELECT id FROM games WHERE slug = ?').get(candidate)) {
+    suffix += 1;
+    candidate = `${base}_${suffix}`;
+  }
+  return candidate;
+}
+
 export function getAllGames(): GameRow[] {
   const db = getDb();
   const rows = db.prepare('SELECT * FROM games ORDER BY sort_order ASC, name_ar ASC').all();
@@ -92,12 +124,18 @@ export function getGameBySlug(slug: string): GameRow | null {
 
 export function createGame(input: CreateGameInput): GameRow {
   const db = getDb();
-  validateSlug(input.slug);
   validateNameAr(input.name_ar);
 
-  const existingSlug = db.prepare('SELECT id FROM games WHERE slug = ?').get(input.slug);
-  if (existingSlug) {
-    throw new Error(`Game slug '${input.slug}' already exists`);
+  const providedSlug = input.slug?.trim();
+  let slug: string;
+  if (providedSlug) {
+    validateSlug(providedSlug);
+    if (db.prepare('SELECT id FROM games WHERE slug = ?').get(providedSlug)) {
+      throw new Error(`Game slug '${providedSlug}' already exists`);
+    }
+    slug = providedSlug;
+  } else {
+    slug = generateUniqueSlug(slugifyGameName(input.name_ar));
   }
 
   const id = crypto.randomUUID();
@@ -108,7 +146,7 @@ export function createGame(input: CreateGameInput): GameRow {
   db.prepare(`
     INSERT INTO games (id, slug, name_ar, description_ar, image_url, is_active, sort_order, created_at, updated_at)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(id, input.slug, input.name_ar, input.description_ar ?? null, input.image_url ?? null, isActive, sortOrder, now, now);
+  `).run(id, slug, input.name_ar, input.description_ar ?? null, input.image_url ?? null, isActive, sortOrder, now, now);
 
   const game = getGameById(id);
   if (!game) {
