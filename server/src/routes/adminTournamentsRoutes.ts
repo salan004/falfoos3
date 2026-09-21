@@ -9,7 +9,8 @@ import {
   getTournamentWithGameInfo,
   createTournament,
   updateTournament,
-  deleteTournament,
+  setTournamentHidden,
+  type TournamentVisibility,
   type TournamentRow,
   type TournamentWithGame,
   type CreateTournamentInput,
@@ -24,9 +25,20 @@ export const adminTournamentsRoutes = Router();
 
 adminTournamentsRoutes.use(requireAdmin);
 
-adminTournamentsRoutes.get('/', (_req: Request, res: Response) => {
+const VALID_VISIBILITIES: TournamentVisibility[] = ['visible', 'hidden', 'all'];
+
+adminTournamentsRoutes.get('/', (req: Request, res: Response) => {
   try {
-    const tournaments = getTournamentsWithGameInfo();
+    // R5 — visibility filter. Defaults to `visible` so hidden tournaments are
+    // excluded from the normal admin listing; `?visibility=hidden` powers the
+    // dedicated "المخفية" view and `?visibility=all` shows everything.
+    const raw = typeof req.query.visibility === 'string' ? req.query.visibility.trim() : '';
+    if (raw && !VALID_VISIBILITIES.includes(raw as TournamentVisibility)) {
+      res.status(400).json({ error: 'invalid_visibility' });
+      return;
+    }
+    const visibility = (raw || 'visible') as TournamentVisibility;
+    const tournaments = getTournamentsWithGameInfo({ visibility });
     res.json({ tournaments });
   } catch (err) {
     console.error('[AdminTournaments] List tournaments error:', err);
@@ -89,17 +101,37 @@ adminTournamentsRoutes.post('/', (req: Request, res: Response) => {
 
 adminTournamentsRoutes.patch('/:id', (req: Request, res: Response) => {
   try {
-    const input = req.body as UpdateTournamentInput;
+    const body = req.body as (UpdateTournamentInput & { hidden?: unknown }) | undefined;
 
-    if (!input || typeof input !== 'object') {
+    if (!body || typeof body !== 'object') {
       res.status(400).json({ error: 'Invalid request body' });
       return;
     }
 
-    const tournament = updateTournament(req.params.id, input);
-    if (!tournament) {
+    if (!getTournamentById(req.params.id)) {
       res.status(404).json({ error: 'Tournament not found' });
       return;
+    }
+
+    const hasHidden = Object.prototype.hasOwnProperty.call(body, 'hidden');
+    if (hasHidden && typeof body.hidden !== 'boolean') {
+      res.status(400).json({ error: 'invalid_hidden' });
+      return;
+    }
+
+    // R5 — `hidden` is a VISIBILITY toggle handled separately from the
+    // lifecycle fields. It never modifies `status`.
+    const { hidden: _hidden, ...lifecycleFields } = body;
+    let tournament = updateTournament(req.params.id, lifecycleFields as UpdateTournamentInput);
+
+    if (hasHidden) {
+      const user = resolveSession(req);
+      const result = setTournamentHidden(req.params.id, body.hidden as boolean, user?.id ?? null);
+      if (!result) {
+        res.status(404).json({ error: 'Tournament not found' });
+        return;
+      }
+      tournament = result.tournament;
     }
 
     res.json({ tournament });
@@ -110,17 +142,26 @@ adminTournamentsRoutes.patch('/:id', (req: Request, res: Response) => {
   }
 });
 
+/**
+ * R5 — BACKWARD-COMPATIBLE HIDE ALIAS.
+ *
+ * `DELETE` no longer deletes anything: it performs the same reversible,
+ * non-destructive visibility hide as `PATCH { hidden: true }`. All tournament
+ * data (participants, matches, corrections, ledgers, purchase intents, images)
+ * is preserved. There is NO hard-delete path anywhere in the admin API.
+ */
 adminTournamentsRoutes.delete('/:id', (req: Request, res: Response) => {
   try {
-    const deleted = deleteTournament(req.params.id);
-    if (!deleted) {
+    const user = resolveSession(req);
+    const result = setTournamentHidden(req.params.id, true, user?.id ?? null);
+    if (!result) {
       res.status(404).json({ error: 'Tournament not found' });
       return;
     }
-    res.status(204).end();
+    res.json({ tournament: result.tournament, hidden: true });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Internal server error';
-    console.error('[AdminTournaments] Delete tournament error:', err);
+    console.error('[AdminTournaments] Hide tournament error:', err);
     res.status(400).json({ error: message });
   }
 });

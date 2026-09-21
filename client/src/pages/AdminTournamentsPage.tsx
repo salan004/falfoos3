@@ -5,7 +5,11 @@ import { useHashRoute } from '../hooks/useHashRoute';
 import { AdminGate } from '../components/AdminGate';
 import { AdminAccessDenied } from '../components/admin/AdminAccessDenied';
 import { ImageUploadField } from '../components/admin/ImageUploadField';
+import { hideTournament, restoreTournament } from '../utils/competitiveApi';
 import { TournamentWithGame, TournamentStatus } from '../types/game';
+
+/** R5 — admin visibility filter for the tournament list. */
+type VisibilityFilter = 'visible' | 'hidden' | 'all';
 
 interface TournamentFormData {
   game_id: string;
@@ -89,10 +93,11 @@ export function AdminTournamentsPage({ gameId }: AdminTournamentsPageProps) {
   const [formData, setFormData] = useState<TournamentFormData>(EMPTY_FORM);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [visibilityFilter, setVisibilityFilter] = useState<VisibilityFilter>('visible');
 
   const loadTournaments = async () => {
     try {
-      const res = await apiFetch('/api/admin/tournaments');
+      const res = await apiFetch(`/api/admin/tournaments?visibility=${visibilityFilter}`);
       const data = await res.json();
       if (res.ok) {
         setTournaments(data.tournaments || []);
@@ -125,7 +130,7 @@ export function AdminTournamentsPage({ gameId }: AdminTournamentsPageProps) {
     void loadTournaments();
     void loadGames();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isLoading]);
+  }, [isLoading, visibilityFilter]);
 
   const visibleTournaments = useMemo(
     () => (gameId ? tournaments.filter((t) => t.game_id === gameId) : tournaments),
@@ -235,14 +240,37 @@ export function AdminTournamentsPage({ gameId }: AdminTournamentsPageProps) {
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('تأكيد حذف البطولة؟ (المسودات فقط)')) return;
-    try {
-      const res = await apiFetch(`/api/admin/tournaments/${id}`, { method: 'DELETE' });
-      if (res.ok) void loadTournaments();
-    } catch {
-      setError('فشل الحذف');
+  /**
+   * R5 — hide a tournament from normal listings. Non-destructive and
+   * reversible: no data, rows, or images are deleted and the lifecycle status
+   * is never changed.
+   */
+  const handleHide = async (tournament: TournamentWithGame) => {
+    if (
+      !confirm(
+        `إخفاء البطولة «${tournament.name_ar}» من الموقع؟\nلن تُحذف أي بيانات ويمكن استعادتها لاحقًا.`
+      )
+    ) {
+      return;
     }
+    setError(null);
+    const res = await hideTournament(tournament.id);
+    if (!res.ok) {
+      setError(res.error || 'فشل إخفاء البطولة');
+      return;
+    }
+    void loadTournaments();
+  };
+
+  /** R5 — restore a hidden tournament's visibility (status untouched). */
+  const handleRestore = async (tournament: TournamentWithGame) => {
+    setError(null);
+    const res = await restoreTournament(tournament.id);
+    if (!res.ok) {
+      setError(res.error || 'فشل استعادة البطولة');
+      return;
+    }
+    void loadTournaments();
   };
 
   const handleViewParticipants = async (tournamentId: string) => {
@@ -298,9 +326,23 @@ export function AdminTournamentsPage({ gameId }: AdminTournamentsPageProps) {
 
       {!showForm && !viewingParticipants ? (
         <div>
-          <button className="btn-neon mb-6" onClick={startCreate}>
-            + إنشاء بطولة جديدة
-          </button>
+          <div className="flex items-center gap-2 flex-wrap mb-6">
+            <button className="btn-neon" onClick={startCreate}>
+              + إنشاء بطولة جديدة
+            </button>
+            <span className="text-sm text-[var(--text-dim)]" style={{ marginInlineStart: 'auto' }}>
+              العرض:
+            </span>
+            {(['visible', 'hidden', 'all'] as VisibilityFilter[]).map((value) => (
+              <button
+                key={value}
+                className={visibilityFilter === value ? 'btn-solid-cyan text-sm' : 'btn-neon text-sm'}
+                onClick={() => setVisibilityFilter(value)}
+              >
+                {value === 'visible' ? 'الظاهرة' : value === 'hidden' ? 'المخفية' : 'الكل'}
+              </button>
+            ))}
+          </div>
 
           {loading ? (
             <div className="panel text-center py-8">جارٍ التحميل…</div>
@@ -327,6 +369,7 @@ export function AdminTournamentsPage({ gameId }: AdminTournamentsPageProps) {
                         <span className={`badge ${STATUS_COLORS[t.status]}`}>
                           {STATUS_LABELS[t.status]}
                         </span>
+                        {t.hidden_at !== null && <span className="badge badge-red">مخفية</span>}
                         <span className="admin-list-meta-item">{t.game_name_ar}</span>
                         <span className="admin-list-meta-item">
                           مشاركون: {t.participant_count}
@@ -351,12 +394,16 @@ export function AdminTournamentsPage({ gameId }: AdminTournamentsPageProps) {
                         {action.label}
                       </button>
                     ))}
-                    {t.status === 'draft' && (
+                    {t.hidden_at !== null ? (
+                      <button className="btn-neon text-sm" onClick={() => handleRestore(t)}>
+                        استعادة
+                      </button>
+                    ) : (
                       <button
                         className="btn-neon text-sm admin-btn-danger"
-                        onClick={() => handleDelete(t.id)}
+                        onClick={() => handleHide(t)}
                       >
-                        حذف
+                        إخفاء
                       </button>
                     )}
                   </div>
@@ -364,7 +411,11 @@ export function AdminTournamentsPage({ gameId }: AdminTournamentsPageProps) {
               ))}
               {visibleTournaments.length === 0 && (
                 <div className="panel text-center py-8 text-[var(--text-dim)]">
-                  لا توجد بطولات — ابدأ بإنشاء واحدة.
+                  {visibilityFilter === 'hidden'
+                    ? 'لا توجد بطولات مخفية.'
+                    : visibilityFilter === 'all'
+                      ? 'لا توجد بطولات.'
+                      : 'لا توجد بطولات — ابدأ بإنشاء واحدة.'}
                 </div>
               )}
             </div>

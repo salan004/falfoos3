@@ -15,6 +15,14 @@ export interface TournamentRow {
   max_participants: number | null;
   /** Optional configured Streamlabs Loyalty ticket price. NULL = legacy/default. */
   ticket_cost: number | null;
+  /**
+   * R5 — visibility, STRICTLY SEPARATE from `status`. NULL = visible. A hidden
+   * tournament keeps its lifecycle status; it is only removed from normal
+   * listings/discovery. Never used to delete data.
+   */
+  hidden_at: number | null;
+  /** Admin user id that performed the last hide (audit only). */
+  hidden_by: string | null;
   starts_at: number | null;
   ends_at: number | null;
   created_by: string;
@@ -62,6 +70,8 @@ function rowToTournament(row: any): TournamentRow {
     status: row.status,
     max_participants: row.max_participants,
     ticket_cost: row.ticket_cost ?? null,
+    hidden_at: row.hidden_at ?? null,
+    hidden_by: row.hidden_by ?? null,
     starts_at: row.starts_at,
     ends_at: row.ends_at,
     created_by: row.created_by,
@@ -126,32 +136,73 @@ function validateStatusTransition(currentStatus: string, newStatus: string): voi
   }
 }
 
-export function getAllTournaments(): TournamentRow[] {
+/**
+ * R5 — visibility selector for tournament listings.
+ *
+ * `'visible'` (default) excludes hidden tournaments; `'hidden'` returns only
+ * hidden ones; `'all'` returns everything. Every LISTING query defaults to
+ * `'visible'` so hidden tournaments disappear from normal surfaces, while
+ * detail/read-by-id and player history stay unfiltered (accessible).
+ */
+export type TournamentVisibility = 'visible' | 'hidden' | 'all';
+
+/** SQL predicate fragment (no user input) for a given visibility, per alias. */
+function visibilityPredicate(visibility: TournamentVisibility, column: string): string {
+  if (visibility === 'hidden') return `${column} IS NOT NULL`;
+  if (visibility === 'all') return '';
+  return `${column} IS NULL`;
+}
+
+export function getAllTournaments(options?: { visibility?: TournamentVisibility }): TournamentRow[] {
   const db = getDb();
-  const rows = db.prepare('SELECT * FROM tournaments ORDER BY created_at DESC').all();
+  const visibility = options?.visibility ?? 'visible';
+  const clause = visibilityPredicate(visibility, 'hidden_at');
+  const rows = db
+    .prepare(`SELECT * FROM tournaments ${clause ? `WHERE ${clause}` : ''} ORDER BY created_at DESC`)
+    .all();
   return rows.map(rowToTournament);
 }
 
-export function getTournamentsByGame(gameId: string): TournamentRow[] {
+export function getTournamentsByGame(
+  gameId: string,
+  options?: { visibility?: TournamentVisibility }
+): TournamentRow[] {
   const db = getDb();
-  const rows = db.prepare('SELECT * FROM tournaments WHERE game_id = ? ORDER BY created_at DESC').all(gameId);
+  const visibility = options?.visibility ?? 'visible';
+  const clause = visibilityPredicate(visibility, 'hidden_at');
+  const rows = db
+    .prepare(
+      `SELECT * FROM tournaments WHERE game_id = ? ${clause ? `AND ${clause}` : ''} ORDER BY created_at DESC`
+    )
+    .all(gameId);
   return rows.map(rowToTournament);
 }
 
-export function getActiveTournaments(): TournamentRow[] {
+export function getActiveTournaments(options?: { visibility?: TournamentVisibility }): TournamentRow[] {
   const db = getDb();
-  const rows = db.prepare("SELECT * FROM tournaments WHERE status IN ('open','active') ORDER BY starts_at ASC").all();
+  const visibility = options?.visibility ?? 'visible';
+  const clause = visibilityPredicate(visibility, 'hidden_at');
+  const rows = db
+    .prepare(
+      `SELECT * FROM tournaments WHERE status IN ('open','active') ${clause ? `AND ${clause}` : ''} ORDER BY starts_at ASC`
+    )
+    .all();
   return rows.map(rowToTournament);
 }
 
-export function getTournamentsWithGameInfo(): TournamentWithGame[] {
+export function getTournamentsWithGameInfo(options?: {
+  visibility?: TournamentVisibility;
+}): TournamentWithGame[] {
   const db = getDb();
+  const visibility = options?.visibility ?? 'visible';
+  const clause = visibilityPredicate(visibility, 't.hidden_at');
   const rows = db.prepare(`
     SELECT t.*, g.name_ar as game_name_ar, g.slug as game_slug, g.image_url as game_image_url,
            (SELECT COUNT(*) FROM tournament_participants
              WHERE tournament_id = t.id AND status IN ('registered','confirmed')) as participant_count
     FROM tournaments t
     JOIN games g ON g.id = t.game_id
+    ${clause ? `WHERE ${clause}` : ''}
     ORDER BY t.created_at DESC
   `).all() as TournamentWithGameRow[];
   return rows.map((row) => ({
@@ -317,15 +368,54 @@ export function updateTournament(id: string, input: UpdateTournamentInput): Tour
   return tournament;
 }
 
-export function deleteTournament(id: string): boolean {
+export interface SetTournamentHiddenResult {
+  tournament: TournamentRow;
+  /** False when the tournament was already in the requested state (idempotent). */
+  changed: boolean;
+}
+
+/**
+ * R5 — the ONLY visibility mutation. Sets or clears `hidden_at`/`hidden_by`.
+ *
+ * Hard guarantees:
+ * - NEVER touches `status` (lifecycle and visibility are independent).
+ * - NEVER deletes any row (tournament-owned or otherwise).
+ * - Reversible and idempotent.
+ *
+ * Returns null when the tournament does not exist.
+ */
+export function setTournamentHidden(
+  id: string,
+  hidden: boolean,
+  actorId?: string | null
+): SetTournamentHiddenResult | null {
   const db = getDb();
   const existing = getTournamentById(id);
-  if (!existing) {
-    throw new Error('Tournament not found');
+  if (!existing) return null;
+
+  const alreadyHidden = existing.hidden_at !== null;
+  if (alreadyHidden === hidden) {
+    return { tournament: existing, changed: false };
   }
-  // Only allow deletion of draft tournaments
-  if (existing.status !== 'draft') {
-    throw new Error('Only draft tournaments can be deleted');
+
+  const now = Date.now();
+  if (hidden) {
+    db.prepare('UPDATE tournaments SET hidden_at = ?, hidden_by = ?, updated_at = ? WHERE id = ?').run(
+      now,
+      actorId ?? null,
+      now,
+      id
+    );
+  } else {
+    db.prepare('UPDATE tournaments SET hidden_at = NULL, hidden_by = NULL, updated_at = ? WHERE id = ?').run(
+      now,
+      id
+    );
   }
-  return db.prepare('DELETE FROM tournaments WHERE id = ?').run(id).changes > 0;
+
+  const tournament = getTournamentById(id);
+  if (!tournament) {
+    throw new Error('Failed to retrieve tournament after visibility change');
+  }
+  return { tournament, changed: true };
 }

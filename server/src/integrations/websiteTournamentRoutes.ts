@@ -67,6 +67,10 @@ function toDiscoveryDto(t: TournamentWithGame) {
     max_participants: t.max_participants,
     participant_count: t.participant_count,
     ticket_cost: t.ticket_cost,
+    // R5 — explicit visibility marker. Hidden tournaments are excluded from the
+    // collection but remain resolvable by id so the bot can recognise them as
+    // unavailable (never a 404 merely because they are hidden).
+    hidden: t.hidden_at !== null,
     starts_at: t.starts_at,
     ends_at: t.ends_at,
   };

@@ -478,11 +478,18 @@ async function main(): Promise<void> {
       assertEqual(bracketRes.body.error, 'invalid_tournament_state', 'bracket reason');
     });
 
-    await testAsync('draft-only deletion is preserved (non-draft delete rejected)', async () => {
-      const id = 'adm-cxl-delete-open';
+    await testAsync('R5: DELETE is a non-destructive hide alias (no hard delete, status unchanged)', async () => {
+      const id = 'adm-hide-delete';
       seedTournament({ id, gameId: DG, status: 'open', createdBy: ADMIN_ID });
       const res = await call(`/api/admin/tournaments/${id}`, { method: 'DELETE', cookie: adminCookie });
-      assertEqual(res.status, 400, 'non-draft delete rejected');
+      assertEqual(res.status, 200, 'hide accepted');
+      assertEqual(res.body.hidden, true, 'response marks hidden');
+      const row = getDb()
+        .prepare('SELECT id, status, hidden_at FROM tournaments WHERE id = ?')
+        .get(id) as { id: string; status: string; hidden_at: number | null } | undefined;
+      assertTrue(!!row, 'tournament row preserved');
+      assertEqual(row!.status, 'open', 'lifecycle status unchanged');
+      assertTrue(row!.hidden_at !== null, 'hidden_at set');
     });
   } finally {
     await api.close();

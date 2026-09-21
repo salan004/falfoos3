@@ -97,6 +97,13 @@ function setTicketCost(tournamentId: string, cost: number | null): void {
   getDb().prepare('UPDATE tournaments SET ticket_cost = ? WHERE id = ?').run(cost, tournamentId);
 }
 
+/** R5 — sets/clears a tournament's visibility on a seeded tournament. */
+function setHidden(tournamentId: string, hidden: boolean): void {
+  getDb()
+    .prepare('UPDATE tournaments SET hidden_at = ?, hidden_by = ? WHERE id = ?')
+    .run(hidden ? Date.now() : null, hidden ? 'admin' : null, tournamentId);
+}
+
 function seedGuest(playerId: string, channel: string | null, claimedUserId: string | null = null): void {
   getDb()
     .prepare(
@@ -1233,6 +1240,7 @@ async function main(): Promise<void> {
     const t = list[0];
     assertEqual(t.tournament_id, TOURNEY, 'tournament id');
     assertEqual(t.ticket_cost, 100, 'ticket_cost');
+    assertEqual(t.hidden, false, 'visible marker');
     assertEqual(t.max_participants, 32, 'max_participants');
     assertEqual(t.participant_count, 3, 'participant_count');
     assertEqual(t.status, 'open', 'status');
@@ -1289,6 +1297,34 @@ async function main(): Promise<void> {
 
     const missing = await signedGet('/api/integrations/website/tournaments/does-not-exist');
     assertEqual(missing.status, 404, 'unknown -> 404');
+  });
+
+  await testAsync('discovery (R5): hidden tournaments are excluded from the collection', async () => {
+    reset();
+    seedUser(ADMIN, 'admin');
+    seedGame();
+    seedTournament(TOURNEY, 32, 0, 'open');
+    seedTournament('tourney-hidden', 32, 0, 'open');
+    setHidden('tourney-hidden', true);
+
+    const res = await signedGet('/api/integrations/website/tournaments');
+    assertEqual(res.status, 200, 'status');
+    const list = res.body.tournaments as any[];
+    assertTrue(list.some((t) => t.tournament_id === TOURNEY), 'visible tournament listed');
+    assertTrue(!list.some((t) => t.tournament_id === 'tourney-hidden'), 'hidden tournament excluded');
+  });
+
+  await testAsync('discovery (R5): hidden tournament detail returns hidden:true (never 404)', async () => {
+    reset();
+    seedUser(ADMIN, 'admin');
+    seedGame();
+    seedTournament(TOURNEY, 32, 0, 'open');
+    setHidden(TOURNEY, true);
+
+    const res = await signedGet(`/api/integrations/website/tournaments/${TOURNEY}`);
+    assertEqual(res.status, 200, 'status');
+    assertEqual(res.body.tournament.tournament_id, TOURNEY, 'id');
+    assertEqual(res.body.tournament.hidden, true, 'hidden marker');
   });
 
   await testAsync('discovery (R4.1): no Loyalty balance / product / tx data leaks', async () => {

@@ -223,6 +223,9 @@ export interface TournamentEntry {
   max_participants: number | null;
   /** Optional configured Loyalty ticket price; null = legacy/default bot pricing. */
   ticket_cost: number | null;
+  /** R5 — visibility (independent of `status`). Non-null = hidden from listings. */
+  hidden_at: number | null;
+  hidden_by: string | null;
   starts_at: number | null;
   ends_at: number | null;
   created_by: string;

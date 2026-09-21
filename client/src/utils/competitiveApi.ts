@@ -197,6 +197,34 @@ export async function cancelTournament(
   });
 }
 
+/* ------------------------------ visibility -------------------------------- */
+
+/**
+ * R5 — hide a tournament from normal listings/discovery. Non-destructive and
+ * reversible: no data, rows, or images are deleted and the lifecycle status is
+ * never changed. Uses the primary PATCH visibility API.
+ */
+export async function hideTournament(
+  tournamentId: string
+): Promise<ApiResult<{ tournament: TournamentSummary }>> {
+  return jsonRequest(`/api/admin/tournaments/${encodeURIComponent(tournamentId)}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ hidden: true }),
+  });
+}
+
+/** R5 — restore a hidden tournament's visibility without changing its status. */
+export async function restoreTournament(
+  tournamentId: string
+): Promise<ApiResult<{ tournament: TournamentSummary }>> {
+  return jsonRequest(`/api/admin/tournaments/${encodeURIComponent(tournamentId)}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ hidden: false }),
+  });
+}
+
 /* ------------------------------ correction -------------------------------- */
 
 export interface CorrectionResultDto {

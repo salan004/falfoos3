@@ -86,6 +86,8 @@ export interface TournamentSummaryDto {
   maxParticipants: number | null;
   /** Optional configured Loyalty ticket price; null = legacy/default bot pricing. */
   ticketCost: number | null;
+  /** R5 — visibility (independent of `status`). True = hidden from listings. */
+  hidden: boolean;
   startsAt: number | null;
   endsAt: number | null;
   participantCount: number;
@@ -212,6 +214,7 @@ function toTournamentSummary(tournament: TournamentWithGame): TournamentSummaryD
     status: tournament.status,
     maxParticipants: tournament.max_participants,
     ticketCost: tournament.ticket_cost,
+    hidden: tournament.hidden_at !== null,
     startsAt: tournament.starts_at,
     endsAt: tournament.ends_at,
     participantCount: bracket?.participantCount ?? 0,

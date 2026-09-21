@@ -239,6 +239,11 @@ export async function startPurchase(
   const tournament = getTournamentById(tid);
   if (!tournament) throw new IntegrationError('tournament_not_found', 404, 'Tournament not found');
   if (tournament.game_id !== gid) throw new IntegrationError('game_mismatch', 409, 'Tournament belongs to another game');
+  // R5 — a hidden tournament is unavailable for NEW purchases. Existing
+  // intents/refunds/recovery are unaffected (they never re-check visibility).
+  if (tournament.hidden_at !== null) {
+    throw new IntegrationError('tournament_hidden', 409, 'Tournament is not available');
+  }
   if (tournament.status !== 'open') throw new IntegrationError('tournament_not_open', 409, 'Tournament is not open');
   if (
     tournament.max_participants !== null &&

@@ -32,6 +32,8 @@ export interface TournamentSummary {
   maxParticipants: number | null;
   /** Optional configured Loyalty ticket price; null = legacy/default bot pricing. */
   ticketCost: number | null;
+  /** R5 — visibility (independent of `status`). True = hidden from listings. */
+  hidden: boolean;
   startsAt: number | null;
   endsAt: number | null;
   participantCount: number;
