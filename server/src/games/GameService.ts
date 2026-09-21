@@ -126,6 +126,13 @@ export function createGame(input: CreateGameInput): GameRow {
   const db = getDb();
   validateNameAr(input.name_ar);
 
+  // R2 — Arabic name uniqueness is enforced on creation too, matching the
+  // update rule, so new duplicate game names can never be introduced.
+  const duplicateName = db.prepare('SELECT id FROM games WHERE name_ar = ?').get(input.name_ar);
+  if (duplicateName) {
+    throw new Error(`Game Arabic name '${input.name_ar}' already exists`);
+  }
+
   const providedSlug = input.slug?.trim();
   let slug: string;
   if (providedSlug) {
@@ -165,9 +172,15 @@ export function updateGame(id: string, input: UpdateGameInput): GameRow {
 
   if (input.name_ar !== undefined) {
     validateNameAr(input.name_ar);
-    const dup = db.prepare('SELECT id FROM games WHERE name_ar = ? AND id != ?').get(input.name_ar, id);
-    if (dup) {
-      throw new Error(`Game Arabic name '${input.name_ar}' already exists`);
+    // R2 — only enforce Arabic-name uniqueness when the name actually changes.
+    // Saving an existing game with its current name (e.g. image/description/
+    // status/order edits) must never fail because a legacy duplicate row shares
+    // that name. Renaming to a name owned by another game is still rejected.
+    if (input.name_ar !== existing.name_ar) {
+      const dup = db.prepare('SELECT id FROM games WHERE name_ar = ? AND id != ?').get(input.name_ar, id);
+      if (dup) {
+        throw new Error(`Game Arabic name '${input.name_ar}' already exists`);
+      }
     }
   }
 
