@@ -221,6 +221,8 @@ export interface TournamentEntry {
   image_url: string | null;
   status: TournamentStatus;
   max_participants: number | null;
+  /** Optional configured Loyalty ticket price; null = legacy/default bot pricing. */
+  ticket_cost: number | null;
   starts_at: number | null;
   ends_at: number | null;
   created_by: string;

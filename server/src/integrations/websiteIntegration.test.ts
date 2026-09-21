@@ -13,6 +13,8 @@ import { startPurchase, recoverPurchaseIntents } from './purchaseService';
 import { IntegrationError } from './errors';
 import { installBotMock, restoreFetch, type BotMockState } from './websiteTestBotMock';
 import { websiteIntegrationRoutes } from './websiteIntegrationRoutes';
+import { websiteTournamentRoutes } from './websiteTournamentRoutes';
+import { captureRawBody } from '../middleware/verifyBotWebhook';
 import type { SessionUser } from '../auth/session';
 
 /**
@@ -90,6 +92,11 @@ function seedTournament(id = TOURNEY, max: number | null = 100, count = 0, statu
     .run(id, GAME, id, status, max, count, ADMIN, Date.now(), Date.now());
 }
 
+/** R4.1 — sets the configured website ticket cost on a seeded tournament. */
+function setTicketCost(tournamentId: string, cost: number | null): void {
+  getDb().prepare('UPDATE tournaments SET ticket_cost = ? WHERE id = ?').run(cost, tournamentId);
+}
+
 function seedGuest(playerId: string, channel: string | null, claimedUserId: string | null = null): void {
   getDb()
     .prepare(
@@ -112,7 +119,10 @@ let recoverApiPort = 0;
 
 async function startRecoverApi(): Promise<void> {
   const app = express();
-  app.use(express.json());
+  // `verify` captures the raw body so the R4.1 inbound HMAC verifier can check
+  // the `timestamp.rawBody` signature (GET requests have an empty body).
+  app.use(express.json({ verify: captureRawBody }));
+  app.use('/api/integrations/website', websiteTournamentRoutes);
   app.use('/api/integrations', websiteIntegrationRoutes);
   recoverApiServer = http.createServer(app);
   await new Promise<void>((resolve) => recoverApiServer!.listen(0, '127.0.0.1', () => resolve()));
@@ -198,6 +208,45 @@ function postIntegration(
     );
     req.on('error', reject);
     req.write(payload);
+    req.end();
+  });
+}
+
+/**
+ * R4.1 — signed GET to the bot-authenticated website tournament discovery
+ * surface over node:http (so the bot mock's fetch replacement cannot intercept
+ * it). `header: null` omits the signature header entirely.
+ */
+function signedGet(
+  path: string,
+  opts: { secret?: string; timestamp?: number; header?: string | null } = {}
+): Promise<{ status: number; body: any }> {
+  const ts = opts.timestamp ?? Math.floor(Date.now() / 1000);
+  const secret = opts.secret ?? TEST_SECRET;
+  const sig = crypto.createHmac('sha256', secret).update(`${ts}.`).digest('hex');
+  const signature = opts.header === undefined ? `t=${ts},v1=${sig}` : opts.header;
+  const headers: Record<string, string> = signature ? { 'X-FalFoos-Signature': signature } : {};
+  return new Promise((resolve, reject) => {
+    const req = http.request(
+      { host: '127.0.0.1', port: recoverApiPort, method: 'GET', path, headers },
+      (res) => {
+        let text = '';
+        res.setEncoding('utf8');
+        res.on('data', (chunk) => (text += chunk));
+        res.on('end', () => {
+          let parsed: any = null;
+          if (text.length > 0) {
+            try {
+              parsed = JSON.parse(text);
+            } catch {
+              parsed = text;
+            }
+          }
+          resolve({ status: res.statusCode || 0, body: parsed });
+        });
+      }
+    );
+    req.on('error', reject);
     req.end();
   });
 }
@@ -822,6 +871,127 @@ async function main(): Promise<void> {
     );
   });
 
+  await testAsync('purchase (R4.1): stored ticket_cost is sent to the bot; browser cannot control it', async () => {
+    reset();
+    bot.purchaseMode = 'ok';
+    bot.purchaseAmount = 30;
+    bot.purchaseCalls = 0;
+    bot.lastPurchaseBody = null;
+    seedUser(USER.id);
+    seedUser(ADMIN, 'admin');
+    seedGame();
+    seedTournament();
+    setTicketCost(TOURNEY, 30);
+    seedGuest(PLAYER, CHANNEL, USER.id);
+
+    // startPurchase has no price parameter: the browser cannot supply one.
+    const result = await startPurchase(USER, TOURNEY, GAME);
+    assertEqual(result.status, 'PARTICIPANT_REGISTERED', 'registered');
+    assertEqual((bot.lastPurchaseBody as any)?.ticket_cost, 30, 'server-loaded price sent to the bot');
+    assertTrue(!!participant(), 'participant registered');
+  });
+
+  await testAsync('purchase (R4.1): NULL ticket_cost skips the assertion (legacy bot pricing)', async () => {
+    reset();
+    bot.purchaseMode = 'ok';
+    bot.purchaseAmount = 999; // bot default — never asserted when NULL
+    bot.purchaseCalls = 0;
+    bot.lastPurchaseBody = null;
+    seedUser(USER.id);
+    seedUser(ADMIN, 'admin');
+    seedGame();
+    seedTournament();
+    seedGuest(PLAYER, CHANNEL, USER.id);
+
+    const result = await startPurchase(USER, TOURNEY, GAME);
+    assertEqual(result.status, 'PARTICIPANT_REGISTERED', 'legacy success');
+    assertTrue(!('ticket_cost' in (bot.lastPurchaseBody ?? {})), 'no ticket_cost sent when NULL');
+  });
+
+  await testAsync('purchase (R4.1): COMPLETED amount mismatch triggers refund, no participant', async () => {
+    reset();
+    bot.purchaseMode = 'ok';
+    bot.purchaseAmount = 30; // bot charged less than the configured price
+    bot.purchaseCalls = 0;
+    bot.refundCalls = 0;
+    seedUser(USER.id);
+    seedUser(ADMIN, 'admin');
+    seedGame();
+    seedTournament();
+    setTicketCost(TOURNEY, 50);
+    seedGuest(PLAYER, CHANNEL, USER.id);
+
+    const result = await startPurchase(USER, TOURNEY, GAME);
+    assertEqual(result.status, 'REFUNDED', 'refunded');
+    assertNull(participant(), 'no participant registered');
+    assertTrue(bot.refundCalls >= 1, 'refund requested through the existing path');
+  });
+
+  await testAsync('purchase (R4.1): COMPLETED missing amount with configured cost fails safely', async () => {
+    reset();
+    bot.purchaseMode = 'ok';
+    bot.purchaseAmount = null; // bot omitted the amount field
+    bot.purchaseCalls = 0;
+    bot.refundCalls = 0;
+    seedUser(USER.id);
+    seedUser(ADMIN, 'admin');
+    seedGame();
+    seedTournament();
+    setTicketCost(TOURNEY, 50);
+    seedGuest(PLAYER, CHANNEL, USER.id);
+
+    const result = await startPurchase(USER, TOURNEY, GAME);
+    assertEqual(result.status, 'REFUNDED', 'refunded');
+    assertNull(participant(), 'no participant');
+    assertTrue(bot.refundCalls >= 1, 'refund requested');
+  });
+
+  await testAsync('purchase (R4.1): non-terminal response neither asserts nor refunds', async () => {
+    reset();
+    bot.purchaseMode = 'received';
+    bot.purchaseAmount = 30;
+    bot.purchaseCalls = 0;
+    bot.refundCalls = 0;
+    seedUser(USER.id);
+    seedUser(ADMIN, 'admin');
+    seedGame();
+    seedTournament();
+    setTicketCost(TOURNEY, 50); // would mismatch, but the response is non-terminal
+    seedGuest(PLAYER, CHANNEL, USER.id);
+
+    const result = await startPurchase(USER, TOURNEY, GAME);
+    assertEqual(result.status, 'BOT_REQUESTED', 'non-terminal');
+    assertEqual(bot.refundCalls, 0, 'no refund on non-terminal');
+    assertNull(participant(), 'no participant');
+    bot.purchaseMode = 'ok';
+  });
+
+  await testAsync('purchase (R4.1): idempotent retry does not double-register or refund', async () => {
+    reset();
+    bot.purchaseMode = 'ok';
+    bot.purchaseAmount = 40;
+    bot.purchaseCalls = 0;
+    bot.refundCalls = 0;
+    seedUser(USER.id);
+    seedUser(ADMIN, 'admin');
+    seedGame();
+    seedTournament();
+    setTicketCost(TOURNEY, 40);
+    seedGuest(PLAYER, CHANNEL, USER.id);
+
+    const first = await startPurchase(USER, TOURNEY, GAME);
+    const retry = await startPurchase(USER, TOURNEY, GAME);
+    assertEqual(first.status, 'PARTICIPANT_REGISTERED', 'first');
+    assertEqual(retry.status, 'PARTICIPANT_REGISTERED', 'retry');
+    assertEqual(bot.purchaseCalls, 1, 'exactly one debit');
+    assertEqual(bot.refundCalls, 0, 'no refund');
+    assertEqual(
+      (getDb().prepare('SELECT COUNT(*) n FROM tournament_participants').get() as any).n,
+      1,
+      'one participant'
+    );
+  });
+
   await testAsync('purchase: insufficient balance fails without a participant', async () => {
     reset();
     bot.purchaseMode = 'insufficient';
@@ -1016,6 +1186,122 @@ async function main(): Promise<void> {
   // -------------------------------------------------------------------------
 
   await startRecoverApi();
+
+  // -------------------------------------------------------------------------
+  // R4.1 — bot-authenticated website tournament discovery
+  // -------------------------------------------------------------------------
+
+  await testAsync('discovery (R4.1): missing signature header is rejected (400)', async () => {
+    reset();
+    const res = await signedGet('/api/integrations/website/tournaments', { header: null });
+    assertEqual(res.status, 400, 'status');
+    assertEqual(res.body.error, 'invalid_signature_header', 'error');
+  });
+
+  await testAsync('discovery (R4.1): invalid HMAC is rejected (401)', async () => {
+    reset();
+    const res = await signedGet('/api/integrations/website/tournaments', { secret: 'wrong-secret' });
+    assertEqual(res.status, 401, 'status');
+    assertEqual(res.body.error, 'invalid_signature', 'error');
+  });
+
+  await testAsync('discovery (R4.1): stale timestamp is rejected (400)', async () => {
+    reset();
+    const res = await signedGet('/api/integrations/website/tournaments', {
+      timestamp: Math.floor(Date.now() / 1000) - 3600,
+    });
+    assertEqual(res.status, 400, 'status');
+    assertEqual(res.body.error, 'stale_timestamp', 'error');
+  });
+
+  await testAsync('discovery (R4.1): authenticated request returns open tournaments with price + roster', async () => {
+    reset();
+    seedUser(ADMIN, 'admin');
+    seedGame();
+    seedTournament(TOURNEY, 32, 0, 'open');
+    setTicketCost(TOURNEY, 100);
+    for (let i = 1; i <= 3; i++) {
+      seedGuest(`dp-${i}`, null);
+      seedParticipant(TOURNEY, `dp-${i}`, `evt_dp-${i}`);
+    }
+    seedTournament('tourney-draft', 16, 0, 'draft');
+
+    const res = await signedGet('/api/integrations/website/tournaments');
+    assertEqual(res.status, 200, 'status');
+    const list = res.body.tournaments as any[];
+    assertEqual(list.length, 1, 'default status=open only');
+    const t = list[0];
+    assertEqual(t.tournament_id, TOURNEY, 'tournament id');
+    assertEqual(t.ticket_cost, 100, 'ticket_cost');
+    assertEqual(t.max_participants, 32, 'max_participants');
+    assertEqual(t.participant_count, 3, 'participant_count');
+    assertEqual(t.status, 'open', 'status');
+    assertEqual(t.game_id, GAME, 'game_id');
+    assertTrue(typeof t.name_ar === 'string' && t.name_ar.length > 0, 'name_ar');
+    assertTrue(typeof t.game_name_ar === 'string', 'game_name_ar');
+    assertTrue(
+      !('balance_after' in t) && !('tx_id' in t) && !('product_id' in t),
+      'no internal fields leaked'
+    );
+  });
+
+  await testAsync('discovery (R4.1): status filter works; invalid status rejected', async () => {
+    reset();
+    seedUser(ADMIN, 'admin');
+    seedGame();
+    seedTournament(TOURNEY, 32, 0, 'open');
+    seedTournament('tourney-active', 16, 0, 'active');
+
+    const active = await signedGet('/api/integrations/website/tournaments?status=active');
+    assertEqual(active.status, 200, 'status');
+    const list = active.body.tournaments as any[];
+    assertEqual(list.length, 1, 'one active');
+    assertEqual(list[0].tournament_id, 'tourney-active', 'filtered by status');
+
+    const bogus = await signedGet('/api/integrations/website/tournaments?status=bogus');
+    assertEqual(bogus.status, 400, 'invalid status rejected');
+    assertEqual(bogus.body.error, 'invalid_status', 'error');
+  });
+
+  await testAsync('discovery (R4.1): gameId filter works', async () => {
+    reset();
+    seedUser(ADMIN, 'admin');
+    seedGame();
+    seedTournament(TOURNEY, 32, 0, 'open');
+
+    const match = await signedGet(`/api/integrations/website/tournaments?gameId=${GAME}`);
+    assertEqual((match.body.tournaments as any[]).length, 1, 'matching game');
+    const none = await signedGet('/api/integrations/website/tournaments?gameId=does-not-exist');
+    assertEqual((none.body.tournaments as any[]).length, 0, 'unknown game empty');
+  });
+
+  await testAsync('discovery (R4.1): detail endpoint returns one tournament; unknown -> 404', async () => {
+    reset();
+    seedUser(ADMIN, 'admin');
+    seedGame();
+    seedTournament(TOURNEY, 32, 0, 'open');
+    setTicketCost(TOURNEY, 55);
+
+    const res = await signedGet(`/api/integrations/website/tournaments/${TOURNEY}`);
+    assertEqual(res.status, 200, 'status');
+    assertEqual(res.body.tournament.tournament_id, TOURNEY, 'id');
+    assertEqual(res.body.tournament.ticket_cost, 55, 'price');
+
+    const missing = await signedGet('/api/integrations/website/tournaments/does-not-exist');
+    assertEqual(missing.status, 404, 'unknown -> 404');
+  });
+
+  await testAsync('discovery (R4.1): no Loyalty balance / product / tx data leaks', async () => {
+    reset();
+    seedUser(ADMIN, 'admin');
+    seedGame();
+    seedTournament(TOURNEY, 32, 0, 'open');
+    setTicketCost(TOURNEY, 100);
+
+    const res = await signedGet('/api/integrations/website/tournaments');
+    const raw = JSON.stringify(res.body);
+    assertTrue(!/balance|loyalty|product_id|tx_id|transaction/i.test(raw), 'no sensitive fields');
+  });
 
   await testAsync('recover: unauthenticated request is rejected (401)', async () => {
     reset();

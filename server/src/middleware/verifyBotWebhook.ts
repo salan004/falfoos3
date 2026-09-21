@@ -30,10 +30,21 @@ export function parseSignatureHeader(header: string | undefined): ParsedSignatur
   return { timestamp, signature };
 }
 
-export function verifyHmacSignature(rawBody: Buffer | string, timestamp: number, signature: string): boolean {
-  const secret = env.BOT_WEBHOOK_SECRET;
+/**
+ * Secret-parameterized HMAC verifier. The signature construction is identical to
+ * `verifyHmacSignature` (`HMAC_SHA256(secret, `${timestamp}.${rawBody}`)`), so
+ * inbound bot traffic can be verified against whichever shared secret applies
+ * (BOT_WEBHOOK_SECRET for webhooks, WEBSITE_INTEGRATION_SECRET for the
+ * bot -> website read surface) without duplicating the crypto.
+ */
+export function verifyHmacSignatureWithSecret(
+  rawBody: Buffer | string,
+  timestamp: number,
+  signature: string,
+  secret: string | undefined
+): boolean {
   if (!secret) {
-    console.error('[BotWebhook] BOT_WEBHOOK_SECRET not configured');
+    console.error('[BotWebhook] HMAC secret not configured');
     return false;
   }
   const bodyString = rawBody instanceof Buffer ? rawBody.toString('utf8') : rawBody;
@@ -43,6 +54,10 @@ export function verifyHmacSignature(rawBody: Buffer | string, timestamp: number,
   // Constant-time comparison
   if (expected.length !== signature.length) return false;
   return crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(signature));
+}
+
+export function verifyHmacSignature(rawBody: Buffer | string, timestamp: number, signature: string): boolean {
+  return verifyHmacSignatureWithSecret(rawBody, timestamp, signature, env.BOT_WEBHOOK_SECRET);
 }
 
 export function isTimestampFresh(timestamp: number, maxAgeMs = 300000): boolean {

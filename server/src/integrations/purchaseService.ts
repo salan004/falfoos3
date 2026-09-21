@@ -287,6 +287,12 @@ async function resumeIntent(intent: PurchaseIntentRow): Promise<PurchaseResult> 
 async function runPurchase(intent: PurchaseIntentRow): Promise<PurchaseResult> {
   updateIntent(intent.request_id, { status: 'BOT_REQUESTED' });
 
+  // R4.1 — the price authority is the SERVER-side tournament row, re-read here
+  // so a stale intent or a malicious client can never supply the price. The
+  // browser is never trusted for `ticket_cost`.
+  const tournament = getTournamentById(intent.tournament_id);
+  const expectedTicketCost = tournament?.ticket_cost ?? null;
+
   let bot;
   try {
     bot = await callBot<Record<string, unknown>>(BOT_ENDPOINTS.purchase, {
@@ -295,6 +301,8 @@ async function runPurchase(intent: PurchaseIntentRow): Promise<PurchaseResult> {
       youtube_channel_id: intent.youtube_channel_id,
       tournament_id: intent.tournament_id,
       game_id: intent.game_id,
+      // Only sent when configured; NULL preserves the legacy bot-default contract.
+      ...(expectedTicketCost !== null ? { ticket_cost: expectedTicketCost } : {}),
     });
   } catch (err) {
     if (err instanceof BotIntegrationError && err.code === 'integration_not_configured') {
@@ -332,6 +340,20 @@ async function runPurchase(intent: PurchaseIntentRow): Promise<PurchaseResult> {
       bot_result_json: JSON.stringify(bot.body),
       error: null,
     });
+
+    // R4.1 — when the website configured a price, verify the ACTUAL debit the
+    // bot reports. A missing amount or a mismatch must NOT register the
+    // participant: reuse the existing refund/recovery path instead.
+    if (expectedTicketCost !== null) {
+      const actualAmount =
+        body.amount === null || body.amount === undefined ? null : Number(body.amount);
+      if (actualAmount === null || !Number.isFinite(actualAmount) || actualAmount !== expectedTicketCost) {
+        const reason = actualAmount === null ? 'ticket_amount_missing' : 'ticket_amount_mismatch';
+        updateIntent(intent.request_id, { status: 'REFUND_REQUESTED', error: reason });
+        return requestRefund(getIntent(intent.request_id)!, reason);
+      }
+    }
+
     return registerParticipant(getIntent(intent.request_id)!);
   }
 

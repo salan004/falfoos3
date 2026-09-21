@@ -84,6 +84,8 @@ export interface TournamentSummaryDto {
   imageUrl: string | null;
   status: string;
   maxParticipants: number | null;
+  /** Optional configured Loyalty ticket price; null = legacy/default bot pricing. */
+  ticketCost: number | null;
   startsAt: number | null;
   endsAt: number | null;
   participantCount: number;
@@ -209,6 +211,7 @@ function toTournamentSummary(tournament: TournamentWithGame): TournamentSummaryD
     imageUrl: tournament.image_url,
     status: tournament.status,
     maxParticipants: tournament.max_participants,
+    ticketCost: tournament.ticket_cost,
     startsAt: tournament.starts_at,
     endsAt: tournament.ends_at,
     participantCount: bracket?.participantCount ?? 0,

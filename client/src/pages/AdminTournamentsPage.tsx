@@ -13,6 +13,8 @@ interface TournamentFormData {
   description_ar: string;
   image_url: string;
   max_participants: string;
+  /** Optional Loyalty ticket price; empty = legacy/default bot pricing. */
+  ticket_cost: string;
   /** Initial status only — lifecycle changes happen from the list actions. */
   status: 'draft' | 'open';
 }
@@ -23,6 +25,7 @@ const EMPTY_FORM: TournamentFormData = {
   description_ar: '',
   image_url: '',
   max_participants: '',
+  ticket_cost: '',
   status: 'draft',
 };
 
@@ -150,6 +153,10 @@ export function AdminTournamentsPage({ gameId }: AdminTournamentsPageProps) {
         max_participants: formData.max_participants
           ? parseInt(formData.max_participants, 10)
           : undefined,
+        // Empty clears the configured price (NULL = legacy/default bot pricing).
+        ticket_cost: formData.ticket_cost.trim() === ''
+          ? null
+          : parseInt(formData.ticket_cost, 10),
       };
 
       // dates (starts_at / ends_at) are deliberately not sent — UI removal only.
@@ -188,6 +195,7 @@ export function AdminTournamentsPage({ gameId }: AdminTournamentsPageProps) {
       description_ar: tournament.description_ar || '',
       image_url: tournament.image_url || '',
       max_participants: tournament.max_participants ? String(tournament.max_participants) : '',
+      ticket_cost: tournament.ticket_cost ? String(tournament.ticket_cost) : '',
       status: 'draft',
     });
     setShowForm(true);
@@ -485,6 +493,19 @@ export function AdminTournamentsPage({ gameId }: AdminTournamentsPageProps) {
                     className="w-full input-field"
                     min="1"
                     placeholder="اتركه فارغًا للا حد"
+                  />
+                </div>
+                <div className="admin-field">
+                  <label className="admin-field-label" htmlFor="tournament-ticket-cost">تكلفة التذكرة (نقاط)</label>
+                  <input
+                    id="tournament-ticket-cost"
+                    type="number"
+                    value={formData.ticket_cost}
+                    onChange={(e) => setFormData({ ...formData, ticket_cost: e.target.value })}
+                    className="w-full input-field"
+                    min="1"
+                    step="1"
+                    placeholder="اتركه فارغًا لسعر البوت الافتراضي"
                   />
                 </div>
                 {!editingTournament && (

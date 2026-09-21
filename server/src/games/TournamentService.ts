@@ -13,6 +13,8 @@ export interface TournamentRow {
   image_url: string | null;
   status: 'draft' | 'open' | 'active' | 'completed' | 'cancelled';
   max_participants: number | null;
+  /** Optional configured Streamlabs Loyalty ticket price. NULL = legacy/default. */
+  ticket_cost: number | null;
   starts_at: number | null;
   ends_at: number | null;
   created_by: string;
@@ -26,6 +28,7 @@ export interface CreateTournamentInput {
   description_ar?: string;
   image_url?: string;
   max_participants?: number;
+  ticket_cost?: number | null;
   starts_at?: number;
   ends_at?: number;
   status?: 'draft' | 'open';
@@ -36,6 +39,7 @@ export interface UpdateTournamentInput {
   description_ar?: string;
   image_url?: string;
   max_participants?: number | null;
+  ticket_cost?: number | null;
   starts_at?: number | null;
   ends_at?: number | null;
   status?: 'draft' | 'open' | 'active' | 'completed' | 'cancelled';
@@ -57,12 +61,39 @@ function rowToTournament(row: any): TournamentRow {
     image_url: row.image_url,
     status: row.status,
     max_participants: row.max_participants,
+    ticket_cost: row.ticket_cost ?? null,
     starts_at: row.starts_at,
     ends_at: row.ends_at,
     created_by: row.created_by,
     created_at: row.created_at,
     updated_at: row.updated_at,
   };
+}
+
+/** Upper bound consistent with the project's integer-configured limits. */
+export const MAX_TICKET_COST = 1_000_000;
+
+/**
+ * R4.1 — normalizes an admin-provided ticket cost.
+ *
+ * NULL / undefined / empty string → NULL (legacy/default bot pricing).
+ * A whole number in [1, MAX_TICKET_COST] → that integer.
+ * Anything else (0, negative, decimal, NaN, non-numeric string, too large)
+ * is rejected — prices are never silently rounded.
+ */
+export function validateTicketCost(value: unknown): number | null {
+  if (value === undefined || value === null || value === '') return null;
+  const n = typeof value === 'string' ? Number(value) : value;
+  if (typeof n !== 'number' || !Number.isFinite(n) || !Number.isInteger(n)) {
+    throw new Error('Ticket cost must be a whole number of loyalty points');
+  }
+  if (n < 1) {
+    throw new Error('Ticket cost must be at least 1 loyalty point');
+  }
+  if (n > MAX_TICKET_COST) {
+    throw new Error(`Ticket cost must be at most ${MAX_TICKET_COST} loyalty points`);
+  }
+  return n;
 }
 
 function validateTournamentName(nameAr: string): void {
@@ -174,12 +205,14 @@ export function createTournament(input: CreateTournamentInput, createdBy: string
     throw new Error('Initial status must be draft or open');
   }
 
+  const ticketCost = validateTicketCost(input.ticket_cost);
+
   const id = crypto.randomUUID();
   const now = Date.now();
 
   db.prepare(`
-    INSERT INTO tournaments (id, game_id, name_ar, description_ar, image_url, status, max_participants, starts_at, ends_at, created_by, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO tournaments (id, game_id, name_ar, description_ar, image_url, status, max_participants, ticket_cost, starts_at, ends_at, created_by, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     id,
     input.game_id,
@@ -188,6 +221,7 @@ export function createTournament(input: CreateTournamentInput, createdBy: string
     input.image_url ?? null,
     status,
     input.max_participants ?? null,
+    ticketCost,
     input.starts_at ?? null,
     input.ends_at ?? null,
     createdBy,
@@ -226,6 +260,10 @@ export function updateTournament(id: string, input: UpdateTournamentInput): Tour
     throw new Error('Maximum participants must be at least 1');
   }
 
+  // R4.1 — validate (and normalize) the ticket cost when explicitly supplied.
+  // `undefined` preserves the stored value; `null`/empty clears it.
+  const ticketCost = input.ticket_cost !== undefined ? validateTicketCost(input.ticket_cost) : undefined;
+
   const updates: string[] = [];
   const params: any[] = [];
 
@@ -244,6 +282,10 @@ export function updateTournament(id: string, input: UpdateTournamentInput): Tour
   if (input.max_participants !== undefined) {
     updates.push('max_participants = ?');
     params.push(input.max_participants);
+  }
+  if (ticketCost !== undefined) {
+    updates.push('ticket_cost = ?');
+    params.push(ticketCost);
   }
   if (input.starts_at !== undefined) {
     updates.push('starts_at = ?');

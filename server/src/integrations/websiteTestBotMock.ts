@@ -9,6 +9,10 @@ import crypto from 'crypto';
 
 export interface BotMockState {
   purchaseMode: 'ok' | 'insufficient' | 'pending' | 'received' | 'processing';
+  /** Amount the mock reports on a COMPLETED purchase; null omits the field. */
+  purchaseAmount: number | null;
+  /** Last parsed `/purchase` request body (asserts website->bot propagation). */
+  lastPurchaseBody: Record<string, any> | null;
   badAttestation: boolean;
   badResponseSignature: boolean;
   purchaseCalls: number;
@@ -49,6 +53,8 @@ function jsonResponse(status: number, body: unknown, secret: string, badSignatur
 export function installBotMock(secret: string): BotMockState {
   const state: BotMockState = {
     purchaseMode: 'ok',
+    purchaseAmount: 30,
+    lastPurchaseBody: null,
     badAttestation: false,
     badResponseSignature: false,
     purchaseCalls: 0,
@@ -171,6 +177,7 @@ export function installBotMock(secret: string): BotMockState {
       };
     } else if (pathname.endsWith('/purchase')) {
       state.purchaseCalls += 1;
+      state.lastPurchaseBody = body;
       if (state.purchaseMode === 'insufficient') {
         response = { request_id: body.request_id, status: 'FAILED', error: 'insufficient_balance' };
       } else if (state.purchaseMode === 'pending') {
@@ -191,7 +198,7 @@ export function installBotMock(secret: string): BotMockState {
           tx_id: txId,
           product_id: 1,
           product_name: 'Test Ticket',
-          amount: 30,
+          ...(state.purchaseAmount !== null ? { amount: state.purchaseAmount } : {}),
           balance_before: 100,
           balance_after: 70,
           ticket_event_id: `evt_${txId}`,

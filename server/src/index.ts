@@ -22,6 +22,7 @@ import { adminTournamentsRoutes } from './routes/adminTournamentsRoutes';
 import { gamesRoutes } from './routes/gamesRoutes';
 import { botRoutes } from './routes/botRoutes';
 import { websiteIntegrationRoutes } from './integrations/websiteIntegrationRoutes';
+import { websiteTournamentRoutes } from './integrations/websiteTournamentRoutes';
 import { recoverPurchaseIntents } from './integrations/purchaseService';
 import { tournamentCompetitiveRoutes } from './routes/tournamentCompetitiveRoutes';
 import { adminTournamentCompetitiveRoutes } from './routes/adminTournamentCompetitiveRoutes';
@@ -172,6 +173,10 @@ app.use('/api/uploads', express.static(uploadsRootDir(), {
 
 // Phase 3 — Bot Webhook Endpoint
 app.use('/api/v1/bot', botRoutes);
+
+// R4.1 — bot-authenticated, read-only website tournament discovery. Mounted
+// before the generic integration router so its `/website/*` paths resolve here.
+app.use('/api/integrations/website', websiteTournamentRoutes);
 
 // Phase 7 — authenticated website integration (linking + ticket purchase).
 app.use('/api/integrations', websiteIntegrationRoutes);

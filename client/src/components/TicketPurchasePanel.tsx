@@ -362,9 +362,13 @@ export function TicketPurchasePanel({
                 </div>
                 <h3 className="ticket-card-title">{t.name_ar}</h3>
                 <p className="ticket-card-game">🎮 {t.game_name_ar || gameName || gameId}</p>
-                <p className="ticket-card-price">
-                  💳 يُخصم سعر التذكرة من رصيد ولاء Streamlabs عبر البوت الموثوق
-                </p>
+                {t.ticket_cost ? (
+                  <p className="ticket-card-price">🎟️ تكلفة التذكرة: {formatPoints(t.ticket_cost)} نقطة</p>
+                ) : (
+                  <p className="ticket-card-price">
+                    💳 يُخصم سعر التذكرة من رصيد ولاء Streamlabs عبر البوت الموثوق
+                  </p>
+                )}
                 <div className="ticket-card-actions">
                   <button
                     className="btn-neon ticket-buy-btn"
@@ -421,7 +425,11 @@ export function TicketPurchasePanel({
                   </div>
                   <div>
                     <dt>التكلفة</dt>
-                    <dd>يُخصم سعر التذكرة من رصيد ولاء Streamlabs عبر البوت الموثوق</dd>
+                    <dd>
+                      {selected.ticket_cost
+                        ? `${formatPoints(selected.ticket_cost)} نقطة ولاء`
+                        : 'يُخصم سعر التذكرة من رصيد ولاء Streamlabs عبر البوت الموثوق'}
+                    </dd>
                   </div>
                 </dl>
                 <p className="ticket-modal-note">

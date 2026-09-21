@@ -30,6 +30,8 @@ export interface TournamentSummary {
   imageUrl: string | null;
   status: string;
   maxParticipants: number | null;
+  /** Optional configured Loyalty ticket price; null = legacy/default bot pricing. */
+  ticketCost: number | null;
   startsAt: number | null;
   endsAt: number | null;
   participantCount: number;
