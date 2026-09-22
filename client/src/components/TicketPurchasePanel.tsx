@@ -53,7 +53,7 @@ function mapPurchaseError(status: number, code: string): string {
     case 'already_registered':
       return 'أنت مسجّل بالفعل في هذه البطولة.';
     case 'insufficient_balance':
-      return 'رصيد ولاء Streamlabs غير كافٍ لإتمام الشراء.';
+      return 'رصيدك (فلوس) غير كافٍ لإتمام الشراء.';
     case 'invalid_request':
       return 'طلب غير صالح — أعد المحاولة.';
     case 'intent_creation_failed':
@@ -366,7 +366,7 @@ export function TicketPurchasePanel({
                   <p className="ticket-card-price">🎟️ تكلفة التذكرة: {formatPoints(t.ticket_cost)} نقطة</p>
                 ) : (
                   <p className="ticket-card-price">
-                    💳 يُخصم سعر التذكرة من رصيد ولاء Streamlabs عبر البوت الموثوق
+                    💳 تُحدَّد قيمة التذكرة عند الشراء وتُخصم من رصيدك (فلوس)
                   </p>
                 )}
                 <div className="ticket-card-actions">
@@ -427,14 +427,15 @@ export function TicketPurchasePanel({
                     <dt>التكلفة</dt>
                     <dd>
                       {selected.ticket_cost
-                        ? `${formatPoints(selected.ticket_cost)} نقطة ولاء`
-                        : 'يُخصم سعر التذكرة من رصيد ولاء Streamlabs عبر البوت الموثوق'}
+                        ? `${formatPoints(selected.ticket_cost)} نقطة (فلوس)`
+                        : 'تُحدَّد قيمة التذكرة عند الشراء وتُخصم من رصيدك (فلوس)'}
                     </dd>
                   </div>
                 </dl>
                 <p className="ticket-modal-note">
-                  عند التأكيد سيُخصم سعر التذكرة من رصيد ولاء Streamlabs الخاص بك، وسيتم
-                  تسجيلك مباشرةً في البطولة عند نجاح العملية.
+                  {selected.ticket_cost
+                    ? `سيتم خصم ${formatPoints(selected.ticket_cost)} نقطة (فلوس) من رصيدك لإتمام شراء تذكرة البطولة، وسيتم تسجيلك مباشرةً في البطولة عند نجاح العملية.`
+                    : 'سيتم خصم قيمة التذكرة من رصيدك (فلوس) لإتمام الشراء، وسيتم تسجيلك مباشرةً في البطولة عند نجاح العملية.'}
                 </p>
               </>
             )}
@@ -454,7 +455,7 @@ export function TicketPurchasePanel({
                 </p>
                 {result?.amount !== null && result?.amount !== undefined && (
                   <p className="ticket-modal-meta">
-                    المبلغ المخصوم: {formatPoints(result.amount)} نقطة ولاء
+                    المبلغ المخصوم: {formatPoints(result.amount)} نقطة (فلوس)
                     {result.balance_after !== null && result.balance_after !== undefined
                       ? ` · الرصيد المتبقي: ${formatPoints(result.balance_after)}`
                       : ''}
