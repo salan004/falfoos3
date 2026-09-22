@@ -115,6 +115,19 @@ function validateTournamentName(nameAr: string): void {
   }
 }
 
+/**
+ * R2 — logical tournament name for uniqueness/rename comparisons. Legacy rows
+ * may carry leading/trailing whitespace while the admin UI submits the trimmed
+ * value, so raw inequality would falsely report a rename. Stored values are
+ * never mutated by this helper.
+ */
+function normalizeTournamentName(nameAr: string): string {
+  return nameAr.trim();
+}
+
+/** Characters stripped from both ends when matching a logical name (no user input). */
+const TOURNAMENT_NAME_TRIM_CHARS = "char(32) || char(9) || char(10) || char(13)";
+
 function validateGameExists(gameId: string): void {
   const db = getDb();
   const game = db.prepare('SELECT id FROM games WHERE id = ? AND is_active = 1').get(gameId);
@@ -251,6 +264,16 @@ export function createTournament(input: CreateTournamentInput, createdBy: string
   validateTournamentName(input.name_ar);
   validateGameExists(input.game_id);
 
+  // R2 — reject a duplicate LOGICAL tournament name (whitespace-normalized),
+  // matching the update rule and the games convention. Legacy padded rows are
+  // matched too, so a trimmed duplicate can never be introduced.
+  const duplicateName = db
+    .prepare(`SELECT id FROM tournaments WHERE TRIM(name_ar, ${TOURNAMENT_NAME_TRIM_CHARS}) = ?`)
+    .get(normalizeTournamentName(input.name_ar));
+  if (duplicateName) {
+    throw new Error(`Tournament name '${input.name_ar}' already exists`);
+  }
+
   const status = input.status ?? 'draft';
   if (status !== 'draft' && status !== 'open') {
     throw new Error('Initial status must be draft or open');
@@ -297,9 +320,20 @@ export function updateTournament(id: string, input: UpdateTournamentInput): Tour
 
   if (input.name_ar !== undefined) {
     validateTournamentName(input.name_ar);
-    const dup = db.prepare('SELECT id FROM tournaments WHERE name_ar = ? AND id != ?').get(input.name_ar, id);
-    if (dup) {
-      throw new Error(`Tournament name '${input.name_ar}' already exists`);
+    // R2 — only enforce uniqueness when the LOGICAL name changes. A legacy
+    // stored name with leading/trailing whitespace is not a rename when the
+    // admin submits the trimmed equivalent. Renaming to a name owned by another
+    // tournament is still rejected (normalized lookup).
+    const normalizedInput = normalizeTournamentName(input.name_ar);
+    if (normalizedInput !== normalizeTournamentName(existing.name_ar)) {
+      const dup = db
+        .prepare(
+          `SELECT id FROM tournaments WHERE TRIM(name_ar, ${TOURNAMENT_NAME_TRIM_CHARS}) = ? AND id != ?`
+        )
+        .get(normalizedInput, id);
+      if (dup) {
+        throw new Error(`Tournament name '${input.name_ar}' already exists`);
+      }
     }
   }
 

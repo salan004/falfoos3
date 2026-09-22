@@ -72,6 +72,23 @@ function validateNameAr(nameAr: string): void {
 }
 
 /**
+ * R2 — logical name used for uniqueness/rename comparisons. Legacy rows may
+ * carry leading/trailing whitespace (e.g. "روكت ليق "), while the admin UI
+ * submits the trimmed value, so raw string inequality would falsely report a
+ * rename. Comparison is whitespace-normalized; stored values are never mutated
+ * by this helper.
+ */
+function normalizeNameAr(nameAr: string): string {
+  return nameAr.trim();
+}
+
+/**
+ * SQL fragment listing the characters stripped from both ends when matching a
+ * logical name: space, tab, LF, CR. Kept as a constant (no user input).
+ */
+const NAME_TRIM_CHARS = "char(32) || char(9) || char(10) || char(13)";
+
+/**
  * Phase F1 — derive an ASCII slug base from a game name. Arabic names yield an
  * empty base, so callers fall back to the generic `game` base and rely on the
  * uniqueness loop below. The result always satisfies `validateSlug`.
@@ -127,8 +144,12 @@ export function createGame(input: CreateGameInput): GameRow {
   validateNameAr(input.name_ar);
 
   // R2 — Arabic name uniqueness is enforced on creation too, matching the
-  // update rule, so new duplicate game names can never be introduced.
-  const duplicateName = db.prepare('SELECT id FROM games WHERE name_ar = ?').get(input.name_ar);
+  // update rule, so new duplicate game names can never be introduced. The
+  // comparison is whitespace-normalized so a legacy padded row still blocks a
+  // logical duplicate.
+  const duplicateName = db
+    .prepare(`SELECT id FROM games WHERE TRIM(name_ar, ${NAME_TRIM_CHARS}) = ?`)
+    .get(normalizeNameAr(input.name_ar));
   if (duplicateName) {
     throw new Error(`Game Arabic name '${input.name_ar}' already exists`);
   }
@@ -172,12 +193,19 @@ export function updateGame(id: string, input: UpdateGameInput): GameRow {
 
   if (input.name_ar !== undefined) {
     validateNameAr(input.name_ar);
-    // R2 — only enforce Arabic-name uniqueness when the name actually changes.
-    // Saving an existing game with its current name (e.g. image/description/
-    // status/order edits) must never fail because a legacy duplicate row shares
-    // that name. Renaming to a name owned by another game is still rejected.
-    if (input.name_ar !== existing.name_ar) {
-      const dup = db.prepare('SELECT id FROM games WHERE name_ar = ? AND id != ?').get(input.name_ar, id);
+    // R2 — only enforce Arabic-name uniqueness when the LOGICAL name changes.
+    // Comparison is whitespace-normalized: a legacy stored name with
+    // leading/trailing whitespace (e.g. "روكت ليق ") must not be treated as a
+    // rename when the admin submits the trimmed equivalent ("روكت ليق").
+    // Renaming to a name owned by another game is still rejected, and the
+    // lookup is normalized so a padded legacy row still blocks the rename.
+    const normalizedInput = normalizeNameAr(input.name_ar);
+    if (normalizedInput !== normalizeNameAr(existing.name_ar)) {
+      const dup = db
+        .prepare(
+          `SELECT id FROM games WHERE TRIM(name_ar, ${NAME_TRIM_CHARS}) = ? AND id != ?`
+        )
+        .get(normalizedInput, id);
       if (dup) {
         throw new Error(`Game Arabic name '${input.name_ar}' already exists`);
       }
