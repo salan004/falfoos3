@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { apiFetch, resolveImageUrl } from '../utils/api';
 import { useAuthSession } from '../hooks/useAuthSession';
-import { useHashRoute } from '../hooks/useHashRoute';
+import { useRoute } from '../hooks/useRoute';
 import { AdminGate } from '../components/AdminGate';
 import { AdminAccessDenied } from '../components/admin/AdminAccessDenied';
 import { ImageUploadField } from '../components/admin/ImageUploadField';
@@ -25,7 +25,7 @@ const EMPTY_FORM: GameFormData = {
 
 export function AdminGamesPage() {
   const { user, isLoading } = useAuthSession();
-  const { navigate } = useHashRoute();
+  const { navigate } = useRoute();
   const [games, setGames] = useState<GameDirectoryEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);

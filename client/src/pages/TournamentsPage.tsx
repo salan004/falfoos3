@@ -1,13 +1,13 @@
 import { useEffect, useState } from 'react';
 import { apiFetch } from '../utils/api';
-import { useHashRoute } from '../hooks/useHashRoute';
+import { useRoute } from '../hooks/useRoute';
 import { useScrollReveal } from '../hooks/useScrollReveal';
 import { TournamentCard } from '../components/TournamentCard';
 import { TournamentEntry, TournamentWithGame } from '../types/game';
 import { ConnectionStatusPill } from '../components/ConnectionStatusPill';
 
 export function TournamentsPage() {
-  const { navigate } = useHashRoute();
+  const { navigate } = useRoute();
   const headerRef = useScrollReveal<HTMLDivElement>();
   const gridRef = useScrollReveal<HTMLDivElement>();
   const [tournaments, setTournaments] = useState<TournamentWithGame[]>([]);

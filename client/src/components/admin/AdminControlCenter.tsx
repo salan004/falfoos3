@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useHashRoute } from '../../hooks/useHashRoute';
+import { useRoute } from '../../hooks/useRoute';
 import { useAuthSession } from '../../hooks/useAuthSession';
 import { useHubTethers, type HubTetherConfig } from '../../hooks/useHubTethers';
 import { BrandLogo } from '../BrandLogo';
@@ -49,7 +49,7 @@ interface LockedBubble {
 }
 
 export function AdminControlCenter() {
-  const { navigate } = useHashRoute();
+  const { navigate } = useRoute();
   const { user, isLoading } = useAuthSession();
   useHubTethers(ADMIN_HUB_CONFIG);
 

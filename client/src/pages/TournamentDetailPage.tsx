@@ -1,9 +1,11 @@
 import { useCallback, useState } from 'react';
-import { useHashRoute } from '../hooks/useHashRoute';
+import { useRoute } from '../hooks/useRoute';
 import { resolveImageUrl } from '../utils/api';
 import { useScrollReveal } from '../hooks/useScrollReveal';
 import { useAuthSession } from '../hooks/useAuthSession';
 import { useTournamentBracket } from '../hooks/useTournamentBracket';
+import { useSeo } from '../seo/useSeo';
+import { breadcrumbList, DEFAULT_DESCRIPTION } from '../seo/seo';
 import { BracketView, type BracketPlayerMeta } from '../components/BracketView';
 import { ArenaAtmosphere } from '../components/ArenaAtmosphere';
 import { CompetitiveParticipantCard } from '../components/CompetitiveParticipantCard';
@@ -59,7 +61,7 @@ const MATCH_STATUS_BADGE: Record<string, string> = {
 };
 
 export function TournamentDetailPage({ tournamentId }: TournamentDetailPageProps) {
-  const { navigate } = useHashRoute();
+  const { navigate } = useRoute();
   const headerRef = useScrollReveal<HTMLDivElement>();
   const { user } = useAuthSession();
   const isAdmin = user?.role === 'admin';
@@ -85,6 +87,33 @@ export function TournamentDetailPage({ tournamentId }: TournamentDetailPageProps
   const [busy, setBusy] = useState(false);
   // F3 — a broken banner URL must never render a broken image.
   const [heroImageFailed, setHeroImageFailed] = useState(false);
+
+  // SEO — route metadata from public tournament data only (never admin state).
+  const tournamentPath = `/tournaments/${encodeURIComponent(tournamentId)}`;
+  useSeo(
+    summary
+      ? {
+          title: `${summary.nameAr} | FalFoos`,
+          description:
+            (summary.descriptionAr && summary.descriptionAr.trim()) ||
+            `بطولة ${summary.nameAr} — ${summary.gameNameAr} على منصة فلفوس.`,
+          path: tournamentPath,
+          image: summary.imageUrl ? resolveImageUrl(summary.imageUrl) : undefined,
+          type: 'article',
+          jsonLd: [
+            breadcrumbList([
+              { name: 'FalFoos', path: '/' },
+              { name: summary.gameNameAr, path: `/stream-games/${encodeURIComponent(summary.gameId)}` },
+              { name: summary.nameAr, path: tournamentPath },
+            ]),
+          ],
+        }
+      : {
+          title: 'بطولة | FalFoos',
+          description: DEFAULT_DESCRIPTION,
+          path: tournamentPath,
+        }
+  );
 
   const runAdminAction = useCallback(
     async (action: () => Promise<{ ok: boolean; error: string | null }>) => {
@@ -309,7 +338,7 @@ export function TournamentDetailPage({ tournamentId }: TournamentDetailPageProps
               className="btn-neon tournament-broadcast-btn"
               title="افتح نسخة البث الشفافة (مناسبة لـ OBS)"
               onClick={() => {
-                const url = `${window.location.origin}${window.location.pathname}#/broadcast/${encodeURIComponent(tournamentId)}`;
+                const url = `${window.location.origin}/broadcast/${encodeURIComponent(tournamentId)}`;
                 window.open(url, '_blank', 'noopener');
               }}
             >

@@ -1,0 +1,10 @@
+User-agent: *
+Allow: /
+
+# Private / administrative surfaces (also marked noindex in the app).
+Disallow: /dashboard
+
+# The website origin does not serve the API; keep it out of the crawl budget.
+Disallow: /api/
+
+Sitemap: https://falfoos.vercel.app/sitemap.xml

@@ -6,14 +6,14 @@ import { Leaderboard } from './Leaderboard';
 import { AdminControls } from './AdminControls';
 import { AdminGate } from './AdminGate';
 import { useGameState } from '../hooks/useGameState';
-import { useHashRoute } from '../hooks/useHashRoute';
+import { useRoute } from '../hooks/useRoute';
 
 interface DashboardProps {
   game: ReturnType<typeof useGameState>;
 }
 
 export function Dashboard({ game }: DashboardProps) {
-  const { navigate } = useHashRoute();
+  const { navigate } = useRoute();
 
   return (
     <div className="dash-shell">

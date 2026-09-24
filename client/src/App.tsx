@@ -25,8 +25,9 @@ import { BroadcastBracketPage } from './pages/BroadcastBracketPage';
 import { TriviaQuestionsPage } from './pages/TriviaQuestionsPage';
 import { GAMES_CATALOG, PHASE_LABELS_AR, resolveGameName } from './data/gamesCatalog';
 import { useGameState } from './hooks/useGameState';
-import { useHashRoute, matchGameRoute, matchProfileRoute, matchTournamentRoute, matchGameTournamentsRoute, matchAdminGamesRoute, matchAdminTournamentsRoute, matchAdminLiveRoute, matchStreamGamesRoute, matchPlayerRoute, matchRegisterRoute, matchBroadcastRoute } from './hooks/useHashRoute';
+import { useRoute, matchGameRoute, matchProfileRoute, matchTournamentRoute, matchGameTournamentsRoute, matchAdminGamesRoute, matchAdminTournamentsRoute, matchAdminLiveRoute, matchStreamGamesRoute, matchPlayerRoute, matchRegisterRoute, matchBroadcastRoute } from './hooks/useRoute';
 import { useGameSounds } from './hooks/useGameSounds';
+import { RouteSeo } from './seo/RouteSeo';
 
 // Phase 12F — the /connect route was consolidated into the Games page
 // (#/games → «بث يوتيوب المباشر» section). The YouTube connection logic,
@@ -164,7 +165,7 @@ function GamePage({ gameId, game }: { gameId: string; game: ReturnType<typeof us
 }
 
 function MainApp() {
-  const { path } = useHashRoute();
+  const { path } = useRoute();
   const game = useGameState();
   useGameSounds();
 
@@ -188,6 +189,7 @@ const gameRoute = matchGameRoute(path);
     <div dir="rtl" style={{ position: 'relative', minHeight: '100vh' }}>
       <PageHeader youtubeStatus={game.youtubeStatus} />
       <PageTransition />
+      <RouteSeo path={path} />
       {path === '/' && <HomePage />}
       {path === '/games' && <GamesPage game={game} />}
       {path === '/stream-games' && <StreamGamesPage />}
@@ -241,7 +243,7 @@ const gameRoute = matchGameRoute(path);
  * sockets). Every other route renders the normal app unchanged.
  */
 export default function App() {
-  const { path } = useHashRoute();
+  const { path } = useRoute();
   const broadcastRoute = matchBroadcastRoute(path);
   if (broadcastRoute) {
     return (

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { apiFetch, resolveImageUrl } from '../utils/api';
-import { useHashRoute } from '../hooks/useHashRoute';
+import { useRoute } from '../hooks/useRoute';
 import { useScrollReveal } from '../hooks/useScrollReveal';
 import { useAuthSession } from '../hooks/useAuthSession';
 import { onCompetitiveEvent, getSocket } from '../utils/socket';
@@ -13,6 +13,7 @@ import { CompetitiveRankings } from '../components/CompetitiveRankings';
 import { GameDirectoryEntry, TournamentWithGame } from '../types/game';
 import type { GameLeaderboardEntry } from '../types/competitive';
 import { fetchGameLeaderboard, createTournament } from '../utils/competitiveApi';
+import { useSeo } from '../seo/useSeo';
 
 interface GameHubPageProps {
   gameId: string;
@@ -29,7 +30,7 @@ const HUB_TABS: { id: HubTab; label: string }[] = [
 ];
 
 export function GameHubPage({ gameId }: GameHubPageProps) {
-  const { navigate } = useHashRoute();
+  const { path: routePath, navigate } = useRoute();
   const { user } = useAuthSession();
   const isAdmin = user?.role === 'admin';
   const headerRef = useScrollReveal<HTMLDivElement>();
@@ -43,6 +44,17 @@ export function GameHubPage({ gameId }: GameHubPageProps) {
   const [players, setPlayers] = useState<GameLeaderboardEntry[]>([]);
   const [competitiveLoading, setCompetitiveLoading] = useState(true);
   const [competitiveError, setCompetitiveError] = useState<string | null>(null);
+
+  // SEO — public game metadata (canonical follows the actual route path).
+  useSeo({
+    title: game ? `${game.name_ar} | FalFoos` : 'ألعاب البث | FalFoos',
+    description:
+      (game?.description_ar && game.description_ar.trim()) ||
+      'بطولات ومسابقات ألعاب فلفوس مع بث يوتيوب تفاعلي.',
+    path: routePath.split('?')[0],
+    image: game?.image_url ? resolveImageUrl(game.image_url) : undefined,
+    type: 'article',
+  });
 
   const loadTournaments = useCallback(async (silent = false) => {
     if (!silent) {

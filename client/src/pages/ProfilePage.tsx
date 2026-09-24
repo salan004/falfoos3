@@ -3,6 +3,8 @@ import { usePlayerProfile } from '../hooks/usePlayerProfile';
 import { usePlayerCompetitive } from '../hooks/usePlayerCompetitive';
 import { PlayerAvatar } from '../components/PlayerAvatar';
 import { AccountLinkPanel } from '../components/AccountLinkPanel';
+import { Link } from '../components/Link';
+import { useSeo } from '../seo/useSeo';
 import { RankBadge } from '../components/RankBadge';
 import { RankProgress } from '../components/RankProgress';
 import { ACHIEVEMENTS_CATALOG } from '../data/achievementsCatalog';
@@ -113,6 +115,25 @@ export function ProfilePage({ playerId }: { playerId?: string }) {
   // playerId, so a per-player remount resets this (no cross-player leakage).
   const [heroBgFailed, setHeroBgFailed] = useState(false);
 
+  // SEO — public player metadata only; the signed-in owner's `/profile` is noindex.
+  const seoPlayer = profile?.player;
+  useSeo(
+    isPublic && seoPlayer
+      ? {
+          title: `${seoPlayer.displayName} | FalFoos`,
+          description: `الملف التنافسي للاعب ${seoPlayer.displayName} على منصة فلفوس.`,
+          path: `/profile/${encodeURIComponent(playerId ?? '')}`,
+          image: isSafeAvatarUrl(seoPlayer.avatarUrl) ? seoPlayer.avatarUrl : undefined,
+          type: 'profile',
+        }
+      : {
+          title: 'ملفي الشخصي | FalFoos',
+          description: 'ملفك وهوية لاعبك على منصة فلفوس.',
+          path: '/profile',
+          robots: 'noindex,nofollow',
+        }
+  );
+
   if (status === 'loading') {
     return (
       <main className="page-fade">
@@ -146,9 +167,9 @@ export function ProfilePage({ playerId }: { playerId?: string }) {
               exactly the account-linking target; keep the CTA reachable here. */}
           {!isPublic && <AccountLinkPanel onLinked={() => setLinkVersion((v) => v + 1)} />}
           {!isPublic && (
-            <a className="nav-link profile-register-link" href="#/register">
+            <Link className="nav-link profile-register-link" to="/register">
               صفحة تسجيل الهوية ←
-            </a>
+            </Link>
           )}
           <div className="panel text-center" style={{ padding: '40px 20px' }}>
             <h2 className="page-title" style={{ fontSize: '1.4rem' }}>
@@ -233,9 +254,9 @@ export function ProfilePage({ playerId }: { playerId?: string }) {
         {/* ---------- Account <-> Player linking (own profile only) ---------- */}
         {!isPublic && <AccountLinkPanel onLinked={() => setLinkVersion((v) => v + 1)} />}
         {!isPublic && (
-          <a className="nav-link profile-register-link" href="#/register">
+          <Link className="nav-link profile-register-link" to="/register">
             صفحة تسجيل الهوية ←
-          </a>
+          </Link>
         )}
 
         {/* ---------- Competitive stat trio (global) ---------- */}

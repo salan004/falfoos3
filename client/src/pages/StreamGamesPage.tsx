@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { apiFetch, resolveImageUrl } from '../utils/api';
-import { useHashRoute } from '../hooks/useHashRoute';
+import { useRoute } from '../hooks/useRoute';
 import { useScrollReveal } from '../hooks/useScrollReveal';
 import { useAuthSession } from '../hooks/useAuthSession';
 import { ArenaAtmosphere } from '../components/ArenaAtmosphere';
@@ -24,7 +24,7 @@ import { GameDirectoryEntry } from '../types/game';
 const PLACEHOLDER_COUNT = 6;
 
 export function StreamGamesPage() {
-  const { navigate } = useHashRoute();
+  const { navigate } = useRoute();
   const { user } = useAuthSession();
   const isAdmin = user?.role === 'admin';
   const gridRef = useScrollReveal<HTMLDivElement>();

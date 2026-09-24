@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { useHashRoute } from '../hooks/useHashRoute';
+import { useRoute } from '../hooks/useRoute';
 import { BrandLogo } from '../components/BrandLogo';
 import { useHubTethers } from '../hooks/useHubTethers';
 
@@ -29,7 +29,7 @@ const HUB_POSITIONS = [
 type DevBubble = { x: number; y: number; variant: 'below' | 'above' };
 
 export function HomePage() {
-  const { navigate } = useHashRoute();
+  const { navigate } = useRoute();
   useHubTethers();
   const [aboutOpen, setAboutOpen] = useState(false);
   const [devBubble, setDevBubble] = useState<DevBubble | null>(null);

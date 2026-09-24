@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useTournamentBracket } from '../hooks/useTournamentBracket';
+import { useSeo } from '../seo/useSeo';
 import { BracketView, type BracketPlayerMeta } from '../components/BracketView';
 import { PlayerAvatar } from '../components/PlayerAvatar';
 import type { MatchDto } from '../types/competitive';
@@ -86,6 +87,14 @@ export function BroadcastBracketPage({ tournamentId }: BroadcastBracketPageProps
   const { summary, bracket, playerMeta, roundNames, championPlayerId, loading, error, reload } =
     useTournamentBracket(tournamentId);
   const [selected, setSelected] = useState<MatchDto | null>(null);
+
+  // SEO — stream overlay is presentation-only and must never be indexed.
+  useSeo({
+    title: summary ? `بث ${summary.nameAr} | FalFoos` : 'براكيت البث | FalFoos',
+    description: 'نسخة بث شفافة من جدول بطولة فلفوس (للمشاهدة فقط).',
+    path: `/broadcast/${encodeURIComponent(tournamentId)}`,
+    robots: 'noindex,nofollow',
+  });
 
   // Transparent overlay mode for the lifetime of this route.
   useEffect(() => {

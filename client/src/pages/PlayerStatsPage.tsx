@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { apiFetch } from '../utils/api';
-import { useHashRoute } from '../hooks/useHashRoute';
+import { useRoute } from '../hooks/useRoute';
+import { useSeo } from '../seo/useSeo';
 import { useScrollReveal } from '../hooks/useScrollReveal';
 import { ArenaAtmosphere } from '../components/ArenaAtmosphere';
 import { PlayerAvatar } from '../components/PlayerAvatar';
@@ -59,7 +60,7 @@ const PARTICIPANT_STATUS_LABELS: Record<string, string> = {
 };
 
 export function PlayerStatsPage({ playerId, tournamentId, gameId }: PlayerStatsPageProps) {
-  const { navigate } = useHashRoute();
+  const { path: routePath, navigate } = useRoute();
   const headerRef = useScrollReveal<HTMLDivElement>();
 
   const [loading, setLoading] = useState(true);
@@ -75,6 +76,17 @@ export function PlayerStatsPage({ playerId, tournamentId, gameId }: PlayerStatsP
   const [tournamentSummary, setTournamentSummary] = useState<TournamentSummary | null>(null);
   const [tournamentState, setTournamentState] = useState<PlayerTournamentState | null>(null);
   const [rosterEntry, setRosterEntry] = useState<CompetitiveRosterEntry | null>(null);
+
+  // SEO — public player statistics metadata.
+  useSeo({
+    title: identity ? `${identity.displayName} | FalFoos` : 'بطاقة لاعب | FalFoos',
+    description: identity
+      ? `الملف التنافسي للاعب ${identity.displayName} على منصة فلفوس.`
+      : 'بطاقة اللاعب التنافسية على منصة فلفوس.',
+    path: routePath.split('?')[0],
+    image: identity?.avatarUrl ?? undefined,
+    type: 'profile',
+  });
 
   const load = useCallback(async () => {
     setLoading(true);

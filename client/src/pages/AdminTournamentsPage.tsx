@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { apiFetch, resolveImageUrl } from '../utils/api';
 import { useAuthSession } from '../hooks/useAuthSession';
-import { useHashRoute } from '../hooks/useHashRoute';
+import { useRoute } from '../hooks/useRoute';
 import { AdminGate } from '../components/AdminGate';
 import { AdminAccessDenied } from '../components/admin/AdminAccessDenied';
 import { ImageUploadField } from '../components/admin/ImageUploadField';
@@ -82,7 +82,7 @@ interface AdminTournamentsPageProps {
 
 export function AdminTournamentsPage({ gameId }: AdminTournamentsPageProps) {
   const { user, isLoading } = useAuthSession();
-  const { navigate } = useHashRoute();
+  const { navigate } = useRoute();
   const [tournaments, setTournaments] = useState<TournamentWithGame[]>([]);
   const [games, setGames] = useState<{ id: string; name_ar: string }[]>([]);
   const [loading, setLoading] = useState(true);

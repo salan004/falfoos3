@@ -1,24 +1,59 @@
 import { useCallback, useEffect, useState } from 'react';
 
-function readPath(): string {
-  const raw = window.location.hash.replace(/^#/, '');
-  const path = raw.startsWith('/') ? raw : '/' + raw;
+/**
+ * SEO Fix 1 — History API (path-based) router.
+ *
+ * Replaces the legacy hash router. `path` is `pathname + search`
+ * (e.g. `/player/abc?gameId=x`) — the same string shape the previous hash
+ * router produced, so every `match*` helper below keeps working unchanged.
+ *
+ * Legacy `#/...` URLs are migrated once on load with `history.replaceState`
+ * (no extra history entry, no redirect loop), preserving the path and query.
+ */
+
+function normalize(rawPath: string): string {
+  const path = rawPath.startsWith('/') ? rawPath : '/' + rawPath;
   return path === '/' ? '/' : path.replace(/\/+$/, '');
 }
 
-export function useHashRoute() {
-  const [path, setPath] = useState<string>(readPath);
+/**
+ * Converts a legacy hash value (`#/x?y`) to its path (`/x?y`).
+ * Returns null when there is no legacy hash route to migrate.
+ */
+export function legacyHashToPath(hash: string): string | null {
+  if (!hash || !hash.startsWith('#/')) return null;
+  const raw = hash.slice(1); // drop the leading '#'
+  return normalize(raw.startsWith('/') ? raw : '/' + raw);
+}
+
+function currentPath(): string {
+  return normalize(window.location.pathname + window.location.search);
+}
+
+/** One-time migration of a legacy `#/...` URL; returns the resolved path. */
+function resolveInitialPath(): string {
+  const migrated = legacyHashToPath(window.location.hash);
+  if (migrated) {
+    window.history.replaceState(null, '', migrated);
+    return migrated;
+  }
+  return currentPath();
+}
+
+export function useRoute() {
+  const [path, setPath] = useState<string>(() => resolveInitialPath());
 
   useEffect(() => {
-    const onChange = () => setPath(readPath());
-    window.addEventListener('hashchange', onChange);
-    return () => window.removeEventListener('hashchange', onChange);
+    const onPopState = () => setPath(currentPath());
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
   }, []);
 
   const navigate = useCallback((to: string) => {
-    const next = to.startsWith('/') ? to : '/' + to;
-    if (readPath() === next) return;
-    window.location.hash = '#' + next;
+    const next = normalize(to);
+    if (currentPath() === next) return;
+    window.history.pushState(null, '', next);
+    setPath(next);
   }, []);
 
   return { path, navigate };
@@ -30,7 +65,7 @@ export function matchGameRoute(path: string): { gameId: string } | null {
 }
 
 /**
- * Phase 12C — #/profile (own profile) and #/profile/:playerId (public,
+ * Phase 12C — `/profile` (own profile) and `/profile/:playerId` (public,
  * read-only). The optional segment is a guests.player_id: a bare UUID or
  * `user:<uuid>` (hence the colon in the allowed characters).
  */
@@ -41,9 +76,9 @@ export function matchProfileRoute(path: string): { playerId?: string } | null {
 
 /**
  * Phase 1D — dedicated competitive player statistics route.
- * `#/player/<playerId>` with optional `?tournamentId=<id>&gameId=<id>` context
+ * `/player/<playerId>` with optional `?tournamentId=<id>&gameId=<id>` context
  * so the page can prefer the tournament's game and show tournament-specific
- * statistics. The general profile stays at `#/profile/<playerId>`.
+ * statistics. The general profile stays at `/profile/<playerId>`.
  */
 export function matchPlayerRoute(
   path: string
@@ -99,14 +134,14 @@ export function matchAdminTournamentsRoute(path: string): { gameId?: string } | 
 
 export function matchStreamGamesRoute(path: string): { gameId: string } | null {
   // Accepts both catalog slugs (a-z_) and database game UUIDs (hex + hyphens),
-  // because Tournament Detail links to #/stream-games/<gameId> with the raw id.
+  // because Tournament Detail links to /stream-games/<gameId> with the raw id.
   const m = path.match(/^\/stream-games\/([A-Za-z0-9_-]+)$/);
   return m ? { gameId: m[1] } : null;
 }
 
 /**
  * Post-Phase 8 — dedicated FalFoos identity / registration experience
- * (`#/register`). Reuses the existing Phase 8 account-linking flow; this route
+ * (`/register`). Reuses the existing Phase 8 account-linking flow; this route
  * is presentation only and adds no new registration path.
  */
 export function matchRegisterRoute(path: string): boolean {
@@ -114,7 +149,7 @@ export function matchRegisterRoute(path: string): boolean {
 }
 
 /**
- * Broadcast Bracket (`#/broadcast/:tournamentId`) — a transparent, interactive
+ * Broadcast Bracket (`/broadcast/:tournamentId`) — a transparent, interactive
  * presentation of the SAME tournament bracket for stream overlays. The id is
  * resolved through the existing public tournament APIs (no new data source).
  */

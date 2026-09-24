@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useAuthSession } from '../hooks/useAuthSession';
-import { useHashRoute } from '../hooks/useHashRoute';
+import { useRoute } from '../hooks/useRoute';
 import { apiUrl } from '../utils/api';
 import { fetchAccountLinkStatus, type AccountLinkStatus } from '../utils/accountLinkApi';
 import {
@@ -86,7 +86,7 @@ export function TicketPurchasePanel({
   error,
   onRefresh,
 }: TicketPurchasePanelProps) {
-  const { navigate } = useHashRoute();
+  const { navigate } = useRoute();
   const { user, isLoading: sessionLoading } = useAuthSession();
 
   const [linkPhase, setLinkPhase] = useState<'loading' | 'ready' | 'error'>('loading');

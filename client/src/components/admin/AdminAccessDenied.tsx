@@ -1,4 +1,4 @@
-import { useHashRoute } from '../../hooks/useHashRoute';
+import { useRoute } from '../../hooks/useRoute';
 
 /**
  * Phase F1 — defined access-denied state for Admin routes.
@@ -7,7 +7,7 @@ import { useHashRoute } from '../../hooks/useHashRoute';
  * on-brand message. Authentication/authorization itself is unchanged.
  */
 export function AdminAccessDenied() {
-  const { navigate } = useHashRoute();
+  const { navigate } = useRoute();
 
   return (
     <main className="page" style={{ maxWidth: 560 }}>

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { useHashRoute } from '../hooks/useHashRoute';
+import { useRoute } from '../hooks/useRoute';
 import { BrandLogo } from './BrandLogo';
 
 /**
@@ -32,7 +32,7 @@ const REDUCED_EXIT_MS = 150;
 type Phase = 'idle' | 'active' | 'leaving';
 
 export function PageTransition() {
-  const { path } = useHashRoute();
+  const { path } = useRoute();
   const [phase, setPhase] = useState<Phase>('idle');
   const [direction, setDirection] = useState<Direction | null>(null);
   const firstRender = useRef(true);

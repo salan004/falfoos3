@@ -15,6 +15,7 @@ import { countIncompleteMatches } from './db/history';
 import { getGlobalLeaderboard } from './db/stats';
 import { authRoutes } from './routes/authRoutes';
 import { guestRoutes } from './routes/guestRoutes';
+import { seoRoutes } from './routes/seoRoutes';
 import { playerRoutes } from './routes/playerRoutes';
 import { adminTriviaRoutes } from './routes/adminTriviaRoutes';
 import { adminGamesRoutes } from './routes/adminGamesRoutes';
@@ -604,16 +605,26 @@ app.get('/api/leaderboard/all-time', (req, res) => {
 });
 
 // ---------------------------------------------------------------------------
+// SEO Fix 1 — API-origin robots + sitemap. Mounted before the SPA catch-all so
+// /robots.txt and /sitemap.xml never return the app shell.
+// ---------------------------------------------------------------------------
+app.use(seoRoutes);
+
+// ---------------------------------------------------------------------------
 // Phase 19 completion — single-origin production hosting.
 // When the client has been built (client/dist), serve it from this process so
 // browsers reach API + Socket.IO on the SAME origin. Dev (Vite :3000 proxy)
 // is unaffected: this directory does not exist unless the client was built.
+//
+// SEO Fix 1 — this is NOT the canonical website origin, so the served shell is
+// marked noindex; the canonical site lives at PRODUCTION_FRONTEND_URL.
 // ---------------------------------------------------------------------------
 const clientDist = path.resolve(__dirname, '..', '..', 'client', 'dist');
 if (fs.existsSync(path.join(clientDist, 'index.html'))) {
   app.use(express.static(clientDist));
   app.get('*', (req, res, next) => {
     if (req.path.startsWith('/api/') || req.path.startsWith('/socket.io/')) return next();
+    res.set('X-Robots-Tag', 'noindex, nofollow');
     res.sendFile(path.join(clientDist, 'index.html'));
   });
   console.log(`[Falfoos] Serving client from ${clientDist}`);

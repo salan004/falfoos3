@@ -1,7 +1,9 @@
 import { apiUrl } from '../utils/api';
 import { useAuthSession } from '../hooks/useAuthSession';
 import { useGuestIdentity } from '../hooks/useGuestIdentity';
+import { useRoute } from '../hooks/useRoute';
 import { PlayerAvatar } from './PlayerAvatar';
+import { Link } from './Link';
 
 /**
  * Phase 11C: optional Google sign-in widget in the main navigation.
@@ -18,6 +20,7 @@ import { PlayerAvatar } from './PlayerAvatar';
  */
 export function AuthWidget() {
   const { user, guestLinked, isLoading, logout } = useAuthSession();
+  const { navigate } = useRoute();
   useGuestIdentity();
 
   if (isLoading) return null;
@@ -36,16 +39,16 @@ export function AuthWidget() {
 
   return (
     <div className="auth-user" dir="ltr">
-      {/* Phase 12C — the chip opens the player's profile (#/profile). */}
-      <a className="auth-profile-link" href="#/profile" title="ملفي الشخصي">
+      {/* Phase 12C — the chip opens the player's profile (/profile). */}
+      <Link className="auth-profile-link" to="/profile" title="ملفي الشخصي">
         <PlayerAvatar id={user.id} name={user.displayName} avatarUrl={user.avatarUrl ?? undefined} size={30} />
         <span className="auth-name">{user.displayName}</span>
-      </a>
+      </Link>
       {!guestLinked && (
         <button
           className="nav-link"
           onClick={() => {
-            window.location.hash = '#/register';
+            navigate('/register');
           }}
           title="ربط حسابك بهوية لاعب FalFoos"
         >

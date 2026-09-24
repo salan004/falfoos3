@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { apiFetch } from '../utils/api';
-import { useHashRoute } from '../hooks/useHashRoute';
+import { useRoute } from '../hooks/useRoute';
 import { useScrollReveal } from '../hooks/useScrollReveal';
 import { TournamentCard } from '../components/TournamentCard';
 import { GameDirectoryEntry, TournamentWithGame } from '../types/game';
@@ -11,7 +11,7 @@ interface GameTournamentsPageProps {
 }
 
 export function GameTournamentsPage({ gameId }: GameTournamentsPageProps) {
-  const { navigate } = useHashRoute();
+  const { navigate } = useRoute();
   const headerRef = useScrollReveal<HTMLDivElement>();
   const gridRef = useScrollReveal<HTMLDivElement>();
   const [game, setGame] = useState<GameDirectoryEntry | null>(null);

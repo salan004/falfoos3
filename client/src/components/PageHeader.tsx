@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { matchGameTournamentsRoute, matchProfileRoute, matchStreamGamesRoute, useHashRoute } from '../hooks/useHashRoute';
+import { matchGameTournamentsRoute, matchProfileRoute, matchStreamGamesRoute, useRoute } from '../hooks/useRoute';
 import { useAuthSession } from '../hooks/useAuthSession';
 import { usePlayerProfile } from '../hooks/usePlayerProfile';
 import { apiFetch } from '../utils/api';
@@ -33,7 +33,7 @@ interface PageHeaderProps {
  * the side (YouTube connect icon, auth widget, admin-only dashboard icon).
  */
 export function PageHeader({ youtubeStatus }: PageHeaderProps) {
-  const { path, navigate } = useHashRoute();
+  const { path, navigate } = useRoute();
   const { user, isLoading } = useAuthSession();
   const isRoleAdmin = user?.role === 'admin';
   // Profile routes (#/profile/:playerId) must title the header with the VIEWED

@@ -3,11 +3,63 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>FalFoos</title>
+    <title>FalFoos — بطولات وألعاب الفلفوسيين</title>
+    <meta
+      name="description"
+      content="فلفوس منصة عربية للبطولات التنافسية والألعاب المباشرة: بطولات، تصنيفات، ملفات لاعبين، وبث يوتيوب تفاعلي."
+    />
+    <meta name="robots" content="index,follow" />
+    <meta name="theme-color" content="#0b0f14" />
+
+    <!-- Open Graph / Twitter defaults (per-route values are applied client-side). -->
+    <meta property="og:site_name" content="FalFoos" />
+    <meta property="og:title" content="FalFoos — بطولات وألعاب الفلفوسيين" />
+    <meta
+      property="og:description"
+      content="فلفوس منصة عربية للبطولات التنافسية والألعاب المباشرة: بطولات، تصنيفات، ملفات لاعبين، وبث يوتيوب تفاعلي."
+    />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://falfoos.vercel.app/" />
+    <meta property="og:image" content="https://falfoos.vercel.app/assets/images/branding/falfoos-logo.png" />
+    <meta property="og:locale" content="ar_AR" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="FalFoos — بطولات وألعاب الفلفوسيين" />
+    <meta
+      name="twitter:description"
+      content="فلفوس منصة عربية للبطولات التنافسية والألعاب المباشرة."
+    />
+    <meta name="twitter:image" content="https://falfoos.vercel.app/assets/images/branding/falfoos-logo.png" />
+
     <!-- Phase 12F: real brand favicon (resize-only derivatives of falfoos-logo.png) -->
+    <link rel="icon" href="/favicon.ico" sizes="any" />
     <link rel="icon" type="image/png" sizes="64x64" href="/assets/images/branding/favicon-64.png" />
     <link rel="icon" type="image/png" sizes="32x32" href="/assets/images/branding/favicon-32.png" />
     <link rel="apple-touch-icon" href="/assets/images/branding/apple-touch-icon.png" />
+
+    <!-- Global entity structured data (visible public identity only). -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "Organization",
+            "@id": "https://falfoos.vercel.app/#organization",
+            "name": "FalFoos",
+            "url": "https://falfoos.vercel.app/",
+            "logo": "https://falfoos.vercel.app/assets/images/branding/falfoos-logo.png"
+          },
+          {
+            "@type": "WebSite",
+            "@id": "https://falfoos.vercel.app/#website",
+            "url": "https://falfoos.vercel.app/",
+            "name": "FalFoos",
+            "inLanguage": "ar",
+            "publisher": { "@id": "https://falfoos.vercel.app/#organization" }
+          }
+        ]
+      }
+    </script>
+
     <!-- Esports UI typography: IBM Plex Sans Arabic (Tajawal fallback) -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />

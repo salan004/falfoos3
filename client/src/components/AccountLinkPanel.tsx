@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useAuthSession } from '../hooks/useAuthSession';
 import { apiUrl } from '../utils/api';
+import { Link } from './Link';
 import {
   fetchAccountLinkStatus,
   startAccountLink,
@@ -210,12 +211,12 @@ export function AccountLinkPanel({ onLinked }: AccountLinkPanelProps) {
             تم ربط الحساب بنجاح
           </span>
           <span className="acct-linked-inline-player">{linkedName}</span>
-          <a
+          <Link
             className="acct-linked-inline-action"
-            href={`#/profile/${encodeURIComponent(linkedPlayer.player_id)}`}
+            to={`/profile/${encodeURIComponent(linkedPlayer.player_id)}`}
           >
             عرض ملف اللاعب ←
-          </a>
+          </Link>
         </div>
       ) : (
         <div className="acct-link-body">

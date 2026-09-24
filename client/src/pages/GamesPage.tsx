@@ -1,4 +1,4 @@
-import { useHashRoute } from '../hooks/useHashRoute';
+import { useRoute } from '../hooks/useRoute';
 import { useScrollReveal } from '../hooks/useScrollReveal';
 import { GameCard } from '../components/GameCard';
 import { ConnectionStatusPill } from '../components/ConnectionStatusPill';
@@ -13,7 +13,7 @@ interface GamesPageProps {
 }
 
 export function GamesPage({ game }: GamesPageProps) {
-  const { navigate } = useHashRoute();
+  const { navigate } = useRoute();
   const headerRef = useScrollReveal<HTMLDivElement>();
   const gridRef = useScrollReveal<HTMLDivElement>();
 

@@ -1,6 +1,6 @@
 import { PlayerAvatar } from './PlayerAvatar';
 import { RankBadge } from './RankBadge';
-import { useHashRoute } from '../hooks/useHashRoute';
+import { useRoute } from '../hooks/useRoute';
 import type { GameLeaderboardEntry } from '../types/competitive';
 
 interface CompetitivePlayersProps {
@@ -12,7 +12,7 @@ interface CompetitivePlayersProps {
 
 /** 👥 اللاعبين — per-game competitive player cards. */
 export function CompetitivePlayers({ players, loading, error, gameId }: CompetitivePlayersProps) {
-  const { navigate } = useHashRoute();
+  const { navigate } = useRoute();
   if (loading) {
     return (
       <div className="panel text-center py-12 loading-pulse text-[var(--text-dim)]">

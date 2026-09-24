@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useGameState } from '../hooks/useGameState';
 import { useAuthSession } from '../hooks/useAuthSession';
-import { useHashRoute } from '../hooks/useHashRoute';
+import { useRoute } from '../hooks/useRoute';
 import { useAllTimeLeaderboard } from '../hooks/useAllTimeLeaderboard';
 import { PlayerAvatar } from '../components/PlayerAvatar';
 import { LeaderboardEntry } from '../types/game';
@@ -29,7 +29,7 @@ interface LeaderboardPageProps {
 
 export function LeaderboardPage({ game }: LeaderboardPageProps) {
   const { user } = useAuthSession();
-  const { navigate } = useHashRoute();
+  const { navigate } = useRoute();
   const [tab, setTab] = useState<LbTab>('session');
   const [gameFilter, setGameFilter] = useState<string | null>(null);
   const allTime = useAllTimeLeaderboard(tab === 'alltime', gameFilter);

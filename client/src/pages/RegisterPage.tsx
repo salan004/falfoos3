@@ -1,6 +1,6 @@
 import { AccountLinkPanel } from '../components/AccountLinkPanel';
 import { ArenaAtmosphere } from '../components/ArenaAtmosphere';
-import { useHashRoute } from '../hooks/useHashRoute';
+import { useRoute } from '../hooks/useRoute';
 
 /**
  * Post-Phase 8 — dedicated FalFoos identity / registration experience
@@ -17,7 +17,7 @@ import { useHashRoute } from '../hooks/useHashRoute';
  * user links an account to a player identity.
  */
 export function RegisterPage() {
-  const { navigate } = useHashRoute();
+  const { navigate } = useRoute();
 
   return (
     <main className="page-fade register-page">
