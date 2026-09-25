@@ -1,6 +1,6 @@
 {
   "rewrites": [
-    { "source": "/sitemap.xml", "destination": "https://api-falfoos.duckdns.org/sitemap.xml" },
+    { "source": "/sitemap.xml", "destination": "https://api.falfoos.com/sitemap.xml" },
     { "source": "/favicon.ico", "destination": "/assets/images/branding/favicon-64.png" },
     { "source": "/((?!api/|socket.io/|assets/)(?!.*\\.).*)", "destination": "/index.html" }
   ]

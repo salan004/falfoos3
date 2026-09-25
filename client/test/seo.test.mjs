@@ -148,9 +148,9 @@ await test('legacyHashToPath ignores non-route hashes', () => {
 
 // --- canonical + JSON-LD ------------------------------------------------------
 await test('canonicalUrl strips query/hash and trailing slashes', () => {
-  assert.equal(seo.canonicalUrl('/'), 'https://falfoos.vercel.app/');
-  assert.equal(seo.canonicalUrl('/tournaments/abc?x=1#y'), 'https://falfoos.vercel.app/tournaments/abc');
-  assert.equal(seo.canonicalUrl('/games/'), 'https://falfoos.vercel.app/games');
+  assert.equal(seo.canonicalUrl('/'), 'https://falfoos.com/');
+  assert.equal(seo.canonicalUrl('/tournaments/abc?x=1#y'), 'https://falfoos.com/tournaments/abc');
+  assert.equal(seo.canonicalUrl('/games/'), 'https://falfoos.com/games');
 });
 
 await test('breadcrumbList produces a valid BreadcrumbList', () => {
@@ -160,7 +160,7 @@ await test('breadcrumbList produces a valid BreadcrumbList', () => {
   ]);
   assert.equal(jsonLd['@type'], 'BreadcrumbList');
   assert.equal(jsonLd.itemListElement.length, 2);
-  assert.equal(jsonLd.itemListElement[1].item, 'https://falfoos.vercel.app/tournaments/abc');
+  assert.equal(jsonLd.itemListElement[1].item, 'https://falfoos.com/tournaments/abc');
 });
 
 // --- applySeo <head> writer ---------------------------------------------------
@@ -172,9 +172,9 @@ await test('applySeo writes title, description, canonical, OG and Twitter tags',
   assert.equal(get('description'), 'D');
   assert.equal(get('twitter:card'), 'summary_large_image');
   const canonical = head.find((el) => el.getAttribute('rel') === 'canonical');
-  assert.equal(canonical.getAttribute('href'), 'https://falfoos.vercel.app/tournaments/abc');
+  assert.equal(canonical.getAttribute('href'), 'https://falfoos.com/tournaments/abc');
   const ogUrl = head.find((el) => el.getAttribute('property') === 'og:url');
-  assert.equal(ogUrl.getAttribute('content'), 'https://falfoos.vercel.app/tournaments/abc');
+  assert.equal(ogUrl.getAttribute('content'), 'https://falfoos.com/tournaments/abc');
   const ogTitle = head.find((el) => el.getAttribute('property') === 'og:title');
   assert.equal(ogTitle.getAttribute('content'), 'T');
 });
@@ -207,7 +207,7 @@ await test('client/public/robots.txt exists with correct directives', () => {
   const content = fs.readFileSync(file, 'utf8');
   assert.ok(content.includes('User-agent: *'));
   assert.ok(content.includes('Disallow: /dashboard'));
-  assert.ok(content.includes('Sitemap: https://falfoos.vercel.app/sitemap.xml'));
+  assert.ok(content.includes('Sitemap: https://falfoos.com/sitemap.xml'));
 });
 
 await test('vercel.json defines the SPA fallback + sitemap rewrite without touching assets', () => {
@@ -219,7 +219,7 @@ await test('vercel.json defines the SPA fallback + sitemap rewrite without touch
   assert.ok(spa.source.includes('assets/'), 'assets excluded');
   assert.ok(spa.source.includes('api/'), 'api excluded');
   const sitemap = config.rewrites.find((r) => r.source === '/sitemap.xml');
-  assert.ok(sitemap && sitemap.destination.includes('api-falfoos.duckdns.org'), 'sitemap proxied to API');
+  assert.ok(sitemap && sitemap.destination.includes('api.falfoos.com'), 'sitemap proxied to API');
 });
 
 await vite.close();

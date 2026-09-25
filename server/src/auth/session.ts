@@ -39,7 +39,9 @@ function baseCookieOptions() {
 function sessionCookieOptions() {
   return {
     httpOnly: true,
-    sameSite: 'none' as const,
+    // Same-site architecture (falfoos.com + api.falfoos.com): Lax is sufficient
+    // and no longer relies on third-party cookies. Host-only (no `Domain`).
+    sameSite: 'lax' as const,
     secure: true,
     path: '/',
   };

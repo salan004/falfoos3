@@ -8,7 +8,7 @@
  * canonical URLs.
  */
 
-export const SITE_URL = 'https://falfoos.vercel.app';
+export const SITE_URL = 'https://falfoos.com';
 export const SITE_NAME = 'FalFoos';
 export const DEFAULT_TITLE = 'FalFoos — بطولات وألعاب الفلفوسيين';
 export const DEFAULT_DESCRIPTION =

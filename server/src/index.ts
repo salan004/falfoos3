@@ -124,9 +124,13 @@ process.on('uncaughtException', (err) => {
   process.exit(1);
 });
 
+// Migration window (Phase 3): the canonical frontend origin is falfoos.com;
+// falfoos.vercel.app is retained so the old host keeps working for rollback.
+const ALLOWED_FRONTEND_ORIGINS = ['https://falfoos.com', 'https://falfoos.vercel.app'];
+
 const app = express();
 app.use(cors({
-  origin: 'https://falfoos.vercel.app',
+  origin: ALLOWED_FRONTEND_ORIGINS,
   credentials: true,
 }));
 app.use(express.json({
@@ -184,7 +188,7 @@ app.use('/api/integrations', websiteIntegrationRoutes);
 
 const server = http.createServer(app);
 const io = new SocketIOServer(server, {
-  cors: { origin: 'https://falfoos.vercel.app', credentials: true, methods: ['GET', 'POST'] },
+  cors: { origin: ALLOWED_FRONTEND_ORIGINS, credentials: true, methods: ['GET', 'POST'] },
 });
 
 // Phase 4F — rebroadcast competitive domain events over Socket.IO. Services

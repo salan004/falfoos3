@@ -5,10 +5,8 @@ import {
   getGoogleConfig,
 } from '../auth/google';
 import {
-  COOKIE_NAME,
   clearOAuthFlowCookies,
   createSession,
-  readCookie,
   readOAuthFlow,
   resolveSession,
   revokeCurrentSession,
@@ -17,6 +15,7 @@ import {
 } from '../auth/session';
 import { checkClaim, startClaim } from '../auth/claiming';
 import { isAccountLinked } from '../auth/socketIdentity';
+import { PRODUCTION_FRONTEND_URL } from '../config/env';
 
 /**
  * Phase 11C — authentication routes. Fully additive: no existing route or
@@ -44,7 +43,7 @@ authRoutes.get('/google', (req, res) => {
 authRoutes.get('/google/callback', async (req, res) => {
   const cfg = getGoogleConfig();
   if (!cfg) {
-    res.status(503).redirect('https://falfoos.vercel.app/?authError=unconfigured');
+    res.status(503).redirect(`${PRODUCTION_FRONTEND_URL}/?authError=unconfigured`);
     return;
   }
 
@@ -55,7 +54,7 @@ authRoutes.get('/google/callback', async (req, res) => {
 
   if (!code || !state || !flow.state || !flow.codeVerifier || state !== flow.state) {
     console.warn('[Falfoos] OAuth callback rejected: state/code mismatch');
-    res.status(400).redirect('https://falfoos.vercel.app/?authError=state');
+    res.status(400).redirect(`${PRODUCTION_FRONTEND_URL}/?authError=state`);
     return;
   }
 
@@ -65,13 +64,13 @@ authRoutes.get('/google/callback', async (req, res) => {
     // Fresh session id at every login — fixation-proof.
     createSession(res, user.id);
     console.log(`[Falfoos] User signed in via Google: ${user.id}`);
-    res.redirect('https://falfoos.vercel.app');
+    res.redirect(PRODUCTION_FRONTEND_URL);
   } catch (err) {
     console.error(
       '[Falfoos] OAuth callback failed:',
       err instanceof Error ? err.message : String(err)
     );
-    res.status(502).redirect('https://falfoos.vercel.app/?authError=exchange');
+    res.status(502).redirect(`${PRODUCTION_FRONTEND_URL}/?authError=exchange`);
   }
 });
 
@@ -81,20 +80,6 @@ authRoutes.get('/me', (req, res) => {
   // or proxy). Without this a stale guest body could outlive a login.
   res.set('Cache-Control', 'no-store');
   const user = resolveSession(req);
-  // TEMP DIAGNOSTIC (AUTH_DIAG=1) — log ONLY booleans; never the cookie value,
-  // session id, headers or user-agent string. Remove after the mobile test.
-  if (process.env.AUTH_DIAG === '1') {
-    const device = /Mobile|Android|iPhone|iPad|iPod/i.test(req.headers['user-agent'] ?? '')
-      ? 'mobile'
-      : 'desktop';
-    console.log('[AuthDiag]', {
-      ts: new Date().toISOString(),
-      device,
-      hasSessionCookie: !!readCookie(req, COOKIE_NAME),
-      authenticated: !!user,
-      status: 200,
-    });
-  }
   // Phase 11D / Phase 8 — has this user linked a channel-backed canonical
   // Player? Channel-less `user:<id>` artifacts do not count.
   const guestLinked = user ? isAccountLinked(user.id) : false;

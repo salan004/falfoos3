@@ -44,7 +44,7 @@ export function isProduction(): boolean {
 }
 
 /** Canonical public URLs (documentation/derivation only — never secrets). */
-export const PRODUCTION_FRONTEND_URL = 'https://falfoos.vercel.app';
+export const PRODUCTION_FRONTEND_URL = 'https://falfoos.com';
 export const OAUTH_CALLBACK_PATH = '/api/auth/google/callback';
 
 /** Redirect URI exactly as google.ts derives it (kept byte-compatible). */

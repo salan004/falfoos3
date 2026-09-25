@@ -69,8 +69,8 @@ async function main(): Promise<void> {
       const body = await res.text();
       assertTrue(body.startsWith('<?xml'), 'xml declaration');
       assertTrue(body.includes('<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'), 'urlset');
-      assertTrue(body.includes('<loc>https://falfoos.vercel.app/</loc>'), 'homepage');
-      assertTrue(body.includes('<loc>https://falfoos.vercel.app/games</loc>'), 'games page');
+      assertTrue(body.includes('<loc>https://falfoos.com/</loc>'), 'homepage');
+      assertTrue(body.includes('<loc>https://falfoos.com/games</loc>'), 'games page');
     });
 
     await testAsync('sitemap includes active games, open tournaments and claimed players', async () => {
