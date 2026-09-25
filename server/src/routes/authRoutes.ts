@@ -5,8 +5,10 @@ import {
   getGoogleConfig,
 } from '../auth/google';
 import {
+  COOKIE_NAME,
   clearOAuthFlowCookies,
   createSession,
+  readCookie,
   readOAuthFlow,
   resolveSession,
   revokeCurrentSession,
@@ -79,6 +81,20 @@ authRoutes.get('/me', (req, res) => {
   // or proxy). Without this a stale guest body could outlive a login.
   res.set('Cache-Control', 'no-store');
   const user = resolveSession(req);
+  // TEMP DIAGNOSTIC (AUTH_DIAG=1) — log ONLY booleans; never the cookie value,
+  // session id, headers or user-agent string. Remove after the mobile test.
+  if (process.env.AUTH_DIAG === '1') {
+    const device = /Mobile|Android|iPhone|iPad|iPod/i.test(req.headers['user-agent'] ?? '')
+      ? 'mobile'
+      : 'desktop';
+    console.log('[AuthDiag]', {
+      ts: new Date().toISOString(),
+      device,
+      hasSessionCookie: !!readCookie(req, COOKIE_NAME),
+      authenticated: !!user,
+      status: 200,
+    });
+  }
   // Phase 11D / Phase 8 — has this user linked a channel-backed canonical
   // Player? Channel-less `user:<id>` artifacts do not count.
   const guestLinked = user ? isAccountLinked(user.id) : false;
