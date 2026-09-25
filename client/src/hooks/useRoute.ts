@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useSyncExternalStore } from 'react';
 
 /**
  * SEO Fix 1 — History API (path-based) router.
@@ -40,20 +40,80 @@ function resolveInitialPath(): string {
   return currentPath();
 }
 
-export function useRoute() {
-  const [path, setPath] = useState<string>(() => resolveInitialPath());
+// ---------------------------------------------------------------------------
+// Shared route store.
+//
+// History API navigation (`pushState`) is deliberately silent — it fires no
+// `popstate`/`hashchange` event. The original per-hook `useState` therefore
+// left every other `useRoute()` consumer (notably `MainApp`) stuck on the old
+// route until a manual refresh. A single module-level store, read through
+// `useSyncExternalStore`, makes every consumer observe the same route the
+// moment `navigate()` runs.
+// ---------------------------------------------------------------------------
 
-  useEffect(() => {
-    const onPopState = () => setPath(currentPath());
-    window.addEventListener('popstate', onPopState);
-    return () => window.removeEventListener('popstate', onPopState);
-  }, []);
+const SERVER_PATH = '/';
+let sharedPath = SERVER_PATH;
+let storeInitialized = false;
+const routeListeners = new Set<() => void>();
+
+/** Single module-level Back/Forward handler — never registered per instance. */
+function handlePopState(): void {
+  commitRoute(currentPath());
+}
+
+/** Lazily binds the store to `window` (no-op outside the browser). */
+function ensureRouteStore(): void {
+  if (storeInitialized || typeof window === 'undefined') return;
+  storeInitialized = true;
+  sharedPath = resolveInitialPath();
+  window.addEventListener('popstate', handlePopState);
+}
+
+/** Publishes a route change and notifies every subscriber synchronously. */
+function commitRoute(next: string): void {
+  if (next === sharedPath) return;
+  sharedPath = next;
+  for (const listener of [...routeListeners]) {
+    try {
+      listener();
+    } catch {
+      // A faulty consumer must never break the shared route update.
+    }
+  }
+}
+
+function subscribeToRoute(listener: () => void): () => void {
+  ensureRouteStore();
+  routeListeners.add(listener);
+  return () => {
+    routeListeners.delete(listener);
+  };
+}
+
+function getRouteSnapshot(): string {
+  ensureRouteStore();
+  return sharedPath;
+}
+
+/** Non-browser snapshot (SSR/build): a stable value; never touches `window`. */
+function getServerRouteSnapshot(): string {
+  return SERVER_PATH;
+}
+
+/** Resolve + push a destination, then synchronously publish it to consumers. */
+function navigateTo(to: string): void {
+  ensureRouteStore();
+  const next = normalize(to);
+  if (currentPath() === next) return;
+  window.history.pushState(null, '', next);
+  commitRoute(next);
+}
+
+export function useRoute() {
+  const path = useSyncExternalStore(subscribeToRoute, getRouteSnapshot, getServerRouteSnapshot);
 
   const navigate = useCallback((to: string) => {
-    const next = normalize(to);
-    if (currentPath() === next) return;
-    window.history.pushState(null, '', next);
-    setPath(next);
+    navigateTo(to);
   }, []);
 
   return { path, navigate };
@@ -157,3 +217,34 @@ export function matchBroadcastRoute(path: string): { tournamentId: string } | nu
   const m = path.match(/^\/broadcast\/([a-z0-9-]+)$/i);
   return m ? { tournamentId: m[1] } : null;
 }
+
+/**
+ * Test-only access to the shared route store. NOT part of the public
+ * `useRoute()` API and never used by application code. Mirrors the
+ * `__resetAuthSessionForTests` pattern used by `useAuthSession`.
+ */
+export const __routeStoreForTests = {
+  getPath(): string {
+    ensureRouteStore();
+    return sharedPath;
+  },
+  subscribe(listener: () => void): () => void {
+    return subscribeToRoute(listener);
+  },
+  navigate(to: string): void {
+    navigateTo(to);
+  },
+  /** Simulates the browser firing `popstate` (Back/Forward). */
+  handlePopState(): void {
+    handlePopState();
+  },
+  /** Restores the store to its pristine, uninitialized state. */
+  reset(): void {
+    if (typeof window !== 'undefined') {
+      window.removeEventListener('popstate', handlePopState);
+    }
+    storeInitialized = false;
+    sharedPath = SERVER_PATH;
+    routeListeners.clear();
+  },
+};
