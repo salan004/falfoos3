@@ -75,6 +75,9 @@ authRoutes.get('/google/callback', async (req, res) => {
 
 /** Current session lookup. Returns {user:null} rather than an error when guest. */
 authRoutes.get('/me', (req, res) => {
+  // Authentication state must never be stored in an HTTP cache (browser, CDN
+  // or proxy). Without this a stale guest body could outlive a login.
+  res.set('Cache-Control', 'no-store');
   const user = resolveSession(req);
   // Phase 11D / Phase 8 — has this user linked a channel-backed canonical
   // Player? Channel-less `user:<id>` artifacts do not count.
