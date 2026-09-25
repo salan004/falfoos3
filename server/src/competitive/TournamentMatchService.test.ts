@@ -142,7 +142,7 @@ test('4-player bracket: winners advance and the final crowns a champion', () => 
   for (const semi of semis) {
     const parts = getMatchParticipants(semi.id);
     assertEqual(parts.length, 2, 'semi has two players');
-    const winner = parts[0].player_id;
+    const winner = parts[0].player_id!;
     winners.push(winner);
     const outcome = recordMatchResult({ matchId: semi.id, winnerPlayerId: winner });
     assertTrue(outcome.advanced, 'semi winner advanced');
@@ -158,7 +158,7 @@ test('4-player bracket: winners advance and the final crowns a champion', () => 
   assertEqual(getMatchParticipants(final.id).length, 2, 'final has two participants');
   assertEqual(getMatch(final.id)!.next_match_id, null, 'final has no next match');
 
-  const finalWinner = getMatchParticipants(final.id)[0].player_id;
+  const finalWinner = getMatchParticipants(final.id)[0].player_id!;
   const outcome = recordMatchResult({ matchId: final.id, winnerPlayerId: finalWinner });
   assertTrue(outcome.tournamentCompleted, 'tournament completed');
   assertEqual(getTournamentChampion(tournamentId), finalWinner, 'champion recorded');
@@ -326,7 +326,7 @@ test('atomic result: forced failures at each stage fully roll back', () => {
     const match = trigger.needNext
       ? getTournamentMatches(tournamentId).find((m) => m.round_no === 1 && m.next_match_id !== null)!
       : getTournamentMatches(tournamentId)[0];
-    const winner = getMatchParticipants(match.id)[0].player_id;
+    const winner = getMatchParticipants(match.id)[0].player_id!;
     const before = stateSnapshot(tournamentId);
 
     getDb().exec(trigger.sql);

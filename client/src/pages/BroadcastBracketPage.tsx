@@ -3,7 +3,7 @@ import { useTournamentBracket } from '../hooks/useTournamentBracket';
 import { useSeo } from '../seo/useSeo';
 import { BracketView, type BracketPlayerMeta } from '../components/BracketView';
 import { PlayerAvatar } from '../components/PlayerAvatar';
-import type { MatchDto } from '../types/competitive';
+import type { MatchDto, MatchParticipantDto, TeamDto } from '../types/competitive';
 
 interface BroadcastBracketPageProps {
   tournamentId: string;
@@ -22,11 +22,13 @@ function MatchDetail({
   match,
   roundName,
   players,
+  teams,
   onClose,
 }: {
   match: MatchDto;
   roundName: string;
   players: Map<string, BracketPlayerMeta>;
+  teams: Map<string, TeamDto>;
   onClose: () => void;
 }) {
   return (
@@ -46,18 +48,48 @@ function MatchDetail({
         {match.players.length === 0 ? (
           <div className="broadcast-detail-empty">بانتظار الفائزين</div>
         ) : (
-          match.players.map((p) => {
-            const meta = players.get(p.playerId);
-            const isWinner = match.winnerPlayerId === p.playerId;
+          match.players.map((p: MatchParticipantDto) => {
+            const meta = p.playerId ? players.get(p.playerId) : undefined;
+            const team = p.teamId ? teams.get(p.teamId) : undefined;
+            const isWinner = p.teamId
+              ? match.winnerTeamId === p.teamId
+              : match.winnerPlayerId === p.playerId;
             return (
-              <div key={`${p.slot}-${p.playerId}`} className={`broadcast-detail-player ${isWinner ? 'is-winner' : ''}`}>
-                <PlayerAvatar id={p.playerId} name={meta?.name ?? 'لاعب'} avatarUrl={meta?.avatarUrl ?? undefined} size={40} />
+              <div
+                key={`${p.slot}-${p.teamId ?? p.playerId}`}
+                className={`broadcast-detail-player ${isWinner ? 'is-winner' : ''}`}
+              >
+                {team ? (
+                  <div className="bracket-team-avatars">
+                    {team.members.map((m) => (
+                      <PlayerAvatar
+                        key={m.playerId}
+                        id={m.playerId}
+                        name={m.displayName ?? 'لاعب'}
+                        avatarUrl={m.avatarUrl ?? undefined}
+                        size={40}
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <PlayerAvatar
+                    id={p.playerId ?? ''}
+                    name={meta?.name ?? 'لاعب'}
+                    avatarUrl={meta?.avatarUrl ?? undefined}
+                    size={40}
+                  />
+                )}
                 <div className="broadcast-detail-player-body">
-                  <span className="broadcast-detail-player-name">{meta?.name ?? 'لاعب'}</span>
+                  <span className="broadcast-detail-player-name">
+                    {team ? `⚔️ ${team.nameAr}` : meta?.name ?? 'لاعب'}
+                  </span>
                   <span className="broadcast-detail-player-meta">
-                    {meta?.rankName ? <span>{meta.rankName}</span> : null}
-                    {typeof meta?.lp === 'number' ? <span>{meta.lp.toLocaleString('ar')} LP</span> : null}
-                    {typeof meta?.elo === 'number' ? <span>Elo {meta.elo.toLocaleString('ar')}</span> : null}
+                    {team
+                      ? team.members.map((m) => m.displayName).filter(Boolean).join(' · ')
+                      : null}
+                    {!team && meta?.rankName ? <span>{meta.rankName}</span> : null}
+                    {!team && typeof meta?.lp === 'number' ? <span>{meta.lp.toLocaleString('ar')} LP</span> : null}
+                    {!team && typeof meta?.elo === 'number' ? <span>Elo {meta.elo.toLocaleString('ar')}</span> : null}
                   </span>
                 </div>
                 {isWinner ? <span className="broadcast-detail-winner">فائز</span> : null}
@@ -84,8 +116,18 @@ function MatchDetail({
  * function as a safety net when a Socket.IO connection is unavailable.
  */
 export function BroadcastBracketPage({ tournamentId }: BroadcastBracketPageProps) {
-  const { summary, bracket, playerMeta, roundNames, championPlayerId, loading, error, reload } =
-    useTournamentBracket(tournamentId);
+  const {
+    summary,
+    bracket,
+    playerMeta,
+    teamById,
+    roundNames,
+    championPlayerId,
+    championTeamId,
+    loading,
+    error,
+    reload,
+  } = useTournamentBracket(tournamentId);
   const [selected, setSelected] = useState<MatchDto | null>(null);
 
   // SEO — stream overlay is presentation-only and must never be indexed.
@@ -140,7 +182,9 @@ export function BroadcastBracketPage({ tournamentId }: BroadcastBracketPageProps
       <BracketView
         bracket={bracket}
         players={playerMeta}
+        teams={teamById}
         championPlayerId={championPlayerId}
+        championTeamId={championTeamId}
         variant="broadcast"
         selectedMatchId={selected?.id ?? null}
         onSelectMatch={(m) => setSelected((cur) => (cur?.id === m.id ? null : m))}
@@ -151,6 +195,7 @@ export function BroadcastBracketPage({ tournamentId }: BroadcastBracketPageProps
           match={selected}
           roundName={selectedRoundName}
           players={playerMeta}
+          teams={teamById}
           onClose={() => setSelected(null)}
         />
       ) : (

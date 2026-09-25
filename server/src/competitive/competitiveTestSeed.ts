@@ -78,14 +78,20 @@ export function seedTournament(input: {
   status?: 'draft' | 'open' | 'active' | 'completed' | 'cancelled';
   createdBy: string;
   maxParticipants?: number | null;
+  competitionType?: 'individual' | 'team_vs_team' | 'two_vs_two';
+  teamFormation?: 'random' | 'player_choice' | null;
+  team1Name?: string | null;
+  team2Name?: string | null;
 }): void {
   const now = Date.now();
+  const competitionType = input.competitionType ?? 'individual';
   getDb()
     .prepare(
       `INSERT OR IGNORE INTO tournaments
          (id, game_id, name_ar, description_ar, image_url, status, max_participants,
+          competition_type, team_formation, team1_name, team2_name,
           starts_at, ends_at, created_by, created_at, updated_at, participant_count)
-       VALUES (?, ?, ?, NULL, NULL, ?, ?, NULL, NULL, ?, ?, ?, 0)`
+       VALUES (?, ?, ?, NULL, NULL, ?, ?, ?, ?, ?, ?, NULL, NULL, ?, ?, ?, 0)`
     )
     .run(
       input.id,
@@ -93,10 +99,55 @@ export function seedTournament(input: {
       input.nameAr ?? 'Test Tournament',
       input.status ?? 'open',
       input.maxParticipants ?? null,
+      competitionType,
+      competitionType === 'individual' ? null : (input.teamFormation ?? 'random'),
+      competitionType === 'team_vs_team' ? (input.team1Name ?? null) : null,
+      competitionType === 'team_vs_team' ? (input.team2Name ?? null) : null,
       input.createdBy,
       now,
       now
     );
+}
+
+/** Sets a seeded guest as a channel-backed linked Player for a website user. */
+export function seedLinkedPlayer(playerId: string, userId: string, channelId: string): void {
+  getDb()
+    .prepare(
+      `UPDATE guests SET youtube_channel_id = ?, claimed_user_id = ? WHERE player_id = ?`
+    )
+    .run(channelId, userId, playerId);
+}
+
+export function seedTeam(
+  teamId: string,
+  tournamentId: string,
+  teamNo: number,
+  nameAr: string,
+  capacity: number | null = null
+): void {
+  const now = Date.now();
+  getDb()
+    .prepare(
+      `INSERT OR IGNORE INTO tournament_teams
+         (id, tournament_id, team_no, name_ar, capacity, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`
+    )
+    .run(teamId, tournamentId, teamNo, nameAr, capacity, now, now);
+}
+
+export function seedTeamMember(
+  tournamentId: string,
+  teamId: string,
+  playerId: string,
+  assignedBy: 'random' | 'player' | 'admin' = 'admin'
+): void {
+  getDb()
+    .prepare(
+      `INSERT OR IGNORE INTO tournament_team_members
+         (tournament_id, team_id, player_id, joined_at, assigned_by)
+       VALUES (?, ?, ?, ?, ?)`
+    )
+    .run(tournamentId, teamId, playerId, Date.now(), assignedBy);
 }
 
 export function seedTournamentParticipant(
@@ -114,11 +165,14 @@ export function seedTournamentParticipant(
     .run(tournamentId, playerId, options?.source ?? 'admin', now, options?.status ?? 'registered');
 }
 
-/** Deletes tournament bracket + tournament fixtures in FK-safe order. */
+/** Deletes tournament bracket + team + tournament fixtures in FK-safe order. */
 export function cleanTournaments(): void {
   const db = getDb();
   db.transaction(() => {
     db.prepare('DELETE FROM tournament_match_participants').run();
+    db.prepare('DELETE FROM match_result_corrections').run();
+    db.prepare('DELETE FROM tournament_team_members').run();
+    db.prepare('DELETE FROM tournament_teams').run();
     db.prepare('DELETE FROM tournament_matches').run();
     db.prepare('DELETE FROM tournament_participants').run();
     db.prepare('DELETE FROM tournaments').run();

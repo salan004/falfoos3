@@ -7,6 +7,7 @@ import {
   computeElo,
   computeEloDelta,
   computeMatchElo,
+  computeTeamMatchElo,
   DEFAULT_INITIAL_ELO,
   DEFAULT_K_FACTOR,
   expectedScore,
@@ -112,6 +113,61 @@ test('rounding is consistent and never introduces asymmetric deltas', () => {
       }
     }
   }
+});
+
+test('team Elo: reduces to the exact 1v1 match result for a single player per side', () => {
+  for (const [a, b] of [[1200, 1200], [1400, 1200], [1000, 1800]] as [number, number][]) {
+    for (const result of ['win', 'loss', 'draw'] as CompetitiveResult[]) {
+      const team = computeTeamMatchElo([a], [b], result);
+      const duel = computeMatchElo(a, b, result);
+      assertEqual(team.playerA.deltas[0], duel.playerA.delta, `A delta parity ${a}/${b}/${result}`);
+      assertEqual(team.playerB.deltas[0], duel.playerB.delta, `B delta parity ${a}/${b}/${result}`);
+      assertEqual(team.totalDelta, 0, `zero-sum 1v1 ${a}/${b}/${result}`);
+    }
+  }
+});
+
+test('team Elo: aggregate delta is exactly zero for any team sizes and ratings', () => {
+  const cases: [number[], number[]][] = [
+    [[1200, 1200], [1200, 1200]],           // 2v2 equal
+    [[1500, 1100], [1300, 1300]],           // 2v2 mixed
+    [[1500, 1100, 900], [1300, 1300]],      // 3v2 (unequal)
+    [[1000], [1800, 1700, 1600, 1500]],     // 1v4 (unequal)
+    [[2000, 800, 1200, 1200, 900], [1400, 1400, 1000, 1000, 1000]], // 5v5
+  ];
+  for (const [ratingsA, ratingsB] of cases) {
+    for (const result of ['win', 'loss', 'draw'] as CompetitiveResult[]) {
+      const match = computeTeamMatchElo(ratingsA, ratingsB, result);
+      const sumA = match.playerA.deltas.reduce((s, d) => s + d, 0);
+      const sumB = match.playerB.deltas.reduce((s, d) => s + d, 0);
+      assertEqual(sumA + sumB, 0, `zero-sum ${JSON.stringify(ratingsA)} vs ${JSON.stringify(ratingsB)}/${result}`);
+      assertEqual(match.totalDelta, 0, `reported total zero ${result}`);
+      assertInteger(sumA, `winner-side aggregate integer ${result}`);
+      // Winner side gains, loser side loses for a decisive result.
+      if (result === 'win') {
+        assertTrue(sumA > 0 && sumB < 0, 'winning side gains, losing side loses');
+      }
+    }
+  }
+});
+
+test('team Elo: each member delta is the sum of pairwise 1v1 exchanges', () => {
+  const winners = [1400, 1100];
+  const losers = [1200, 1300, 1000];
+  const match = computeTeamMatchElo(winners, losers, 'win');
+  winners.forEach((rating, i) => {
+    const expected = losers.reduce((sum, opp) => sum + computeEloDelta(rating, opp, 'win'), 0);
+    assertEqual(match.playerA.deltas[i], expected, `member ${i} equals pairwise sum`);
+  });
+  losers.forEach((rating, i) => {
+    const expected = winners.reduce((sum, opp) => sum + computeEloDelta(rating, opp, 'loss'), 0);
+    assertEqual(match.playerB.deltas[i], expected, `opponent ${i} equals pairwise sum`);
+  });
+});
+
+test('team Elo: rejects an empty side', () => {
+  assertThrows(() => computeTeamMatchElo([], [1200], 'win'), 'empty winning side');
+  assertThrows(() => computeTeamMatchElo([1200], [], 'win'), 'empty losing side');
 });
 
 test('result helpers: score and inversion', () => {

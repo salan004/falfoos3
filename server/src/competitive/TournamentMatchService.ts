@@ -31,8 +31,10 @@
 
 import { getDb } from '../db/db';
 import { getTournamentById, updateTournament, type TournamentRow } from '../games/TournamentService';
+import { getTeamMembers } from './TeamService';
 import { applyLpResult } from './LpService';
-import { applyEloResult } from './EloService';
+import { applyEloDelta, applyEloResult } from './EloService';
+import { computeTeamMatchElo } from './eloEngine';
 import { awardMatchXp } from './GlobalProgressionService';
 import { applyResultStats, getOrCreateProfile } from './CompetitiveProfileService';
 import { emitCompetitiveEvent } from './competitiveEvents';
@@ -64,6 +66,8 @@ export interface TournamentMatchRow {
   status: TournamentMatchStatus;
   best_of: number | null;
   winner_player_id: string | null;
+  /** Roadmap #2 — set when the winning competitor is a team. */
+  winner_team_id: string | null;
   next_match_id: string | null;
   next_match_slot: number | null;
   scheduled_at: number | null;
@@ -77,14 +81,20 @@ export interface TournamentMatchRow {
 
 export interface MatchParticipantRow {
   match_id: string;
-  player_id: string;
+  /** Set for individual competitors; null for team competitors. */
+  player_id: string | null;
+  /** Set for team competitors; null for individual competitors. */
+  team_id: string | null;
   slot: number;
   seed: number | null;
 }
 
 export interface RecordMatchResultInput {
   matchId: string;
-  winnerPlayerId: string;
+  /** Individual tournaments: the winning player. Exactly one of the two. */
+  winnerPlayerId?: string;
+  /** Team tournaments: the winning team. Exactly one of the two. */
+  winnerTeamId?: string;
   resultSource?: MatchResultSource;
   /** Defaults to `match:<matchId>:result`. */
   idempotencyKey?: string;
@@ -92,13 +102,19 @@ export interface RecordMatchResultInput {
 
 export interface RecordMatchResultOutcome {
   match: TournamentMatchRow;
-  winnerPlayerId: string;
+  winnerPlayerId: string | null;
+  /** Roadmap #2 — winning team id (null for individual matches). */
+  winnerTeamId: string | null;
   loserPlayerId: string | null;
+  /** Roadmap #2 — losing team id (null for individual matches). */
+  loserTeamId: string | null;
   advanced: boolean;
   nextMatchId: string | null;
   nextMatchSlot: number | null;
   tournamentCompleted: boolean;
   championPlayerId: string | null;
+  /** Roadmap #2 — champion team id for team tournaments. */
+  championTeamId: string | null;
   alreadyProcessed: boolean;
 }
 
@@ -125,7 +141,7 @@ export function getMatch(matchId: string): TournamentMatchRow | null {
 export function getMatchParticipants(matchId: string): MatchParticipantRow[] {
   return getDb()
     .prepare(
-      'SELECT match_id, player_id, slot, seed FROM tournament_match_participants WHERE match_id = ? ORDER BY slot ASC'
+      'SELECT match_id, player_id, team_id, slot, seed FROM tournament_match_participants WHERE match_id = ? ORDER BY slot ASC'
     )
     .all(matchId) as MatchParticipantRow[];
 }
@@ -148,6 +164,18 @@ export function getTournamentChampion(tournamentId: string): string | null {
     )
     .get(tournamentId) as { winner_player_id: string | null } | undefined;
   return row?.winner_player_id ?? null;
+}
+
+/** Roadmap #2 — champion TEAM for team tournaments (null for individual). */
+export function getTournamentChampionTeam(tournamentId: string): string | null {
+  const row = getDb()
+    .prepare(
+      `SELECT winner_team_id FROM tournament_matches
+        WHERE tournament_id = ? AND next_match_id IS NULL AND status = 'completed'
+        LIMIT 1`
+    )
+    .get(tournamentId) as { winner_team_id: string | null } | undefined;
+  return row?.winner_team_id ?? null;
 }
 
 function requireMatch(matchId: string): TournamentMatchRow {
@@ -247,17 +275,26 @@ function buildReplayOutcome(
   tournament: TournamentRow
 ): RecordMatchResultOutcome {
   const participants = getMatchParticipants(match.id);
-  const loser = participants.find((p) => p.player_id !== match.winner_player_id)?.player_id ?? null;
+  const isTeam = match.winner_team_id !== null;
+  const loserPlayerId = isTeam
+    ? null
+    : participants.find((p) => p.player_id !== match.winner_player_id)?.player_id ?? null;
+  const loserTeamId = isTeam
+    ? participants.find((p) => p.team_id !== null && p.team_id !== match.winner_team_id)?.team_id ?? null
+    : null;
   const isFinal = match.next_match_id === null;
   return {
     match,
-    winnerPlayerId: match.winner_player_id!,
-    loserPlayerId: loser,
+    winnerPlayerId: match.winner_player_id,
+    winnerTeamId: match.winner_team_id,
+    loserPlayerId,
+    loserTeamId,
     advanced: !isFinal,
     nextMatchId: match.next_match_id,
     nextMatchSlot: match.next_match_slot,
     tournamentCompleted: isFinal && tournament.status === 'completed',
     championPlayerId: isFinal ? match.winner_player_id : null,
+    championTeamId: isFinal ? match.winner_team_id : null,
     alreadyProcessed: true,
   };
 }
@@ -265,6 +302,12 @@ function buildReplayOutcome(
 /**
  * Records the result of a played match and applies every competitive effect in
  * ONE atomic transaction.
+ *
+ * Roadmap #2 / D1 — for a team match the winning team's members each receive an
+ * individual win and the losing team's members each receive an individual loss,
+ * using the EXISTING LP/Elo/XP/W-L primitives. Elo is computed per member
+ * against the opposing team's pre-match average rating; no separate team rating
+ * system is introduced.
  */
 export function recordMatchResult(input: RecordMatchResultInput): RecordMatchResultOutcome {
   const db = getDb();
@@ -312,42 +355,188 @@ export function recordMatchResult(input: RecordMatchResultInput): RecordMatchRes
         `match needs exactly two known participants (got ${participants.length})`
       );
     }
-    const winner = participants.find((p) => p.player_id === input.winnerPlayerId);
-    if (!winner) {
-      throw new TournamentMatchError('winner_not_participant', 'winner is not a match participant');
-    }
-    const loser = participants.find((p) => p.player_id !== winner.player_id);
-    if (!loser) {
-      throw new TournamentMatchError('invalid_match', 'match has no opponent');
-    }
 
     // Participants must be registered in the same tournament.
     const isRegistered = db.prepare(
       `SELECT 1 AS ok FROM tournament_participants
         WHERE tournament_id = ? AND player_id = ? AND status IN ('registered','confirmed')`
     );
-    for (const participant of [winner, loser]) {
-      if (!isRegistered.get(match.tournament_id, participant.player_id)) {
+
+    // LP / W-L-D / XP for one member. Elo is applied separately so individual
+    // (unchanged `applyEloResult`) and team (zero-sum `applyEloDelta`) paths stay
+    // clearly separated.
+    const applyEffects = (playerId: string, result: CompetitiveResult): void => {
+      applyLpResult({
+        playerId,
+        gameId: match.game_id,
+        result,
+        sourceType: 'match',
+        sourceId: match.id,
+        matchId: match.id,
+        tournamentId: match.tournament_id,
+        idempotencyKey: `match:${match.id}:${playerId}:lp`,
+      });
+      applyResultStats(playerId, match.game_id, result);
+      awardMatchXp({
+        playerId,
+        matchId: match.id,
+        tournamentId: match.tournament_id,
+        gameId: match.game_id,
+        result,
+        idempotencyKey: `match:${match.id}:${playerId}:xp`,
+      });
+    };
+
+    let winnerPlayerId: string | null = null;
+    let winnerTeamId: string | null = null;
+    let loserPlayerId: string | null = null;
+    let loserTeamId: string | null = null;
+    let winnerPlayerIds: string[] = [];
+    let loserPlayerIds: string[] = [];
+    let advanceCompetitor: { playerId: string | null; teamId: string | null };
+
+    // ---------------------------------------------------------------------
+    // Individual (legacy 1v1)
+    // ---------------------------------------------------------------------
+    if (participants.every((p) => p.team_id === null)) {
+      const winner = participants.find((p) => p.player_id === input.winnerPlayerId);
+      if (!input.winnerPlayerId || !winner || winner.player_id === null) {
+        throw new TournamentMatchError('winner_not_participant', 'winner is not a match participant');
+      }
+      const loser = participants.find((p) => p.player_id !== winner.player_id);
+      if (!loser || loser.player_id === null) {
+        throw new TournamentMatchError('invalid_match', 'match has no opponent');
+      }
+      if (!isRegistered.get(match.tournament_id, winner.player_id)) {
         throw new TournamentMatchError(
           'participant_not_registered',
-          `player "${participant.player_id}" is not a registered participant`
+          `player "${winner.player_id}" is not a registered participant`
         );
       }
-    }
+      if (!isRegistered.get(match.tournament_id, loser.player_id)) {
+        throw new TournamentMatchError(
+          'participant_not_registered',
+          `player "${loser.player_id}" is not a registered participant`
+        );
+      }
 
-    // Capture pre-match Elo for a mathematically consistent exchange.
-    const winnerEloBefore = getOrCreateProfile(winner.player_id, match.game_id).elo;
-    const loserEloBefore = getOrCreateProfile(loser.player_id, match.game_id).elo;
+      const winnerEloBefore = getOrCreateProfile(winner.player_id, match.game_id).elo;
+      const loserEloBefore = getOrCreateProfile(loser.player_id, match.game_id).elo;
 
-    // Complete the match (guarded so a concurrent completion cannot double-apply).
-    const updated = db.prepare(
-      `UPDATE tournament_matches
-          SET status = 'completed', winner_player_id = ?, completed_at = ?, updated_at = ?,
-              result_source = ?, result_idempotency_key = ?
-        WHERE id = ? AND status IN ('pending','scheduled','active')`
-    ).run(winner.player_id, now, now, resultSource, idempotencyKey, match.id);
-    if (updated.changes !== 1) {
-      throw new TournamentMatchError('match_not_playable', 'match is no longer playable');
+      const updated = db.prepare(
+        `UPDATE tournament_matches
+            SET status = 'completed', winner_player_id = ?, winner_team_id = NULL,
+                completed_at = ?, updated_at = ?,
+                result_source = ?, result_idempotency_key = ?
+          WHERE id = ? AND status IN ('pending','scheduled','active')`
+      ).run(winner.player_id, now, now, resultSource, idempotencyKey, match.id);
+      if (updated.changes !== 1) {
+        throw new TournamentMatchError('match_not_playable', 'match is no longer playable');
+      }
+
+      winnerPlayerId = winner.player_id;
+      loserPlayerId = loser.player_id;
+      winnerPlayerIds = [winner.player_id];
+      loserPlayerIds = [loser.player_id];
+      advanceCompetitor = { playerId: winner.player_id, teamId: null };
+      applyEffects(winner.player_id, 'win');
+      applyEffects(loser.player_id, 'loss');
+      // 1v1 Elo — UNCHANGED: each side against the other's pre-match rating.
+      applyEloResult({
+        playerId: winner.player_id,
+        gameId: match.game_id,
+        opponentRating: loserEloBefore,
+        result: 'win',
+        sourceId: match.id,
+        matchId: match.id,
+        idempotencyKey: `match:${match.id}:${winner.player_id}:elo`,
+      });
+      applyEloResult({
+        playerId: loser.player_id,
+        gameId: match.game_id,
+        opponentRating: winnerEloBefore,
+        result: 'loss',
+        sourceId: match.id,
+        matchId: match.id,
+        idempotencyKey: `match:${match.id}:${loser.player_id}:elo`,
+      });
+    } else {
+      // -------------------------------------------------------------------
+      // Team match (Team vs Team / 2v2)
+      // -------------------------------------------------------------------
+      if (!input.winnerTeamId) {
+        throw new TournamentMatchError('winner_not_participant', 'winning team is required for a team match');
+      }
+      const winner = participants.find((p) => p.team_id === input.winnerTeamId);
+      if (!winner || winner.team_id === null) {
+        throw new TournamentMatchError('winner_not_participant', 'winning team is not a match participant');
+      }
+      const loser = participants.find((p) => p.team_id !== winner.team_id);
+      if (!loser || loser.team_id === null) {
+        throw new TournamentMatchError('invalid_match', 'match has no opponent');
+      }
+
+      const winnerMembers = getTeamMembers(winner.team_id);
+      const loserMembers = getTeamMembers(loser.team_id);
+      if (winnerMembers.length === 0 || loserMembers.length === 0) {
+        throw new TournamentMatchError('invalid_match', 'team has no members');
+      }
+      for (const playerId of [...winnerMembers, ...loserMembers]) {
+        if (!isRegistered.get(match.tournament_id, playerId)) {
+          throw new TournamentMatchError(
+            'participant_not_registered',
+            `player "${playerId}" is not a registered participant`
+          );
+        }
+      }
+
+      // Capture every member's pre-match rating BEFORE any Elo is written, then
+      // compute the zero-sum team exchange from the existing 1v1 engine.
+      const winnerEloBefore = winnerMembers.map((id) => getOrCreateProfile(id, match.game_id).elo);
+      const loserEloBefore = loserMembers.map((id) => getOrCreateProfile(id, match.game_id).elo);
+      const teamElo = computeTeamMatchElo(winnerEloBefore, loserEloBefore, 'win');
+
+      const updated = db.prepare(
+        `UPDATE tournament_matches
+            SET status = 'completed', winner_player_id = NULL, winner_team_id = ?,
+                completed_at = ?, updated_at = ?,
+                result_source = ?, result_idempotency_key = ?
+          WHERE id = ? AND status IN ('pending','scheduled','active')`
+      ).run(winner.team_id, now, now, resultSource, idempotencyKey, match.id);
+      if (updated.changes !== 1) {
+        throw new TournamentMatchError('match_not_playable', 'match is no longer playable');
+      }
+
+      winnerTeamId = winner.team_id;
+      loserTeamId = loser.team_id;
+      winnerPlayerIds = winnerMembers;
+      loserPlayerIds = loserMembers;
+      advanceCompetitor = { playerId: null, teamId: winner.team_id };
+      for (const playerId of winnerMembers) applyEffects(playerId, 'win');
+      for (const playerId of loserMembers) applyEffects(playerId, 'loss');
+      // Team Elo — per-member zero-sum deltas from the existing 1v1 engine.
+      winnerMembers.forEach((playerId, index) =>
+        applyEloDelta({
+          playerId,
+          gameId: match.game_id,
+          delta: teamElo.playerA.deltas[index],
+          sourceType: 'match',
+          sourceId: match.id,
+          matchId: match.id,
+          idempotencyKey: `match:${match.id}:${playerId}:elo`,
+        })
+      );
+      loserMembers.forEach((playerId, index) =>
+        applyEloDelta({
+          playerId,
+          gameId: match.game_id,
+          delta: teamElo.playerB.deltas[index],
+          sourceType: 'match',
+          sourceId: match.id,
+          matchId: match.id,
+          idempotencyKey: `match:${match.id}:${playerId}:elo`,
+        })
+      );
     }
 
     // Winner advances to the explicit next-match slot; the loser does not.
@@ -360,82 +549,18 @@ export function recordMatchResult(input: RecordMatchResultInput): RecordMatchRes
         throw new TournamentMatchError('bad_graph', 'next match slot is missing');
       }
       db.prepare(
-        `INSERT INTO tournament_match_participants (match_id, player_id, slot, seed, created_at)
-         VALUES (?, ?, ?, NULL, ?)`
-      ).run(nextMatchId, winner.player_id, nextMatchSlot, now);
+        `INSERT INTO tournament_match_participants (match_id, player_id, team_id, slot, seed, created_at)
+         VALUES (?, ?, ?, ?, NULL, ?)`
+      ).run(nextMatchId, advanceCompetitor.playerId, advanceCompetitor.teamId, nextMatchSlot, now);
     }
-
-    // LP — winner +25, loser -20, exactly once via deterministic keys.
-    applyLpResult({
-      playerId: winner.player_id,
-      gameId: match.game_id,
-      result: 'win',
-      sourceType: 'match',
-      sourceId: match.id,
-      matchId: match.id,
-      tournamentId: match.tournament_id,
-      idempotencyKey: `match:${match.id}:${winner.player_id}:lp`,
-    });
-    applyLpResult({
-      playerId: loser.player_id,
-      gameId: match.game_id,
-      result: 'loss',
-      sourceType: 'match',
-      sourceId: match.id,
-      matchId: match.id,
-      tournamentId: match.tournament_id,
-      idempotencyKey: `match:${match.id}:${loser.player_id}:lp`,
-    });
-
-    // Elo — Phase 4A engine, both sides zero-sum against pre-match ratings.
-    applyEloResult({
-      playerId: winner.player_id,
-      gameId: match.game_id,
-      opponentRating: loserEloBefore,
-      result: 'win',
-      sourceId: match.id,
-      matchId: match.id,
-      idempotencyKey: `match:${match.id}:${winner.player_id}:elo`,
-    });
-    applyEloResult({
-      playerId: loser.player_id,
-      gameId: match.game_id,
-      opponentRating: winnerEloBefore,
-      result: 'loss',
-      sourceId: match.id,
-      matchId: match.id,
-      idempotencyKey: `match:${match.id}:${loser.player_id}:elo`,
-    });
-
-    // W/L/D stats (byes and cancellations never reach here).
-    applyResultStats(winner.player_id, match.game_id, 'win');
-    applyResultStats(loser.player_id, match.game_id, 'loss');
-
-    // Global Competitive XP (Model C: match + result) — GLOBAL across games,
-    // independent of LP/Elo/rank, awarded exactly once per player/match inside
-    // this same transaction (the idempotency key is the duplicate guard).
-    awardMatchXp({
-      playerId: winner.player_id,
-      matchId: match.id,
-      tournamentId: match.tournament_id,
-      gameId: match.game_id,
-      result: 'win',
-      idempotencyKey: `match:${match.id}:${winner.player_id}:xp`,
-    });
-    awardMatchXp({
-      playerId: loser.player_id,
-      matchId: match.id,
-      tournamentId: match.tournament_id,
-      gameId: match.game_id,
-      result: 'loss',
-      idempotencyKey: `match:${match.id}:${loser.player_id}:xp`,
-    });
 
     // Final match → completed tournament. The champion is the final's winner.
     let tournamentCompleted = false;
     let championPlayerId: string | null = null;
+    let championTeamId: string | null = null;
     if (match.next_match_id === null) {
-      championPlayerId = winner.player_id;
+      championPlayerId = winnerPlayerId;
+      championTeamId = winnerTeamId;
       updateTournament(match.tournament_id, { status: 'completed' });
       tournamentCompleted = true;
     }
@@ -443,13 +568,16 @@ export function recordMatchResult(input: RecordMatchResultInput): RecordMatchRes
     const finalMatch = requireMatch(match.id);
     return {
       match: finalMatch,
-      winnerPlayerId: winner.player_id,
-      loserPlayerId: loser.player_id,
+      winnerPlayerId,
+      winnerTeamId,
+      loserPlayerId,
+      loserTeamId,
       advanced: nextMatchId !== null,
       nextMatchId,
       nextMatchSlot,
       tournamentCompleted,
       championPlayerId,
+      championTeamId,
       alreadyProcessed: false,
     };
   });
@@ -473,11 +601,25 @@ export function recordMatchResult(input: RecordMatchResultInput): RecordMatchRes
         championPlayerId: outcome.championPlayerId,
       });
     }
-    if (outcome.winnerPlayerId) {
-      emitCompetitiveEvent({ type: 'competitive_profile.updated', gameId, playerId: outcome.winnerPlayerId });
+    // Individual callers may emit via the direct fields; team matches rely on
+    // the member lists. The event is a refetch signal only, so de-duplication
+    // is unnecessary.
+    for (const playerId of new Set(
+      [outcome.winnerPlayerId, outcome.loserPlayerId].filter((id): id is string => !!id)
+    )) {
+      emitCompetitiveEvent({ type: 'competitive_profile.updated', gameId, playerId });
     }
-    if (outcome.loserPlayerId) {
-      emitCompetitiveEvent({ type: 'competitive_profile.updated', gameId, playerId: outcome.loserPlayerId });
+    if (outcome.winnerTeamId || outcome.loserTeamId) {
+      const getTeamMemberships = new Set<string>();
+      if (outcome.winnerTeamId) {
+        for (const id of getTeamMembers(outcome.winnerTeamId)) getTeamMemberships.add(id);
+      }
+      if (outcome.loserTeamId) {
+        for (const id of getTeamMembers(outcome.loserTeamId)) getTeamMemberships.add(id);
+      }
+      for (const playerId of getTeamMemberships) {
+        emitCompetitiveEvent({ type: 'competitive_profile.updated', gameId, playerId });
+      }
     }
   }
 

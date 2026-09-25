@@ -57,7 +57,7 @@ async function main(): Promise<void> {
   const pendingPlayers = setupTournament(PENDING_ID, 4);
   // Complete one semifinal to create a completed match + competitive effects.
   const semis = getTournamentMatches(PENDING_ID).filter((m) => m.round_no === 1);
-  const semiWinner = getMatchParticipants(semis[0].id)[0].player_id;
+  const semiWinner = getMatchParticipants(semis[0].id)[0].player_id!;
   recordMatchResult({ matchId: semis[0].id, winnerPlayerId: semiWinner });
 
   const DONE_ID = 'api-pub-done';

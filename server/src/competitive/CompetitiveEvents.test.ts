@@ -78,7 +78,7 @@ test('recording a result emits match/tournament/profile events with identifiers'
   reset();
   const { tournamentId } = setupTournament(2);
   const match = getTournamentMatches(tournamentId)[0];
-  const winner = getMatchParticipants(match.id)[0].player_id;
+  const winner = getMatchParticipants(match.id)[0].player_id!;
   recordMatchResult({ matchId: match.id, winnerPlayerId: winner });
 
   assertTrue(types().includes('match.updated'), 'match.updated');
@@ -97,7 +97,7 @@ test('recording a result emits match/tournament/profile events with identifiers'
 test('an idempotent replay emits no events', () => {
   const { tournamentId } = setupTournament(2);
   const match = getTournamentMatches(tournamentId)[0];
-  const winner = getMatchParticipants(match.id)[0].player_id;
+  const winner = getMatchParticipants(match.id)[0].player_id!;
   const key = `evt:${match.id}`;
   recordMatchResult({ matchId: match.id, winnerPlayerId: winner, idempotencyKey: key });
   reset();
@@ -108,7 +108,7 @@ test('an idempotent replay emits no events', () => {
 test('a rolled-back transaction emits no events', () => {
   const { tournamentId } = setupTournament(2);
   const match = getTournamentMatches(tournamentId)[0];
-  const winner = getMatchParticipants(match.id)[0].player_id;
+  const winner = getMatchParticipants(match.id)[0].player_id!;
   reset();
   getDb().exec(
     "CREATE TRIGGER evt_abort BEFORE INSERT ON lp_transactions BEGIN SELECT RAISE(ABORT, 'boom'); END;"
@@ -128,8 +128,8 @@ test('a correction emits match.corrected plus refresh signals after commit', () 
   const { tournamentId } = setupTournament(2);
   const match = getTournamentMatches(tournamentId)[0];
   const parts = getMatchParticipants(match.id);
-  const a = parts[0].player_id;
-  const b = parts[1].player_id;
+  const a = parts[0].player_id!;
+  const b = parts[1].player_id!;
   recordMatchResult({ matchId: match.id, winnerPlayerId: a });
   reset();
   correctMatchResult({ matchId: match.id, correctedWinnerPlayerId: b, reason: 'event test' });

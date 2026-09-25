@@ -22,15 +22,20 @@ import {
   getMatch,
   getMatchParticipants,
   getTournamentChampion,
+  getTournamentChampionTeam,
   getTournamentMatches,
   type TournamentMatchRow,
   type MatchParticipantRow,
 } from './TournamentMatchService';
+import { getTeamMemberRows } from './TeamService';
 import { computeRank, type ComputedRank } from './ranks';
 import { DEFAULT_INITIAL_ELO } from './eloEngine';
 
 export interface MatchParticipantDto {
-  playerId: string;
+  /** Set for individual competitors; null for team competitors. */
+  playerId: string | null;
+  /** Roadmap #2 — set for team competitors; null for individual competitors. */
+  teamId: string | null;
   slot: number;
   seed: number | null;
   /** True when this participant reached the round via a first-round bye. */
@@ -46,6 +51,8 @@ export interface MatchDto {
   status: string;
   bestOf: number | null;
   winnerPlayerId: string | null;
+  /** Roadmap #2 — winning team id for team matches. */
+  winnerTeamId: string | null;
   nextMatchId: string | null;
   nextMatchSlot: number | null;
   scheduledAt: number | null;
@@ -88,6 +95,12 @@ export interface TournamentSummaryDto {
   ticketCost: number | null;
   /** R5 — visibility (independent of `status`). True = hidden from listings. */
   hidden: boolean;
+  /** Roadmap #2 — competition configuration. */
+  competitionType: string;
+  teamFormation: string | null;
+  team1Name: string | null;
+  team2Name: string | null;
+  teamsLockedAt: number | null;
   startsAt: number | null;
   endsAt: number | null;
   participantCount: number;
@@ -98,6 +111,8 @@ export interface TournamentSummaryDto {
   completedMatchCount: number;
   remainingMatchCount: number;
   championPlayerId: string | null;
+  /** Roadmap #2 — champion team for team tournaments. */
+  championTeamId: string | null;
 }
 
 export interface ParticipantDto {
@@ -170,6 +185,7 @@ const PARTICIPANT_STATUSES = new Set(['registered', 'confirmed']);
 function toMatchDto(match: TournamentMatchRow, participants: MatchParticipantRow[]): MatchDto {
   const players: MatchParticipantDto[] = participants.map((p) => ({
     playerId: p.player_id,
+    teamId: p.team_id,
     slot: p.slot,
     seed: p.seed,
     advancedByBye: p.seed !== null && match.round_no > 1,
@@ -185,6 +201,7 @@ function toMatchDto(match: TournamentMatchRow, participants: MatchParticipantRow
     status: match.status,
     bestOf: match.best_of,
     winnerPlayerId: match.winner_player_id,
+    winnerTeamId: match.winner_team_id,
     nextMatchId: match.next_match_id,
     nextMatchSlot: match.next_match_slot,
     scheduledAt: match.scheduled_at,
@@ -215,9 +232,15 @@ function toTournamentSummary(tournament: TournamentWithGame): TournamentSummaryD
     maxParticipants: tournament.max_participants,
     ticketCost: tournament.ticket_cost,
     hidden: tournament.hidden_at !== null,
+    competitionType: tournament.competition_type,
+    teamFormation: tournament.team_formation,
+    team1Name: tournament.team1_name,
+    team2Name: tournament.team2_name,
+    teamsLockedAt: tournament.teams_locked_at,
     startsAt: tournament.starts_at,
     endsAt: tournament.ends_at,
-    participantCount: bracket?.participantCount ?? 0,
+    // People count — for team tournaments this is participants, not teams.
+    participantCount: tournament.participant_count,
     bracketGenerated: matches.length > 0,
     totalRounds: bracket?.totalRounds ?? 0,
     byes: bracket?.byes ?? 0,
@@ -225,6 +248,7 @@ function toTournamentSummary(tournament: TournamentWithGame): TournamentSummaryD
     completedMatchCount,
     remainingMatchCount,
     championPlayerId: getTournamentChampion(tournament.id),
+    championTeamId: getTournamentChampionTeam(tournament.id),
   };
 }
 
@@ -266,6 +290,7 @@ export function getBracketDto(tournamentId: string): BracketDto | null {
         status: m.status,
         bestOf: m.bestOf,
         winnerPlayerId: m.winnerPlayerId,
+        winnerTeamId: m.winnerTeamId,
         nextMatchId: m.nextMatchId,
         nextMatchSlot: m.nextMatchSlot,
         scheduledAt: m.scheduledAt,
@@ -278,6 +303,7 @@ export function getBracketDto(tournamentId: string): BracketDto | null {
           m.status !== 'disputed',
         players: m.participants.map((p) => ({
           playerId: p.playerId,
+          teamId: p.teamId,
           slot: p.slot,
           seed: p.seed,
           advancedByBye: p.seed !== null && m.roundNo > 1,
@@ -339,6 +365,21 @@ interface DerivedPlayerState {
   draws: number;
 }
 
+/** Player ids represented by one match-side participant (player or team). */
+function participantPlayerIds(participant: MatchParticipantRow): string[] {
+  if (participant.player_id !== null) return [participant.player_id];
+  if (participant.team_id !== null) return getTeamMemberRows(participant.team_id).map((m) => m.player_id);
+  return [];
+}
+
+/** The set of player ids that won the tournament (individual or team). */
+function championPlayerIds(tournamentId: string): Set<string> {
+  const championTeam = getTournamentChampionTeam(tournamentId);
+  if (championTeam) return new Set(getTeamMemberRows(championTeam).map((m) => m.player_id));
+  const champion = getTournamentChampion(tournamentId);
+  return new Set(champion ? [champion] : []);
+}
+
 /** Derives tournament-scoped player state from the authoritative match graph. */
 function computePlayerStates(tournamentId: string): Map<string, DerivedPlayerState> {
   const states = new Map<string, DerivedPlayerState>();
@@ -364,34 +405,42 @@ function computePlayerStates(tournamentId: string): Map<string, DerivedPlayerSta
   const matches = getTournamentMatches(tournamentId);
   for (const match of matches) {
     const participants = getMatchParticipants(match.id);
+    const hasWinner = match.winner_player_id !== null || match.winner_team_id !== null;
     for (const participant of participants) {
-      const state = ensure(participant.player_id);
-      if (state.seed === null && match.round_no === 1 && participant.seed !== null) {
-        state.seed = participant.seed;
-      }
-      if (match.status === 'pending' || match.status === 'scheduled' || match.status === 'active') {
-        state.currentMatchId = match.id;
-        state.advanced = true;
-      } else if (match.status === 'completed') {
-        state.completedMatches += 1;
-        if (match.winner_player_id === null) {
-          // A corrected draw: neither win nor loss, and no elimination.
-          state.draws += 1;
-        } else if (match.winner_player_id === participant.player_id) {
-          state.wins += 1;
-        } else {
-          state.losses += 1;
-          state.eliminated = true;
+      const memberIds = participantPlayerIds(participant);
+      const isWinnerSide =
+        (participant.player_id !== null && match.winner_player_id === participant.player_id) ||
+        (participant.team_id !== null && match.winner_team_id === participant.team_id);
+      for (const playerId of memberIds) {
+        const state = ensure(playerId);
+        if (state.seed === null && match.round_no === 1 && participant.seed !== null) {
+          state.seed = participant.seed;
+        }
+        if (match.status === 'pending' || match.status === 'scheduled' || match.status === 'active') {
+          state.currentMatchId = match.id;
+          state.advanced = true;
+        } else if (match.status === 'completed') {
+          state.completedMatches += 1;
+          if (!hasWinner) {
+            // A corrected draw: neither win nor loss, and no elimination.
+            state.draws += 1;
+          } else if (isWinnerSide) {
+            state.wins += 1;
+          } else {
+            state.losses += 1;
+            state.eliminated = true;
+          }
         }
       }
     }
   }
 
-  const champion = getTournamentChampion(tournamentId);
-  if (champion && states.has(champion)) {
-    const state = states.get(champion)!;
-    state.champion = true;
-    state.eliminated = false;
+  for (const playerId of championPlayerIds(tournamentId)) {
+    const state = states.get(playerId);
+    if (state) {
+      state.champion = true;
+      state.eliminated = false;
+    }
   }
   // A player still waiting in a live match is not eliminated.
   for (const state of states.values()) {
@@ -404,7 +453,7 @@ function computePlayerStates(tournamentId: string): Map<string, DerivedPlayerSta
 export function getParticipantsDto(tournamentId: string): ParticipantDto[] {
   const rows = getParticipantsByTournament(tournamentId);
   const states = computePlayerStates(tournamentId);
-  const champion = getTournamentChampion(tournamentId);
+  const champions = championPlayerIds(tournamentId);
 
   // Targeted competitive lookup for exactly this tournament's participants —
   // independent of any leaderboard limit, so bracket/roster rank metadata is
@@ -439,7 +488,7 @@ export function getParticipantsDto(tournamentId: string): ParticipantDto[] {
         seed: state?.seed ?? null,
         eliminated: state?.eliminated ?? false,
         advanced: state?.advanced ?? false,
-        champion: champion === row.player_id,
+        champion: champions.has(row.player_id),
         lp: profile?.lp ?? null,
         elo: profile?.elo ?? null,
         rank: computeRank(profile?.lp ?? 0),
@@ -484,7 +533,7 @@ export function getPlayerTournamentState(
     currentMatchId: state?.currentMatchId ?? null,
     eliminated: state?.eliminated ?? false,
     advanced: state?.advanced ?? false,
-    champion: getTournamentChampion(tournamentId) === playerId,
+    champion: championPlayerIds(tournamentId).has(playerId),
     completedMatches: state?.completedMatches ?? 0,
     wins: state?.wins ?? 0,
     losses: state?.losses ?? 0,

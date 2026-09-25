@@ -9,9 +9,10 @@ import { breadcrumbList, DEFAULT_DESCRIPTION } from '../seo/seo';
 import { BracketView, type BracketPlayerMeta } from '../components/BracketView';
 import { ArenaAtmosphere } from '../components/ArenaAtmosphere';
 import { CompetitiveParticipantCard } from '../components/CompetitiveParticipantCard';
+import { TeamSelectionPanel } from '../components/TeamSelectionPanel';
 import { PlayerAvatar } from '../components/PlayerAvatar';
 import { RankBadge } from '../components/RankBadge';
-import type { MatchDto } from '../types/competitive';
+import type { MatchDto, MatchParticipantDto, TeamDto } from '../types/competitive';
 import {
   generateBracket,
   recordMatchResult,
@@ -78,6 +79,10 @@ export function TournamentDetailPage({ tournamentId }: TournamentDetailPageProps
     roundNames,
     participantRecords,
     championMeta,
+    teams,
+    teamById,
+    playerTeamId,
+    canSelectTeam,
     loading,
     error,
     reload,
@@ -224,6 +229,41 @@ export function TournamentDetailPage({ tournamentId }: TournamentDetailPageProps
         </section>
       )}
 
+      {/* ---------- Team Championship Hero — team competitions ---------- */}
+      {summary.status === 'completed' && summary.championTeamId && teamById.get(summary.championTeamId) && (
+        <section className="tournament-champion" aria-label="فريق البطولة">
+          <div className="tournament-champion-frame" aria-hidden="true">
+            <div className="tournament-champion-cup">
+              <span className="tournament-champion-cup-bowl" />
+              <span className="tournament-champion-cup-stem" />
+              <span className="tournament-champion-cup-base" />
+            </div>
+          </div>
+          <div className="tournament-champion-label">الفريق البطل</div>
+          <div className="bracket-team-avatars bracket-team-avatars-champion">
+            {teamById.get(summary.championTeamId)!.members.map((m) => (
+              <PlayerAvatar
+                key={m.playerId}
+                id={m.playerId}
+                name={m.displayName ?? 'لاعب'}
+                avatarUrl={m.avatarUrl ?? undefined}
+                size={72}
+              />
+            ))}
+          </div>
+          <h2 className="tournament-champion-name">
+            ⚔️ {teamById.get(summary.championTeamId)!.nameAr}
+          </h2>
+          <div className="tournament-champion-rank">
+            {teamById
+              .get(summary.championTeamId)!
+              .members.map((m) => m.displayName)
+              .filter(Boolean)
+              .join(' · ')}
+          </div>
+        </section>
+      )}
+
       {/* ---------- Tournament HUD (participants · rounds · matches) ---------- */}
       <section className="tournament-hud" aria-label="إحصائيات البطولة">
         <div className="tournament-hud-cell">
@@ -295,6 +335,18 @@ export function TournamentDetailPage({ tournamentId }: TournamentDetailPageProps
 
       {isAdmin && adminError && <div className="panel text-[var(--neon-red)] mb-4">{adminError}</div>}
 
+      {/* ---------- Team selection (registered owner, team competitions) ---------- */}
+      {summary.competitionType !== 'individual' && (canSelectTeam || !!playerTeamId) && (
+        <TeamSelectionPanel
+          tournamentId={tournamentId}
+          competitionType={summary.competitionType}
+          teams={teams}
+          playerTeamId={playerTeamId}
+          canSelect={canSelectTeam}
+          onChanged={() => void reload()}
+        />
+      )}
+
       {/* ---------- Participants ---------- */}
       <section className="mb-10">
         <div className="tournament-section-head">
@@ -347,7 +399,13 @@ export function TournamentDetailPage({ tournamentId }: TournamentDetailPageProps
           )}
         </div>
         {bracket ? (
-          <BracketView bracket={bracket} players={playerMeta} championPlayerId={summary.championPlayerId} />
+          <BracketView
+            bracket={bracket}
+            players={playerMeta}
+            teams={teamById}
+            championPlayerId={summary.championPlayerId}
+            championTeamId={summary.championTeamId}
+          />
         ) : (
           <div className="tournament-empty-state">
             <span className="tournament-empty-icon" aria-hidden="true">⚔</span>
@@ -372,6 +430,7 @@ export function TournamentDetailPage({ tournamentId }: TournamentDetailPageProps
                 match={match}
                 roundName={roundNames.get(match.roundNo) ?? `دور ${match.roundNo}`}
                 playerMeta={playerMeta}
+                teams={teamById}
                 isAdmin={isAdmin}
                 busy={busy}
                 onAction={runAdminAction}
@@ -390,6 +449,7 @@ function MatchRow({
   match,
   roundName,
   playerMeta,
+  teams,
   isAdmin,
   busy,
   onAction,
@@ -399,6 +459,7 @@ function MatchRow({
   match: MatchDto;
   roundName: string;
   playerMeta: Map<string, BracketPlayerMeta>;
+  teams: Map<string, TeamDto>;
   isAdmin: boolean;
   busy: boolean;
   onAction: (action: () => Promise<{ ok: boolean; error: string | null }>) => Promise<void>;
@@ -407,7 +468,7 @@ function MatchRow({
 }) {
   const [pickingWinner, setPickingWinner] = useState(false);
   const [correcting, setCorrecting] = useState(false);
-  const [correctWinner, setCorrectWinner] = useState<string | null>(null);
+  const [correctWinner, setCorrectWinner] = useState<{ playerId: string | null; teamId: string | null } | null>(null);
   const [correctChosen, setCorrectChosen] = useState(false);
   const [reason, setReason] = useState('');
   const [confirm, setConfirm] = useState(false);
@@ -417,6 +478,18 @@ function MatchRow({
 
   const playerName = (playerId: string | null) =>
     playerId ? playerMeta.get(playerId)?.name ?? 'لاعب' : '—';
+
+  /** Display label for a match side (player or team). */
+  const competitorName = (p: MatchParticipantDto): string => {
+    if (p.teamId) return teams.get(p.teamId)?.nameAr ?? 'فريق';
+    if (p.playerId) return playerMeta.get(p.playerId)?.name ?? 'لاعب';
+    return '—';
+  };
+  const isWinnerSide = (p: MatchParticipantDto): boolean =>
+    p.teamId ? match.winnerTeamId === p.teamId : match.winnerPlayerId === p.playerId;
+  const hasWinner = match.winnerPlayerId !== null || match.winnerTeamId !== null;
+  const correctKey = correctWinner ? `${correctWinner.playerId ?? ''}:${correctWinner.teamId ?? ''}` : 'draw';
+  const sideKey = (p: MatchParticipantDto) => `${p.playerId ?? ''}:${p.teamId ?? ''}`;
 
   const canStart = isAdmin && (match.status === 'pending' || match.status === 'scheduled');
   const canRecord = isAdmin && (match.status === 'pending' || match.status === 'scheduled' || match.status === 'active');
@@ -430,7 +503,8 @@ function MatchRow({
     setSubmitting(true);
     setCorrectError(null);
     const res = await correctMatchResult(tournamentId, match.id, {
-      correctedWinnerPlayerId: correctWinner,
+      correctedWinnerPlayerId: correctWinner?.playerId ?? null,
+      correctedWinnerTeamId: correctWinner?.teamId ?? null,
       reason: reason.trim(),
     });
     setSubmitting(false);
@@ -461,18 +535,41 @@ function MatchRow({
 
       <div className="tournament-match-body">
         {match.players.map((p) => {
-          const isWinner = match.winnerPlayerId === p.playerId;
-          const meta = playerMeta.get(p.playerId);
+          const isWinner = isWinnerSide(p);
+          const meta = p.playerId ? playerMeta.get(p.playerId) : undefined;
+          const team = p.teamId ? teams.get(p.teamId) : undefined;
           return (
             <div
-              key={`${p.slot}-${p.playerId}`}
+              key={`${p.slot}-${p.teamId ?? p.playerId}`}
               className={`tournament-match-player ${isWinner ? 'is-winner' : ''} ${
-                match.status === 'completed' && match.winnerPlayerId !== null && !isWinner ? 'is-defeated' : ''
-              }`}
+                match.status === 'completed' && hasWinner && !isWinner ? 'is-defeated' : ''
+              } ${p.teamId ? 'is-team' : ''}`}
             >
-              <PlayerAvatar id={p.playerId} name={meta?.name ?? 'لاعب'} avatarUrl={meta?.avatarUrl ?? undefined} size={30} />
-              <span className="tournament-match-player-name">{meta?.name ?? 'لاعب'}</span>
-              {meta?.rankName && <span className="badge badge-cyan">{meta.rankName}</span>}
+              {team ? (
+                <>
+                  <div className="bracket-team-avatars">
+                    {team.members.map((m) => (
+                      <PlayerAvatar
+                        key={m.playerId}
+                        id={m.playerId}
+                        name={m.displayName ?? 'لاعب'}
+                        avatarUrl={m.avatarUrl ?? undefined}
+                        size={30}
+                      />
+                    ))}
+                  </div>
+                  <span className="tournament-match-player-name">⚔️ {team.nameAr}</span>
+                  <span className="tournament-match-player-members">
+                    {team.members.map((m) => m.displayName).filter(Boolean).join(' · ')}
+                  </span>
+                </>
+              ) : (
+                <>
+                  <PlayerAvatar id={p.playerId!} name={meta?.name ?? 'لاعب'} avatarUrl={meta?.avatarUrl ?? undefined} size={30} />
+                  <span className="tournament-match-player-name">{meta?.name ?? 'لاعب'}</span>
+                  {meta?.rankName && <span className="badge badge-cyan">{meta.rankName}</span>}
+                </>
+              )}
               {isWinner && <span className="tournament-match-winner-tag">فائز</span>}
             </div>
           );
@@ -491,22 +588,31 @@ function MatchRow({
               <div className="tournament-match-correction-title">
                 تصحيح نتيجة مباراة مكتملة
                 <span className="text-xs text-[var(--text-dim)]">
-                  {' '}· الحالية: {match.winnerPlayerId ? playerName(match.winnerPlayerId) : 'تعادل'}
+                  {' '}· الحالية:{' '}
+                  {match.winnerTeamId
+                    ? teams.get(match.winnerTeamId)?.nameAr ?? 'فريق'
+                    : match.winnerPlayerId
+                      ? playerName(match.winnerPlayerId)
+                      : 'تعادل'}
                 </span>
               </div>
               <div className="text-xs text-[var(--text-dim)]">الفائز بعد التصحيح:</div>
               <div className="flex gap-2 flex-wrap">
                 {match.players.map((p) => (
                   <button
-                    key={`c-${p.playerId}`}
+                    key={`c-${p.teamId ?? p.playerId}`}
                     type="button"
-                    className={correctChosen && correctWinner === p.playerId ? 'btn-solid-cyan text-sm' : 'btn-neon text-sm'}
+                    className={
+                      correctChosen && correctWinner !== null && correctKey === sideKey(p)
+                        ? 'btn-solid-cyan text-sm'
+                        : 'btn-neon text-sm'
+                    }
                     onClick={() => {
-                      setCorrectWinner(p.playerId);
+                      setCorrectWinner({ playerId: p.playerId, teamId: p.teamId });
                       setCorrectChosen(true);
                     }}
                   >
-                    {playerName(p.playerId)}
+                    {competitorName(p)}
                   </button>
                 ))}
                 <button
@@ -557,15 +663,21 @@ function MatchRow({
               <span className="text-xs text-[var(--text-dim)]">اختر الفائز:</span>
               {match.players.map((p) => (
                 <button
-                  key={p.playerId}
+                  key={p.teamId ?? p.playerId}
                   className="btn-neon text-sm"
                   disabled={busy}
                   onClick={async () => {
-                    await onAction(() => recordMatchResult(tournamentId, match.id, { winnerPlayerId: p.playerId }));
+                    await onAction(() =>
+                      recordMatchResult(
+                        tournamentId,
+                        match.id,
+                        p.teamId ? { winnerTeamId: p.teamId } : { winnerPlayerId: p.playerId! }
+                      )
+                    );
                     setPickingWinner(false);
                   }}
                 >
-                  {playerName(p.playerId)}
+                  {competitorName(p)}
                 </button>
               ))}
               <button className="text-xs text-[var(--text-dim)]" onClick={() => setPickingWinner(false)}>

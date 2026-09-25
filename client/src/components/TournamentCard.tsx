@@ -1,7 +1,14 @@
-import { TournamentWithGame } from '../types/game';
+import { TournamentWithGame, CompetitionType } from '../types/game';
 import { resolveImageUrl } from '../utils/api';
 
 type TournamentStatus = 'draft' | 'open' | 'active' | 'completed' | 'cancelled';
+
+/** Roadmap #2 — compact competition-type label (secondary metadata). */
+const COMPETITION_LABELS: Record<CompetitionType, string> = {
+  individual: 'فردي',
+  team_vs_team: 'فريق ضد فريق',
+  two_vs_two: '2 ضد 2',
+};
 
 interface TournamentCardProps {
   tournament: TournamentWithGame;
@@ -63,6 +70,11 @@ export function TournamentCard({ tournament, gameImageUrl, onClick }: Tournament
           <p className="tournament-card-desc">{tournament.description_ar}</p>
         )}
         <div className="tournament-card-meta">
+          {tournament.competition_type && tournament.competition_type !== 'individual' && (
+            <span className="badge badge-cyan">
+              ⚔️ {COMPETITION_LABELS[tournament.competition_type]}
+            </span>
+          )}
           <span className="badge badge-yellow">
             👥 {(tournament.participant_count ?? 0).toLocaleString('ar')}
             {tournament.max_participants ? ` / ${tournament.max_participants.toLocaleString('ar')}` : ''}

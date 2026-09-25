@@ -212,6 +212,9 @@ export interface YouTubeConnectionStatus {
 
 /** Phase 3 — Tournament types */
 export type TournamentStatus = 'draft' | 'open' | 'active' | 'completed' | 'cancelled';
+/** Roadmap #2 — competition configuration. */
+export type CompetitionType = 'individual' | 'team_vs_team' | 'two_vs_two';
+export type TeamFormation = 'random' | 'player_choice';
 
 export interface TournamentEntry {
   id: string;
@@ -226,6 +229,12 @@ export interface TournamentEntry {
   /** R5 — visibility (independent of `status`). Non-null = hidden from listings. */
   hidden_at: number | null;
   hidden_by: string | null;
+  /** Roadmap #2 — competition configuration. */
+  competition_type: CompetitionType;
+  team_formation: TeamFormation | null;
+  team1_name: string | null;
+  team2_name: string | null;
+  teams_locked_at: number | null;
   starts_at: number | null;
   ends_at: number | null;
   created_by: string;

@@ -2,30 +2,46 @@
  * Phase 4C — BracketService.
  *
  * Generates a single-elimination bracket for an `open` tournament from its
- * already-registered `tournament_participants`, then transitions the tournament
- * to `active`. The entire generation runs in ONE transaction: a failure leaves
- * no partial bracket and the tournament unchanged.
+ * already-registered competitors, then transitions the tournament to `active`.
+ * The entire generation runs in ONE transaction: a failure leaves no partial
+ * bracket and the tournament unchanged.
+ *
+ * Roadmap #2 — a competitor is either:
+ * - an individual player (legacy 1v1), or
+ * - a team (Team vs Team / 2v2).
+ * The bracket engine is otherwise unchanged: it seeds, sizes, creates and wires
+ * matches identically regardless of competitor kind. Team vs Team naturally
+ * yields a single final (two competitors); 2v2 yields a normal bracket over
+ * teams. Byes operate at the competitor (team) level and a team never splits.
  *
  * Randomization:
- * - participants are shuffled once, at generation, using Node's crypto RNG by
- *   default (`crypto.randomInt`) via an unbiased Fisher–Yates shuffle.
+ * - individual: players are shuffled with Node's crypto RNG via an unbiased
+ *   Fisher–Yates shuffle.
+ * - team random formations: `TeamService.randomAssignTeams` performs the
+ *   distribution with the same RNG; the bracket then runs over the assigned
+ *   teams.
  * - tests may inject a deterministic `randomInt` via `options.randomInt`.
  * - the bracket is locked after generation: a second call is rejected; nothing
  *   ever reshuffles on reload, result, or advancement.
  *
  * Byes:
- * - bracket size is the smallest power of two >= participant count.
- * - byes = bracketSize - participantCount. The standard seed order
- *   (1 vs B, 2 vs B-1, ...) guarantees at most one bye per first-round pair and
- *   spreads them across the bracket.
- * - a bye is NOT a match: the player is placed directly into their next-round
- *   slot, and no match row (playable or fake) is created for it. Byes therefore
- *   never award LP/Elo/stats.
+ * - bracket size is the smallest power of two >= competitor count.
+ * - byes = bracketSize - competitorCount. Standard seed order spreads them.
+ * - a bye is NOT a match: the competitor is placed directly into their
+ *   next-round slot, and no match row is created for it.
  */
 
 import { randomInt, randomUUID } from 'crypto';
 import { getDb } from '../db/db';
-import { updateTournament, type TournamentRow } from '../games/TournamentService';
+import { updateTournament, isTeamCompetition, type TournamentRow } from '../games/TournamentService';
+import {
+  TeamError,
+  assertFormationComplete,
+  ensureTeamsInitialized,
+  getTeams,
+  lockTeams,
+  randomAssignTeams,
+} from './TeamService';
 import { emitCompetitiveEvent } from './competitiveEvents';
 
 export class BracketError extends Error {
@@ -51,7 +67,10 @@ export interface GenerateBracketResult {
 }
 
 export interface BracketParticipantView {
-  playerId: string;
+  /** Set for individual matches; null for team matches. */
+  playerId: string | null;
+  /** Set for team matches; null for individual matches. */
+  teamId: string | null;
   slot: number;
   seed: number | null;
 }
@@ -63,6 +82,7 @@ export interface BracketMatchView {
   status: string;
   bestOf: number | null;
   winnerPlayerId: string | null;
+  winnerTeamId: string | null;
   nextMatchId: string | null;
   nextMatchSlot: number | null;
   scheduledAt: number | null;
@@ -98,11 +118,18 @@ interface TournamentMatchRow {
   status: string;
   best_of: number | null;
   winner_player_id: string | null;
+  winner_team_id: string | null;
   next_match_id: string | null;
   next_match_slot: number | null;
   scheduled_at: number | null;
   started_at: number | null;
   completed_at: number | null;
+}
+
+/** A bracket competitor: a canonical player id or a tournament team id. */
+interface Competitor {
+  kind: 'player' | 'team';
+  id: string;
 }
 
 /** Smallest power of two >= n (n >= 1). */
@@ -132,7 +159,7 @@ export function buildSeedOrder(size: number): number[] {
   return order;
 }
 
-/** Round display name derived from the number of players alive in that round. */
+/** Round display name derived from the number of competitors alive in that round. */
 export function roundNameForPlayers(playersAlive: number): { en: string; ar: string } {
   if (playersAlive <= 2) return { en: 'Final', ar: 'النهائي' };
   if (playersAlive === 4) return { en: 'Semi Final', ar: 'نصف النهائي' };
@@ -161,6 +188,31 @@ export function hasBracket(tournamentId: string): boolean {
     .prepare('SELECT COUNT(*) AS n FROM tournament_matches WHERE tournament_id = ?')
     .get(tournamentId) as { n: number };
   return row.n > 0;
+}
+
+/** The competitor list the bracket will be generated from. */
+function resolveCompetitors(
+  tournament: TournamentRow,
+  options?: GenerateBracketOptions
+): Competitor[] {
+  if (isTeamCompetition(tournament.competition_type)) {
+    ensureTeamsInitialized(tournament.id);
+    if (tournament.team_formation === 'random') {
+      randomAssignTeams(tournament.id, { randomInt: options?.randomInt });
+    }
+    assertFormationComplete(tournament.id, tournament.competition_type);
+    return getTeams(tournament.id).map((team) => ({ kind: 'team' as const, id: team.id }));
+  }
+
+  const participantRows = getDb()
+    .prepare(
+      `SELECT player_id FROM tournament_participants
+        WHERE tournament_id = ? AND status IN ('registered','confirmed')
+        ORDER BY player_id ASC`
+    )
+    .all(tournament.id) as { player_id: string }[];
+  const players = [...new Set(participantRows.map((r) => r.player_id))];
+  return players.map((playerId) => ({ kind: 'player' as const, id: playerId }));
 }
 
 /**
@@ -192,39 +244,39 @@ export function generateBracket(
       );
     }
 
-    const participantRows = db
-      .prepare(
-        `SELECT player_id FROM tournament_participants
-          WHERE tournament_id = ? AND status IN ('registered','confirmed')
-          ORDER BY player_id ASC`
-      )
-      .all(tournamentId) as { player_id: string }[];
+    let competitors: Competitor[];
+    try {
+      competitors = resolveCompetitors(tournament, options);
+    } catch (err) {
+      if (err instanceof TeamError) {
+        // Surface team-formation problems through the bracket error contract.
+        throw new BracketError(err.code, err.message);
+      }
+      throw err;
+    }
 
-    // The participant rows are authoritative; the denormalized participant_count
-    // is never trusted for bracket sizing.
-    const players = [...new Set(participantRows.map((r) => r.player_id))];
-    if (players.length < 2) {
+    const competitorCount = competitors.length;
+    if (competitorCount < 2) {
       throw new BracketError(
         'not_enough_participants',
-        `at least 2 eligible participants are required (got ${players.length})`
+        `at least 2 eligible competitors are required (got ${competitorCount})`
       );
     }
 
-    const participantCount = players.length;
-    const bracketSize = nextPowerOfTwo(participantCount);
+    const bracketSize = nextPowerOfTwo(competitorCount);
     const totalRounds = Math.log2(bracketSize);
-    const byes = bracketSize - participantCount;
+    const byes = bracketSize - competitorCount;
 
-    // Randomized seeding: shuffled players are assigned seeds 1..N; higher seeds
-    // (N+1..B) are byes.
-    const shuffled = shuffle(players, randomIntExclusive);
-    const seedToPlayer = new Map<number, string>();
-    shuffled.forEach((playerId, index) => seedToPlayer.set(index + 1, playerId));
+    // Randomized seeding: shuffled competitors are assigned seeds 1..N; higher
+    // seeds (N+1..B) are byes.
+    const shuffled = shuffle(competitors, randomIntExclusive);
+    const seedToCompetitor = new Map<number, Competitor>();
+    shuffled.forEach((competitor, index) => seedToCompetitor.set(index + 1, competitor));
 
     const seedOrder = buildSeedOrder(bracketSize);
     const leaves = seedOrder.map((seed) => ({
       seed,
-      playerId: seed <= participantCount ? seedToPlayer.get(seed)! : null,
+      competitor: seed <= competitorCount ? seedToCompetitor.get(seed)! : null,
     }));
 
     const roundCounts: number[] = [];
@@ -241,10 +293,10 @@ export function generateBracket(
       db.prepare(
         `INSERT INTO tournament_matches
            (id, tournament_id, game_id, round_no, slot_no, status, best_of,
-            winner_player_id, next_match_id, next_match_slot,
+            winner_player_id, winner_team_id, next_match_id, next_match_slot,
             scheduled_at, started_at, completed_at, result_source, result_idempotency_key,
             created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, 'pending', 1, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, ?, ?)`
+         VALUES (?, ?, ?, ?, ?, 'pending', 1, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, ?, ?)`
       ).run(id, tournamentId, tournament.game_id, roundNo, slotNo, now, now);
       matchIdByPosition.set(`${roundNo}:${position}`, id);
       matchCount += 1;
@@ -253,14 +305,21 @@ export function generateBracket(
 
     const insertParticipant = (
       matchId: string,
-      playerId: string,
+      competitor: Competitor,
       slot: number,
       seed: number | null
     ): void => {
-      db.prepare(
-        `INSERT INTO tournament_match_participants (match_id, player_id, slot, seed, created_at)
-         VALUES (?, ?, ?, ?, ?)`
-      ).run(matchId, playerId, slot, seed, now);
+      if (competitor.kind === 'player') {
+        db.prepare(
+          `INSERT INTO tournament_match_participants (match_id, player_id, team_id, slot, seed, created_at)
+           VALUES (?, ?, NULL, ?, ?, ?)`
+        ).run(matchId, competitor.id, slot, seed, now);
+      } else {
+        db.prepare(
+          `INSERT INTO tournament_match_participants (match_id, player_id, team_id, slot, seed, created_at)
+           VALUES (?, NULL, ?, ?, ?, ?)`
+        ).run(matchId, competitor.id, slot, seed, now);
+      }
     };
 
     // Create every match in rounds 2..R (they are always needed as advancement
@@ -273,34 +332,34 @@ export function generateBracket(
     }
 
     // Round 1: pair adjacent leaves. Create a match only for pairs with two
-    // players; a pair with a bye has exactly one player and advances directly.
+    // competitors; a pair with a bye has exactly one and advances directly.
     const round1Count = roundCounts[0];
     let round1Slot = 0;
     for (let position = 1; position <= round1Count; position++) {
       const left = leaves[(position - 1) * 2];
       const right = leaves[(position - 1) * 2 + 1];
-      const present = [left, right].filter((leaf) => leaf.playerId !== null) as {
+      const present = [left, right].filter((leaf) => leaf.competitor !== null) as {
         seed: number;
-        playerId: string;
+        competitor: Competitor;
       }[];
 
       if (present.length === 2) {
         round1Slot += 1;
         const matchId = insertMatch(1, position, round1Slot);
-        insertParticipant(matchId, present[0].playerId, 1, present[0].seed);
-        insertParticipant(matchId, present[1].playerId, 2, present[1].seed);
+        insertParticipant(matchId, present[0].competitor, 1, present[0].seed);
+        insertParticipant(matchId, present[1].competitor, 2, present[1].seed);
       } else if (present.length === 1) {
-        // Bye — no match row. Place the player directly into their next-round slot.
-        const player = present[0];
+        // Bye — no match row. Place the competitor directly into their next slot.
+        const entry = present[0];
         const nextPosition = Math.ceil(position / 2);
         const nextSlot = position % 2 === 1 ? 1 : 2;
         const nextMatchId = matchIdByPosition.get(`2:${nextPosition}`);
         if (!nextMatchId) {
           throw new BracketError('bad_bracket', 'internal error: missing next-round match for bye');
         }
-        insertParticipant(nextMatchId, player.playerId, nextSlot, player.seed);
+        insertParticipant(nextMatchId, entry.competitor, nextSlot, entry.seed);
       } else {
-        throw new BracketError('bad_bracket', 'internal error: first-round pair with no players');
+        throw new BracketError('bad_bracket', 'internal error: first-round pair with no competitors');
       }
     }
 
@@ -323,6 +382,13 @@ export function generateBracket(
       }
     }
 
+    // Lock team composition (no-op for individual tournaments) before the
+    // tournament becomes active, so no window exists where a bracket reflects a
+    // still-changing roster.
+    if (isTeamCompetition(tournament.competition_type)) {
+      lockTeams(tournamentId);
+    }
+
     // Bracket is complete and valid: transition the tournament open → active.
     // `updateTournament` validates the state machine transition.
     updateTournament(tournamentId, { status: 'active' });
@@ -333,7 +399,7 @@ export function generateBracket(
       bracketSize,
       totalRounds,
       byes,
-      participantCount,
+      participantCount: competitorCount,
       matchCount,
     };
   });
@@ -358,14 +424,38 @@ export function generateBracket(
 function readParticipants(matchId: string): BracketParticipantView[] {
   const rows = getDb()
     .prepare(
-      `SELECT player_id, slot, seed FROM tournament_match_participants
+      `SELECT player_id, team_id, slot, seed FROM tournament_match_participants
         WHERE match_id = ? ORDER BY slot ASC`
     )
-    .all(matchId) as { player_id: string; slot: number; seed: number | null }[];
-  return rows.map((row) => ({ playerId: row.player_id, slot: row.slot, seed: row.seed }));
+    .all(matchId) as { player_id: string | null; team_id: string | null; slot: number; seed: number | null }[];
+  return rows.map((row) => ({
+    playerId: row.player_id,
+    teamId: row.team_id,
+    slot: row.slot,
+    seed: row.seed,
+  }));
 }
 
-/** Structured bracket read for the future public API/visual bracket. */
+/** Number of bracket competitors: teams for team competitions, players otherwise. */
+function competitorCountFor(tournament: TournamentRow): number {
+  if (isTeamCompetition(tournament.competition_type)) {
+    return (
+      getDb()
+        .prepare('SELECT COUNT(*) AS n FROM tournament_teams WHERE tournament_id = ?')
+        .get(tournament.id) as { n: number }
+    ).n;
+  }
+  return (
+    getDb()
+      .prepare(
+        `SELECT COUNT(*) AS n FROM tournament_participants
+          WHERE tournament_id = ? AND status IN ('registered','confirmed')`
+      )
+      .get(tournament.id) as { n: number }
+  ).n;
+}
+
+/** Structured bracket read for the public API/visual bracket. */
 export function getTournamentBracket(tournamentId: string): TournamentBracketView | null {
   const db = getDb();
   const tournament = db.prepare('SELECT * FROM tournaments WHERE id = ?').get(tournamentId) as
@@ -376,7 +466,7 @@ export function getTournamentBracket(tournamentId: string): TournamentBracketVie
   const matchRows = db
     .prepare(
       `SELECT id, tournament_id, game_id, round_no, slot_no, status, best_of,
-              winner_player_id, next_match_id, next_match_slot,
+              winner_player_id, winner_team_id, next_match_id, next_match_slot,
               scheduled_at, started_at, completed_at
          FROM tournament_matches
         WHERE tournament_id = ?
@@ -384,14 +474,7 @@ export function getTournamentBracket(tournamentId: string): TournamentBracketVie
     )
     .all(tournamentId) as TournamentMatchRow[];
 
-  const participantCount = (
-    db
-      .prepare(
-        `SELECT COUNT(*) AS n FROM tournament_participants
-          WHERE tournament_id = ? AND status IN ('registered','confirmed')`
-      )
-      .get(tournamentId) as { n: number }
-  ).n;
+  const participantCount = competitorCountFor(tournament);
 
   if (matchRows.length === 0) {
     return {
@@ -423,6 +506,7 @@ export function getTournamentBracket(tournamentId: string): TournamentBracketVie
         status: m.status,
         bestOf: m.best_of,
         winnerPlayerId: m.winner_player_id,
+        winnerTeamId: m.winner_team_id,
         nextMatchId: m.next_match_id,
         nextMatchSlot: m.next_match_slot,
         scheduledAt: m.scheduled_at,

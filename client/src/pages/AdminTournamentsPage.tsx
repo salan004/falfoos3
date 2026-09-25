@@ -6,7 +6,7 @@ import { AdminGate } from '../components/AdminGate';
 import { AdminAccessDenied } from '../components/admin/AdminAccessDenied';
 import { ImageUploadField } from '../components/admin/ImageUploadField';
 import { hideTournament, restoreTournament } from '../utils/competitiveApi';
-import { TournamentWithGame, TournamentStatus } from '../types/game';
+import { TournamentWithGame, TournamentStatus, CompetitionType, TeamFormation } from '../types/game';
 
 /** R5 — admin visibility filter for the tournament list. */
 type VisibilityFilter = 'visible' | 'hidden' | 'all';
@@ -21,6 +21,11 @@ interface TournamentFormData {
   ticket_cost: string;
   /** Initial status only — lifecycle changes happen from the list actions. */
   status: 'draft' | 'open';
+  /** Roadmap #2 — competition configuration. */
+  competition_type: CompetitionType;
+  team_formation: TeamFormation | '';
+  team1_name: string;
+  team2_name: string;
 }
 
 const EMPTY_FORM: TournamentFormData = {
@@ -31,7 +36,23 @@ const EMPTY_FORM: TournamentFormData = {
   max_participants: '',
   ticket_cost: '',
   status: 'draft',
+  competition_type: 'individual',
+  team_formation: '',
+  team1_name: '',
+  team2_name: '',
 };
+
+/** Roadmap #2 — Arabic labels for the competition configuration controls. */
+const COMPETITION_OPTIONS: { value: CompetitionType; label: string }[] = [
+  { value: 'individual', label: 'فردي' },
+  { value: 'team_vs_team', label: 'فريق ضد فريق' },
+  { value: 'two_vs_two', label: '2 ضد 2' },
+];
+
+const FORMATION_OPTIONS: { value: TeamFormation; label: string }[] = [
+  { value: 'random', label: 'توزيع عشوائي' },
+  { value: 'player_choice', label: 'اختيار اللاعبين' },
+];
 
 const STATUS_LABELS: Record<TournamentStatus, string> = {
   draft: 'مسودة',
@@ -148,6 +169,7 @@ export function AdminTournamentsPage({ gameId }: AdminTournamentsPageProps) {
     setSubmitting(true);
 
     try {
+      const isTeam = formData.competition_type !== 'individual';
       const base = {
         game_id: formData.game_id,
         name_ar: formData.name_ar.trim(),
@@ -162,6 +184,13 @@ export function AdminTournamentsPage({ gameId }: AdminTournamentsPageProps) {
         ticket_cost: formData.ticket_cost.trim() === ''
           ? null
           : parseInt(formData.ticket_cost, 10),
+        // Roadmap #2 — competition configuration.
+        competition_type: formData.competition_type,
+        team_formation: isTeam ? (formData.team_formation || 'random') : null,
+        team1_name:
+          formData.competition_type === 'team_vs_team' ? formData.team1_name.trim() : null,
+        team2_name:
+          formData.competition_type === 'team_vs_team' ? formData.team2_name.trim() : null,
       };
 
       // dates (starts_at / ends_at) are deliberately not sent — UI removal only.
@@ -202,6 +231,10 @@ export function AdminTournamentsPage({ gameId }: AdminTournamentsPageProps) {
       max_participants: tournament.max_participants ? String(tournament.max_participants) : '',
       ticket_cost: tournament.ticket_cost ? String(tournament.ticket_cost) : '',
       status: 'draft',
+      competition_type: tournament.competition_type ?? 'individual',
+      team_formation: tournament.team_formation ?? '',
+      team1_name: tournament.team1_name ?? '',
+      team2_name: tournament.team2_name ?? '',
     });
     setShowForm(true);
     setError(null);
@@ -518,6 +551,103 @@ export function AdminTournamentsPage({ gameId }: AdminTournamentsPageProps) {
                   placeholder="وصف البطولة"
                 />
               </div>
+            </section>
+
+            <section className="admin-form-section">
+              <h3 className="admin-form-section-title">نوع المنافسة</h3>
+              <div className="admin-form-grid">
+                <div className="admin-field">
+                  <label className="admin-field-label" htmlFor="tournament-competition">
+                    نوع المنافسة *
+                  </label>
+                  <select
+                    id="tournament-competition"
+                    value={formData.competition_type}
+                    onChange={(e) =>
+                      setFormData({ ...formData, competition_type: e.target.value as CompetitionType })
+                    }
+                    className="w-full input-field"
+                  >
+                    {COMPETITION_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {formData.competition_type !== 'individual' && (
+                  <div className="admin-field">
+                    <label className="admin-field-label" htmlFor="tournament-formation">
+                      طريقة تشكيل الفرق *
+                    </label>
+                    <select
+                      id="tournament-formation"
+                      value={formData.team_formation || 'random'}
+                      onChange={(e) =>
+                        setFormData({ ...formData, team_formation: e.target.value as TeamFormation })
+                      }
+                      className="w-full input-field"
+                    >
+                      {FORMATION_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+              </div>
+
+              {formData.competition_type === 'team_vs_team' && (
+                <div className="admin-form-grid">
+                  <div className="admin-field">
+                    <label className="admin-field-label" htmlFor="tournament-team1">
+                      اسم الفريق الأول
+                    </label>
+                    <input
+                      id="tournament-team1"
+                      type="text"
+                      value={formData.team1_name}
+                      onChange={(e) => setFormData({ ...formData, team1_name: e.target.value })}
+                      maxLength={60}
+                      className="w-full input-field"
+                      placeholder="الفريق الأول"
+                    />
+                  </div>
+                  <div className="admin-field">
+                    <label className="admin-field-label" htmlFor="tournament-team2">
+                      اسم الفريق الثاني
+                    </label>
+                    <input
+                      id="tournament-team2"
+                      type="text"
+                      value={formData.team2_name}
+                      onChange={(e) => setFormData({ ...formData, team2_name: e.target.value })}
+                      maxLength={60}
+                      className="w-full input-field"
+                      placeholder="الفريق الثاني"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {formData.competition_type === 'two_vs_two' && (
+                <p className="admin-field-hint">
+                  أسماء الفرق في منافسة 2 ضد 2 تُنشأ تلقائيًا (الفريق 1، الفريق 2، …).
+                  {formData.team_formation === 'player_choice'
+                    ? ' يجب تحديد «عدد المشاركين» (زوجي) ليتحدد عدد الفرق.'
+                    : ''}
+                </p>
+              )}
+
+              {formData.competition_type !== 'individual' && (
+                <p className="admin-field-hint">
+                  {formData.team_formation === 'player_choice'
+                    ? 'يختار اللاعبون فرقهم من صفحة البطولة بعد شراء التذكرة، ويُقفل الاختيار عند توليد الجدول.'
+                    : 'يُوزّع اللاعبون على الفرق تلقائيًا عند توليد جدول البطولة.'}
+                </p>
+              )}
             </section>
 
             <section className="admin-form-section">

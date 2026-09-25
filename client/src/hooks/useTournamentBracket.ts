@@ -6,6 +6,7 @@ import type {
   CompetitiveRosterEntry,
   GameLeaderboardEntry,
   MatchDto,
+  TeamDto,
   TournamentSummary,
 } from '../types/competitive';
 import {
@@ -13,6 +14,7 @@ import {
   fetchTournamentRoster,
   fetchTournamentBracket,
   fetchTournamentMatches,
+  fetchTournamentTeams,
   fetchGameLeaderboard,
 } from '../utils/competitiveApi';
 
@@ -27,6 +29,15 @@ export interface TournamentBracketData {
   participantRecords: Map<string, { wins: number; losses: number }>;
   championPlayerId: string | null;
   championMeta: BracketPlayerMeta | undefined;
+  /** Roadmap #2 — champion team for team tournaments. */
+  championTeamId: string | null;
+  /** Roadmap #2 — teams and a fast lookup for team competitors. */
+  teams: TeamDto[];
+  teamById: Map<string, TeamDto>;
+  /** Roadmap #2 — the signed-in linked player's current team (null if none). */
+  playerTeamId: string | null;
+  /** Roadmap #2 — server hint: this session may select a team now. */
+  canSelectTeam: boolean;
   loading: boolean;
   error: string | null;
   /** Bumped on every successful (re)load — useful for broadcast "live" cues. */
@@ -49,6 +60,9 @@ export function useTournamentBracket(tournamentId: string): TournamentBracketDat
   const [roster, setRoster] = useState<CompetitiveRosterEntry[]>([]);
   const [bracket, setBracket] = useState<BracketDto | null>(null);
   const [matches, setMatches] = useState<MatchDto[]>([]);
+  const [teams, setTeams] = useState<TeamDto[]>([]);
+  const [playerTeamId, setPlayerTeamId] = useState<string | null>(null);
+  const [canSelectTeam, setCanSelectTeam] = useState(false);
   const [profiles, setProfiles] = useState<Map<string, GameLeaderboardEntry>>(new Map());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -65,16 +79,20 @@ export function useTournamentBracket(tournamentId: string): TournamentBracketDat
     const summaryData = summaryRes.data.tournament;
     setSummary(summaryData);
 
-    const [rosterRes, bracketRes, matchesRes, leaderboardRes] = await Promise.all([
+    const [rosterRes, bracketRes, matchesRes, leaderboardRes, teamsRes] = await Promise.all([
       fetchTournamentRoster(tournamentId),
       fetchTournamentBracket(tournamentId),
       fetchTournamentMatches(tournamentId),
       fetchGameLeaderboard(summaryData.gameId),
+      fetchTournamentTeams(tournamentId),
     ]);
 
     setRoster(rosterRes.data?.participants ?? []);
     setBracket(bracketRes.data?.bracket ?? null);
     setMatches(matchesRes.data?.matches ?? []);
+    setTeams(teamsRes.data?.teams ?? []);
+    setPlayerTeamId(teamsRes.data?.playerTeamId ?? null);
+    setCanSelectTeam(teamsRes.data?.canSelect ?? false);
 
     const map = new Map<string, GameLeaderboardEntry>();
     for (const entry of leaderboardRes.data?.leaderboard.players ?? []) {
@@ -144,6 +162,12 @@ export function useTournamentBracket(tournamentId: string): TournamentBracketDat
     return map;
   }, [bracket]);
 
+  const teamById = useMemo(() => {
+    const map = new Map<string, TeamDto>();
+    for (const team of teams) map.set(team.id, team);
+    return map;
+  }, [teams]);
+
   const participantRecords = useMemo(() => {
     const records = new Map<string, { wins: number; losses: number }>();
     const ensure = (playerId: string) => {
@@ -156,17 +180,29 @@ export function useTournamentBracket(tournamentId: string): TournamentBracketDat
     };
     for (const match of matches) {
       if (match.status !== 'completed') continue;
+      const hasWinner = match.winnerPlayerId !== null || match.winnerTeamId !== null;
       for (const p of match.players) {
-        const rec = ensure(p.playerId);
-        if (match.winnerPlayerId === null) continue;
-        if (match.winnerPlayerId === p.playerId) rec.wins += 1;
-        else rec.losses += 1;
+        const playerIds = p.teamId
+          ? teamById.get(p.teamId)?.members.map((m) => m.playerId) ?? []
+          : p.playerId
+            ? [p.playerId]
+            : [];
+        const isWinnerSide = p.teamId
+          ? match.winnerTeamId === p.teamId
+          : match.winnerPlayerId === p.playerId;
+        for (const playerId of playerIds) {
+          const rec = ensure(playerId);
+          if (!hasWinner) continue;
+          if (isWinnerSide) rec.wins += 1;
+          else rec.losses += 1;
+        }
       }
     }
     return records;
-  }, [matches]);
+  }, [matches, teamById]);
 
   const championPlayerId = summary?.championPlayerId ?? null;
+  const championTeamId = summary?.championTeamId ?? null;
   const championMeta = championPlayerId ? playerMeta.get(championPlayerId) : undefined;
 
   return {
@@ -180,6 +216,11 @@ export function useTournamentBracket(tournamentId: string): TournamentBracketDat
     participantRecords,
     championPlayerId,
     championMeta,
+    championTeamId,
+    teams,
+    teamById,
+    playerTeamId,
+    canSelectTeam,
     loading,
     error,
     updatedAt,

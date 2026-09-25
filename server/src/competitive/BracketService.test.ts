@@ -55,9 +55,9 @@ function setupTournament(gameId: string, playerCount: number, status: 'open' | '
   return { tournamentId, players };
 }
 
-function allBracketParticipants(tournamentId: string): { playerId: string; slot: number; roundNo: number }[] {
+function allBracketParticipants(tournamentId: string): { playerId: string | null; slot: number; roundNo: number }[] {
   const bracket = getTournamentBracket(tournamentId)!;
-  const out: { playerId: string; slot: number; roundNo: number }[] = [];
+  const out: { playerId: string | null; slot: number; roundNo: number }[] = [];
   for (const round of bracket.rounds) {
     for (const match of round.matches) {
       for (const p of match.participants) {
@@ -158,7 +158,7 @@ test('non-power-of-two brackets use byes without fake matches', () => {
     for (const match of round2) {
       assertTrue(match.participants.length <= 2, `round-2 match at most two players (${n})`);
       for (const p of match.participants) {
-        assertTrue(players.includes(p.playerId), `round-2 participant is a real player (${n})`);
+        assertTrue(players.includes(p.playerId ?? ''), `round-2 participant is a real player (${n})`);
       }
     }
   }
@@ -203,7 +203,7 @@ test('deterministic RNG injection yields reproducible seeding', () => {
     for (const round of bracket.rounds) {
       for (const match of round.matches) {
         for (const p of match.participants) {
-          if (p.seed !== null) entries.push([p.playerId.slice(-3), p.seed]);
+          if (p.seed !== null) entries.push([(p.playerId ?? '').slice(-3), p.seed]);
         }
       }
     }

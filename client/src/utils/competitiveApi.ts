@@ -1,11 +1,14 @@
 import { apiFetch } from './api';
 import type {
   BracketDto,
+  CompetitionType,
   CompetitiveRosterEntry,
   GameLeaderboard,
   MatchDto,
   PlayerCompetitiveProfile,
   PlayerTournamentState,
+  TeamDto,
+  TeamFormation,
   TournamentSummary,
 } from '../types/competitive';
 
@@ -64,6 +67,69 @@ export async function fetchTournamentMatches(id: string): Promise<ApiResult<{ ma
   return jsonRequest(`/api/tournaments/${id}/matches`);
 }
 
+/* ----------------------------------- teams -------------------------------- */
+
+export interface TournamentTeamsResponse {
+  teams: TeamDto[];
+  competitionType?: CompetitionType;
+  teamFormation?: TeamFormation | null;
+  teamsLockedAt?: number | null;
+  /** Session-aware (server-authoritative only for hints). */
+  playerTeamId?: string | null;
+  canSelect?: boolean;
+}
+
+/** Roadmap #2 — public team read for a tournament. */
+export async function fetchTournamentTeams(id: string): Promise<ApiResult<TournamentTeamsResponse>> {
+  return jsonRequest(`/api/tournaments/${id}/teams`);
+}
+
+export interface TeamSelectionResponse {
+  teams: TeamDto[];
+  playerTeamId: string | null;
+  idempotent: boolean;
+  switched: boolean;
+}
+
+/** Roadmap #2 — the server derives the player from the session; only teamId is sent. */
+export async function selectTournamentTeam(
+  tournamentId: string,
+  teamId: string
+): Promise<ApiResult<TeamSelectionResponse>> {
+  return jsonRequest(`/api/tournaments/${tournamentId}/team-selection`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ teamId }),
+  });
+}
+
+/** Roadmap #2 — admin team inspection. */
+export async function adminFetchTournamentTeams(
+  tournamentId: string
+): Promise<ApiResult<{ teams: TeamDto[] }>> {
+  return jsonRequest(`/api/admin/tournaments/${tournamentId}/teams`);
+}
+
+/** Roadmap #2 — admin random re-distribution (before lock). */
+export async function adminRandomizeTournamentTeams(
+  tournamentId: string
+): Promise<ApiResult<{ teams: TeamDto[] }>> {
+  return jsonRequest(`/api/admin/tournaments/${tournamentId}/teams/randomize`, { method: 'POST' });
+}
+
+/** Roadmap #2 — admin correction of a single player's team. */
+export async function adminAssignTournamentTeam(
+  tournamentId: string,
+  playerId: string,
+  teamId: string
+): Promise<ApiResult<{ team: TeamDto }>> {
+  return jsonRequest(`/api/admin/tournaments/${tournamentId}/teams/assignment`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ playerId, teamId }),
+  });
+}
+
 export async function fetchGameLeaderboard(gameId: string, limit?: number): Promise<ApiResult<{ leaderboard: GameLeaderboard }>> {
   const query = limit ? `?limit=${encodeURIComponent(String(limit))}` : '';
   return jsonRequest(`/api/games/${gameId}/competitive${query}`);
@@ -108,16 +174,27 @@ export async function generateBracket(tournamentId: string): Promise<ApiResult<{
 }
 
 export interface RecordResultBody {
-  winnerPlayerId: string;
+  /** Exactly one of winnerPlayerId / winnerTeamId is required. */
+  winnerPlayerId?: string;
+  winnerTeamId?: string;
   resultSource?: 'admin' | 'auto' | 'import';
   idempotencyKey?: string;
+}
+
+export interface RecordResultResponse {
+  winnerPlayerId: string | null;
+  winnerTeamId: string | null;
+  tournamentCompleted: boolean;
+  championPlayerId: string | null;
+  championTeamId: string | null;
+  alreadyProcessed: boolean;
 }
 
 export async function recordMatchResult(
   tournamentId: string,
   matchId: string,
   body: RecordResultBody
-): Promise<ApiResult<{ result: { winnerPlayerId: string; tournamentCompleted: boolean; championPlayerId: string | null; alreadyProcessed: boolean } }>> {
+): Promise<ApiResult<{ result: RecordResultResponse }>> {
   return jsonRequest(`/api/admin/tournaments/${tournamentId}/matches/${matchId}/result`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -171,6 +248,11 @@ export interface CreateTournamentBody {
   starts_at?: number;
   ends_at?: number;
   status?: string;
+  /** Roadmap #2 — competition configuration. */
+  competition_type?: CompetitionType;
+  team_formation?: TeamFormation | null;
+  team1_name?: string | null;
+  team2_name?: string | null;
 }
 
 export async function createTournament(
@@ -233,17 +315,21 @@ export interface CorrectionResultDto {
   gameId: string;
   status: string;
   previousWinnerPlayerId: string | null;
+  previousWinnerTeamId: string | null;
   correctedWinnerPlayerId: string | null;
+  correctedWinnerTeamId: string | null;
   changed: boolean;
   alreadyProcessed: boolean;
   tournamentCompleted: boolean;
   championPlayerId: string | null;
+  championTeamId: string | null;
   affectedPlayerIds: string[];
 }
 
 export interface CorrectMatchResultBody {
-  /** null records the corrected outcome as a draw. */
-  correctedWinnerPlayerId: string | null;
+  /** Exactly one is set; both null records the corrected outcome as a draw. */
+  correctedWinnerPlayerId?: string | null;
+  correctedWinnerTeamId?: string | null;
   reason: string;
   idempotencyKey?: string;
 }

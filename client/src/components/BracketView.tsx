@@ -1,6 +1,6 @@
 import { PlayerAvatar } from './PlayerAvatar';
 import { RankBadge } from './RankBadge';
-import type { BracketDto, MatchDto } from '../types/competitive';
+import type { BracketDto, MatchDto, TeamDto } from '../types/competitive';
 
 export interface BracketPlayerMeta {
   name: string;
@@ -16,10 +16,51 @@ interface BracketViewProps {
   bracket: BracketDto;
   players: Map<string, BracketPlayerMeta>;
   championPlayerId?: string | null;
+  /** Roadmap #2 — team lookup for team competitors + team champion. */
+  teams?: Map<string, TeamDto>;
+  championTeamId?: string | null;
   /** `broadcast` renders the same tree with stream-overlay-friendly styling. */
   variant?: 'default' | 'broadcast';
   selectedMatchId?: string | null;
   onSelectMatch?: (match: MatchDto) => void;
+}
+
+/** Compact team side: stacked member avatars + team name + member names. */
+function TeamSide({
+  team,
+  fallbackName,
+}: {
+  team: TeamDto | undefined;
+  fallbackName: string;
+}) {
+  const members = team?.members ?? [];
+  const name = team?.nameAr ?? fallbackName;
+  return (
+    <>
+      <div className="bracket-team-avatars" aria-hidden={members.length === 0}>
+        {members.slice(0, 3).map((m) => (
+          <PlayerAvatar
+            key={m.playerId}
+            id={m.playerId}
+            name={m.displayName ?? 'لاعب'}
+            avatarUrl={m.avatarUrl ?? undefined}
+            size={26}
+          />
+        ))}
+      </div>
+      <div className="bracket-player-body">
+        <span className="bracket-player-name" title={name}>
+          ⚔️ {name}
+        </span>
+        <span className="bracket-player-sub bracket-team-members">
+          {members
+            .map((m) => m.displayName)
+            .filter((n): n is string => !!n)
+            .join(' · ')}
+        </span>
+      </div>
+    </>
+  );
 }
 
 const STATUS_LABELS: Record<string, string> = {
@@ -49,6 +90,7 @@ interface MatchRange {
 function MatchCard({
   match,
   players,
+  teams,
   hasNext,
   isFinalRound,
   interactive,
@@ -57,6 +99,7 @@ function MatchCard({
 }: {
   match: MatchDto;
   players: Map<string, BracketPlayerMeta>;
+  teams?: Map<string, TeamDto>;
   hasNext: boolean;
   isFinalRound: boolean;
   interactive: boolean;
@@ -106,39 +149,50 @@ function MatchCard({
         ) : (
           <>
             {match.players.map((p) => {
-              const meta = players.get(p.playerId);
-              const name = meta?.name ?? 'لاعب';
-              const isWinner = match.winnerPlayerId === p.playerId;
-              const isDefeated = isCompleted && match.winnerPlayerId !== null && !isWinner;
+              const isTeam = p.teamId !== null;
+              const meta = p.playerId ? players.get(p.playerId) : undefined;
+              const team = isTeam ? teams?.get(p.teamId!) : undefined;
+              const name = isTeam ? (team?.nameAr ?? 'فريق') : (meta?.name ?? 'لاعب');
+              const isWinner = isTeam
+                ? match.winnerTeamId !== null && match.winnerTeamId === p.teamId
+                : match.winnerPlayerId === p.playerId;
+              const hasWinner = match.winnerPlayerId !== null || match.winnerTeamId !== null;
+              const isDefeated = isCompleted && hasWinner && !isWinner;
               return (
                 <div
-                  key={`${p.slot}-${p.playerId}`}
+                  key={`${p.slot}-${p.teamId ?? p.playerId}`}
                   className={`bracket-player ${isWinner ? 'is-winner' : ''} ${
                     isDefeated ? 'is-defeated' : ''
-                  }`}
+                  } ${isTeam ? 'is-team' : ''}`}
                 >
-                  <PlayerAvatar
-                    id={p.playerId}
-                    name={name}
-                    avatarUrl={meta?.avatarUrl ?? undefined}
-                    size={28}
-                  />
-                  <div className="bracket-player-body">
-                    <span className="bracket-player-name" title={name}>
-                      {name}
-                    </span>
-                    <span className="bracket-player-sub">
-                      {typeof p.seed === 'number' ? (
-                        <span className="bracket-player-seed">#{p.seed.toLocaleString('ar')}</span>
-                      ) : null}
-                      {meta?.rankName ? (
-                        <span className="bracket-player-rank">
-                          <RankBadge tierKey={meta?.tierKey} label={meta.rankName} size={13} />
-                          {meta.rankName}
+                  {isTeam ? (
+                    <TeamSide team={team} fallbackName={name} />
+                  ) : (
+                    <>
+                      <PlayerAvatar
+                        id={p.playerId!}
+                        name={name}
+                        avatarUrl={meta?.avatarUrl ?? undefined}
+                        size={28}
+                      />
+                      <div className="bracket-player-body">
+                        <span className="bracket-player-name" title={name}>
+                          {name}
                         </span>
-                      ) : null}
-                    </span>
-                  </div>
+                        <span className="bracket-player-sub">
+                          {typeof p.seed === 'number' ? (
+                            <span className="bracket-player-seed">#{p.seed.toLocaleString('ar')}</span>
+                          ) : null}
+                          {meta?.rankName ? (
+                            <span className="bracket-player-rank">
+                              <RankBadge tierKey={meta?.tierKey} label={meta.rankName} size={13} />
+                              {meta.rankName}
+                            </span>
+                          ) : null}
+                        </span>
+                      </div>
+                    </>
+                  )}
                   {isWinner ? <span className="bracket-player-advance" aria-hidden="true" /> : null}
                 </div>
               );
@@ -176,6 +230,8 @@ export function BracketView({
   bracket,
   players,
   championPlayerId,
+  teams,
+  championTeamId,
   variant = 'default',
   selectedMatchId,
   onSelectMatch,
@@ -196,6 +252,8 @@ export function BracketView({
   const totalRounds = rounds.length;
   const leafCount = Math.max(1, Math.floor(bracket.bracketSize / 2));
   const championMeta = championPlayerId ? players.get(championPlayerId) : undefined;
+  const championTeam = championTeamId ? teams?.get(championTeamId) : undefined;
+  const hasChampion = !!(championPlayerId || championTeamId);
   const interactive = typeof onSelectMatch === 'function';
 
   // ---- Advancement graph (server-provided ids only) -----------------------
@@ -236,7 +294,7 @@ export function BracketView({
     columns.push('minmax(var(--bracket-col, 240px), 1fr)');
     if (ri < totalRounds - 1) columns.push('var(--bracket-gap, 64px)');
   }
-  if (championPlayerId) {
+  if (hasChampion) {
     columns.push('var(--bracket-gap, 64px)');
     columns.push('minmax(200px, 0.9fr)');
   }
@@ -285,6 +343,7 @@ export function BracketView({
           <MatchCard
             match={match}
             players={players}
+            teams={teams}
             hasNext={hasNext && !!match.nextMatchId}
             isFinalRound={ri === totalRounds - 1}
             interactive={interactive}
@@ -322,7 +381,7 @@ export function BracketView({
     }
   }
 
-  if (championPlayerId && finalMatch) {
+  if (hasChampion && finalMatch) {
     const finalRange = ranges.get(finalMatch.id)!;
     nodes.push(
       <div
@@ -346,19 +405,41 @@ export function BracketView({
       >
         <div className="bracket-champion-crown" aria-hidden="true">🏆</div>
         <div className="bracket-champion-label">البطل</div>
-        <PlayerAvatar
-          id={championPlayerId}
-          name={championMeta?.name ?? 'البطل'}
-          avatarUrl={championMeta?.avatarUrl ?? undefined}
-          size={48}
-        />
-        <div className="bracket-champion-name">{championMeta?.name ?? 'البطل'}</div>
-        {championMeta?.rankName ? (
-          <div className="bracket-champion-rank">
-            <RankBadge tierKey={championMeta?.tierKey} label={championMeta.rankName} size={18} />
-            {championMeta.rankName}
-          </div>
-        ) : null}
+        {championTeam ? (
+          <>
+            <div className="bracket-team-avatars bracket-team-avatars-champion">
+              {championTeam.members.map((m) => (
+                <PlayerAvatar
+                  key={m.playerId}
+                  id={m.playerId}
+                  name={m.displayName ?? 'لاعب'}
+                  avatarUrl={m.avatarUrl ?? undefined}
+                  size={40}
+                />
+              ))}
+            </div>
+            <div className="bracket-champion-name">⚔️ {championTeam.nameAr}</div>
+            <div className="bracket-champion-rank">
+              {championTeam.members.map((m) => m.displayName).filter(Boolean).join(' · ')}
+            </div>
+          </>
+        ) : (
+          <>
+            <PlayerAvatar
+              id={championPlayerId!}
+              name={championMeta?.name ?? 'البطل'}
+              avatarUrl={championMeta?.avatarUrl ?? undefined}
+              size={48}
+            />
+            <div className="bracket-champion-name">{championMeta?.name ?? 'البطل'}</div>
+            {championMeta?.rankName ? (
+              <div className="bracket-champion-rank">
+                <RankBadge tierKey={championMeta?.tierKey} label={championMeta.rankName} size={18} />
+                {championMeta.rankName}
+              </div>
+            ) : null}
+          </>
+        )}
       </div>
     );
   }

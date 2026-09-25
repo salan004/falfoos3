@@ -82,7 +82,7 @@ function correctionCount(matchId: string): number {
 function finalPair(tournamentId: string): { matchId: string; a: string; b: string } {
   const match = getTournamentMatches(tournamentId)[0];
   const parts = getMatchParticipants(match.id);
-  return { matchId: match.id, a: parts[0].player_id, b: parts[1].player_id };
+  return { matchId: match.id, a: parts[0].player_id!, b: parts[1].player_id! };
 }
 
 console.log('=== MatchCorrectionService ===');
@@ -257,8 +257,8 @@ test('bracket: corrected winner replaces the pending downstream participant', ()
   const semis = getTournamentMatches(tournamentId).filter((m) => m.round_no === 1);
   const semi = semis[0];
   const parts = getMatchParticipants(semi.id);
-  const winner = parts[0].player_id;
-  const loser = parts[1].player_id;
+  const winner = parts[0].player_id!;
+  const loser = parts[1].player_id!;
   recordMatchResult({ matchId: semi.id, winnerPlayerId: winner });
 
   const next = getMatch(semi.next_match_id!)!;
@@ -280,7 +280,7 @@ test('bracket: a completed downstream match protects its history', () => {
   const semis = getTournamentMatches(tournamentId).filter((m) => m.round_no === 1);
   const winners: string[] = [];
   for (const semi of semis) {
-    const w = getMatchParticipants(semi.id)[0].player_id;
+    const w = getMatchParticipants(semi.id)[0].player_id!;
     winners.push(w);
     recordMatchResult({ matchId: semi.id, winnerPlayerId: w });
   }
@@ -291,7 +291,7 @@ test('bracket: a completed downstream match protects its history', () => {
     codeOf(() =>
       correctMatchResult({
         matchId: semis[0].id,
-        correctedWinnerPlayerId: getMatchParticipants(semis[0].id)[1].player_id,
+        correctedWinnerPlayerId: getMatchParticipants(semis[0].id)[1].player_id!,
         reason: 'too late',
       })
     ),
@@ -305,14 +305,14 @@ test('bracket: a started downstream match blocks correction', () => {
   const { tournamentId } = setupTournament(DG, 4);
   const semis = getTournamentMatches(tournamentId).filter((m) => m.round_no === 1);
   const semi = semis[0];
-  recordMatchResult({ matchId: semi.id, winnerPlayerId: getMatchParticipants(semi.id)[0].player_id });
+  recordMatchResult({ matchId: semi.id, winnerPlayerId: getMatchParticipants(semi.id)[0].player_id! });
   const next = getMatch(semi.next_match_id!)!;
   setMatchStatus(next.id, 'scheduled');
   assertEqual(
     codeOf(() =>
       correctMatchResult({
         matchId: semi.id,
-        correctedWinnerPlayerId: getMatchParticipants(semi.id)[1].player_id,
+        correctedWinnerPlayerId: getMatchParticipants(semi.id)[1].player_id!,
         reason: 'started',
       })
     ),

@@ -3,7 +3,28 @@ import crypto from 'crypto';
 
 /**
  * Phase 3 — Tournaments data access.
+ *
+ * Roadmap #2 — competition configuration:
+ * - `competition_type`: individual (legacy), team_vs_team, two_vs_two
+ * - `team_formation`: random | player_choice (NULL for individual)
+ * - `team1_name` / `team2_name`: admin custom names for Team vs Team
+ * - `teams_locked_at`: set once team composition is frozen
  */
+
+export type CompetitionType = 'individual' | 'team_vs_team' | 'two_vs_two';
+export type TeamFormation = 'random' | 'player_choice';
+
+export const COMPETITION_TYPES: readonly CompetitionType[] = [
+  'individual',
+  'team_vs_team',
+  'two_vs_two',
+];
+export const TEAM_FORMATIONS: readonly TeamFormation[] = ['random', 'player_choice'];
+
+/** True for competitions whose matches are contested by teams. */
+export function isTeamCompetition(type: CompetitionType): boolean {
+  return type === 'team_vs_team' || type === 'two_vs_two';
+}
 
 export interface TournamentRow {
   id: string;
@@ -23,6 +44,16 @@ export interface TournamentRow {
   hidden_at: number | null;
   /** Admin user id that performed the last hide (audit only). */
   hidden_by: string | null;
+  /** Roadmap #2 — competition type. Existing rows default to `individual`. */
+  competition_type: CompetitionType;
+  /** Roadmap #2 — team formation for team competitions; NULL for individual. */
+  team_formation: TeamFormation | null;
+  /** Roadmap #2 — custom Team 1 name (Team vs Team only). */
+  team1_name: string | null;
+  /** Roadmap #2 — custom Team 2 name (Team vs Team only). */
+  team2_name: string | null;
+  /** Roadmap #2 — set once team composition is frozen (bracket generation). */
+  teams_locked_at: number | null;
   starts_at: number | null;
   ends_at: number | null;
   created_by: string;
@@ -37,6 +68,10 @@ export interface CreateTournamentInput {
   image_url?: string;
   max_participants?: number;
   ticket_cost?: number | null;
+  competition_type?: CompetitionType;
+  team_formation?: TeamFormation | null;
+  team1_name?: string | null;
+  team2_name?: string | null;
   starts_at?: number;
   ends_at?: number;
   status?: 'draft' | 'open';
@@ -48,6 +83,10 @@ export interface UpdateTournamentInput {
   image_url?: string;
   max_participants?: number | null;
   ticket_cost?: number | null;
+  competition_type?: CompetitionType;
+  team_formation?: TeamFormation | null;
+  team1_name?: string | null;
+  team2_name?: string | null;
   starts_at?: number | null;
   ends_at?: number | null;
   status?: 'draft' | 'open' | 'active' | 'completed' | 'cancelled';
@@ -72,6 +111,11 @@ function rowToTournament(row: any): TournamentRow {
     ticket_cost: row.ticket_cost ?? null,
     hidden_at: row.hidden_at ?? null,
     hidden_by: row.hidden_by ?? null,
+    competition_type: (row.competition_type as CompetitionType) ?? 'individual',
+    team_formation: (row.team_formation as TeamFormation | null) ?? null,
+    team1_name: row.team1_name ?? null,
+    team2_name: row.team2_name ?? null,
+    teams_locked_at: row.teams_locked_at ?? null,
     starts_at: row.starts_at,
     ends_at: row.ends_at,
     created_by: row.created_by,
@@ -112,6 +156,73 @@ function validateTournamentName(nameAr: string): void {
   }
   if (nameAr.length > 150) {
     throw new Error('Tournament name must be 150 characters or less');
+  }
+}
+
+const MAX_TEAM_NAME = 60;
+
+function normalizeTeamName(value: unknown, label: string): string | null {
+  if (value === undefined || value === null) return null;
+  if (typeof value !== 'string') throw new Error(`${label} must be text`);
+  const trimmed = value.trim();
+  if (trimmed.length === 0) return null;
+  if (trimmed.length > MAX_TEAM_NAME) {
+    throw new Error(`${label} must be ${MAX_TEAM_NAME} characters or less`);
+  }
+  return trimmed;
+}
+
+export function validateCompetitionType(value: unknown): CompetitionType {
+  if (value === undefined || value === null || value === '') return 'individual';
+  if (typeof value !== 'string' || !COMPETITION_TYPES.includes(value as CompetitionType)) {
+    throw new Error('Invalid competition type');
+  }
+  return value as CompetitionType;
+}
+
+function optionalTeamFormation(value: unknown): TeamFormation | null {
+  if (value === undefined || value === null || value === '') return null;
+  if (typeof value !== 'string' || !TEAM_FORMATIONS.includes(value as TeamFormation)) {
+    throw new Error('Invalid team formation');
+  }
+  return value as TeamFormation;
+}
+
+/**
+ * Roadmap #2 — validates the effective competition configuration as a whole.
+ * Rejects invalid combinations server-side (never trust the Admin UI).
+ */
+interface CompetitionConfig {
+  competitionType: CompetitionType;
+  teamFormation: TeamFormation | null;
+  team1Name: string | null;
+  team2Name: string | null;
+  maxParticipants: number | null;
+}
+
+function validateCompetitionConfig(config: CompetitionConfig): void {
+  const { competitionType, teamFormation, team1Name, team2Name, maxParticipants } = config;
+
+  if (competitionType === 'individual') {
+    if (teamFormation !== null) throw new Error('Individual tournaments cannot have a team formation');
+    if (team1Name !== null || team2Name !== null) {
+      throw new Error('Individual tournaments cannot have team names');
+    }
+    return;
+  }
+
+  // team_vs_team / two_vs_two
+  if (teamFormation === null) {
+    throw new Error('Team tournaments require a team formation (random or player_choice)');
+  }
+
+  if (competitionType === 'two_vs_two') {
+    if (team1Name !== null || team2Name !== null) {
+      throw new Error('2v2 tournaments use automatic team names');
+    }
+    if (teamFormation === 'player_choice' && (maxParticipants === null || maxParticipants < 2)) {
+      throw new Error('2v2 player-choice tournaments require max participants of at least 2');
+    }
   }
 }
 
@@ -281,12 +392,31 @@ export function createTournament(input: CreateTournamentInput, createdBy: string
 
   const ticketCost = validateTicketCost(input.ticket_cost);
 
+  // Roadmap #2 — competition configuration (validated as a whole).
+  const competitionType = validateCompetitionType(input.competition_type);
+  const teamFormation = optionalTeamFormation(input.team_formation);
+  const team1Name = normalizeTeamName(input.team1_name, 'Team 1 name');
+  const team2Name = normalizeTeamName(input.team2_name, 'Team 2 name');
+  const maxParticipants = input.max_participants ?? null;
+  validateCompetitionConfig({
+    competitionType,
+    teamFormation,
+    team1Name,
+    team2Name,
+    maxParticipants,
+  });
+
+  const effectiveTeam1 = competitionType === 'team_vs_team' ? team1Name : null;
+  const effectiveTeam2 = competitionType === 'team_vs_team' ? team2Name : null;
+
   const id = crypto.randomUUID();
   const now = Date.now();
 
   db.prepare(`
-    INSERT INTO tournaments (id, game_id, name_ar, description_ar, image_url, status, max_participants, ticket_cost, starts_at, ends_at, created_by, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO tournaments (id, game_id, name_ar, description_ar, image_url, status, max_participants, ticket_cost,
+                             competition_type, team_formation, team1_name, team2_name,
+                             starts_at, ends_at, created_by, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     id,
     input.game_id,
@@ -294,8 +424,12 @@ export function createTournament(input: CreateTournamentInput, createdBy: string
     input.description_ar ?? null,
     input.image_url ?? null,
     status,
-    input.max_participants ?? null,
+    maxParticipants,
     ticketCost,
+    competitionType,
+    teamFormation,
+    effectiveTeam1,
+    effectiveTeam2,
     input.starts_at ?? null,
     input.ends_at ?? null,
     createdBy,
@@ -345,6 +479,52 @@ export function updateTournament(id: string, input: UpdateTournamentInput): Tour
     throw new Error('Maximum participants must be at least 1');
   }
 
+  // Roadmap #2 — competition configuration. `undefined` preserves the stored
+  // value. Changing the competition/formation is blocked once teams exist or
+  // are locked, and only while the tournament is draft/open.
+  const requestedCompetition =
+    input.competition_type !== undefined ? validateCompetitionType(input.competition_type) : undefined;
+  const requestedFormation =
+    input.team_formation !== undefined ? optionalTeamFormation(input.team_formation) : undefined;
+  const requestedTeam1 =
+    input.team1_name !== undefined ? normalizeTeamName(input.team1_name, 'Team 1 name') : undefined;
+  const requestedTeam2 =
+    input.team2_name !== undefined ? normalizeTeamName(input.team2_name, 'Team 2 name') : undefined;
+
+  const effectiveCompetition = requestedCompetition ?? existing.competition_type;
+  const effectiveFormation =
+    requestedFormation !== undefined ? requestedFormation : existing.team_formation;
+  const effectiveTeam1 = requestedTeam1 !== undefined ? requestedTeam1 : existing.team1_name;
+  const effectiveTeam2 = requestedTeam2 !== undefined ? requestedTeam2 : existing.team2_name;
+  const effectiveMax = input.max_participants !== undefined ? input.max_participants : existing.max_participants;
+
+  const competitionChanging =
+    (requestedCompetition !== undefined && requestedCompetition !== existing.competition_type) ||
+    (requestedFormation !== undefined && requestedFormation !== existing.team_formation);
+
+  if (competitionChanging) {
+    const teamsExist = (
+      db.prepare('SELECT COUNT(*) AS n FROM tournament_teams WHERE tournament_id = ?').get(id) as { n: number }
+    ).n;
+    if (existing.teams_locked_at !== null) {
+      throw new Error('Cannot change competition after teams are locked');
+    }
+    if (teamsExist > 0) {
+      throw new Error('Cannot change competition after teams have been created');
+    }
+    if (existing.status !== 'draft' && existing.status !== 'open') {
+      throw new Error('Competition can only be changed while draft or open');
+    }
+  }
+
+  validateCompetitionConfig({
+    competitionType: effectiveCompetition,
+    teamFormation: effectiveCompetition === 'individual' ? null : effectiveFormation,
+    team1Name: effectiveCompetition === 'team_vs_team' ? effectiveTeam1 : null,
+    team2Name: effectiveCompetition === 'team_vs_team' ? effectiveTeam2 : null,
+    maxParticipants: effectiveMax,
+  });
+
   // R4.1 — validate (and normalize) the ticket cost when explicitly supplied.
   // `undefined` preserves the stored value; `null`/empty clears it.
   const ticketCost = input.ticket_cost !== undefined ? validateTicketCost(input.ticket_cost) : undefined;
@@ -371,6 +551,22 @@ export function updateTournament(id: string, input: UpdateTournamentInput): Tour
   if (ticketCost !== undefined) {
     updates.push('ticket_cost = ?');
     params.push(ticketCost);
+  }
+  if (
+    requestedCompetition !== undefined ||
+    requestedFormation !== undefined ||
+    requestedTeam1 !== undefined ||
+    requestedTeam2 !== undefined
+  ) {
+    const finalType = effectiveCompetition;
+    updates.push('competition_type = ?');
+    params.push(finalType);
+    updates.push('team_formation = ?');
+    params.push(finalType === 'individual' ? null : effectiveFormation);
+    updates.push('team1_name = ?');
+    params.push(finalType === 'team_vs_team' ? effectiveTeam1 : null);
+    updates.push('team2_name = ?');
+    params.push(finalType === 'team_vs_team' ? effectiveTeam2 : null);
   }
   if (input.starts_at !== undefined) {
     updates.push('starts_at = ?');

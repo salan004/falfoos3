@@ -20,6 +20,7 @@ import {
   getParticipantsByTournament,
   type ParticipantWithProfile,
 } from '../games/ParticipantService';
+import { ensureTeamsInitialized } from '../competitive/TeamService';
 
 export const adminTournamentsRoutes = Router();
 
@@ -91,6 +92,9 @@ adminTournamentsRoutes.post('/', (req: Request, res: Response) => {
     }
 
     const tournament = createTournament(input, user.id);
+    // Roadmap #2 — materialize team shells immediately for player-choice
+    // tournaments so the selection UI has teams to offer.
+    ensureTeamsInitialized(tournament.id);
     res.status(201).json({ tournament });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Internal server error';
@@ -123,6 +127,9 @@ adminTournamentsRoutes.patch('/:id', (req: Request, res: Response) => {
     // lifecycle fields. It never modifies `status`.
     const { hidden: _hidden, ...lifecycleFields } = body;
     let tournament = updateTournament(req.params.id, lifecycleFields as UpdateTournamentInput);
+    // Roadmap #2 — materialize team shells if the competition was just switched
+    // to a team type (idempotent no-op otherwise).
+    ensureTeamsInitialized(tournament.id);
 
     if (hasHidden) {
       const user = resolveSession(req);

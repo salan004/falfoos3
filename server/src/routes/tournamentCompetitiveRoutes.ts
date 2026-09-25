@@ -21,6 +21,17 @@ import {
   getPlayerTournaments,
   getTournamentSummary,
 } from '../competitive/CompetitiveQueryService';
+import {
+  TeamError,
+  assignPlayerToTeam,
+  ensureTeamsInitialized,
+  getPlayerTeam,
+  getTeamsDto,
+} from '../competitive/TeamService';
+import { getTournamentById } from '../games/TournamentService';
+import { getParticipant } from '../games/ParticipantService';
+import { resolveSession } from '../auth/session';
+import { findLinkedPlayerForUser } from '../identity/identityService';
 
 export const tournamentCompetitiveRoutes = Router();
 
@@ -36,6 +47,27 @@ function badRequest(res: Response, error: string): void {
 
 function notFound(res: Response, error: string): void {
   res.status(404).json({ error });
+}
+
+const TEAM_STATUS: Record<string, number> = {
+  tournament_not_found: 404,
+  not_team_competition: 409,
+  teams_locked: 409,
+  tournament_not_open: 409,
+  tournament_cancelled: 409,
+  team_not_found: 404,
+  team_full: 409,
+  not_registered: 409,
+  formation_not_choice: 409,
+};
+
+function sendTeamError(res: Response, err: unknown): void {
+  if (err instanceof TeamError) {
+    res.status(TEAM_STATUS[err.code] ?? 400).json({ error: err.code, message: err.message });
+    return;
+  }
+  console.error('[Tournaments] Unexpected team error:', err);
+  res.status(500).json({ error: 'internal_error' });
 }
 
 /* ------------------------------- tournaments ------------------------------ */
@@ -69,6 +101,98 @@ tournamentCompetitiveRoutes.get('/tournaments/:tournamentId/roster', (req: Reque
   if (!getTournamentSummary(tournamentId)) return notFound(res, 'tournament_not_found');
   res.json({ participants: getParticipantsDto(tournamentId) });
 });
+
+/* ----------------------------------- teams -------------------------------- */
+
+/**
+ * Roadmap #2 — public team read. Teams are materialized lazily for player-choice
+ * tournaments (a read may initialize the empty team shells). No sensitive
+ * internal fields are exposed; membership identity comes from the guest row.
+ */
+tournamentCompetitiveRoutes.get('/tournaments/:tournamentId/teams', (req: Request, res: Response) => {
+  const { tournamentId } = req.params;
+  if (!isId(tournamentId)) return badRequest(res, 'invalid_tournament_id');
+  const tournament = getTournamentById(tournamentId);
+  if (!tournament) return notFound(res, 'tournament_not_found');
+  if (tournament.competition_type === 'individual') {
+    res.json({ teams: [], competitionType: 'individual' });
+    return;
+  }
+  try {
+    ensureTeamsInitialized(tournamentId);
+  } catch (err) {
+    sendTeamError(res, err);
+    return;
+  }
+
+  // Session-aware hints (never trusted for authorization; the selection
+  // endpoint re-validates everything).
+  let playerTeamId: string | null = null;
+  let canSelect = false;
+  const user = resolveSession(req);
+  if (user) {
+    const linked = findLinkedPlayerForUser(user.id);
+    if (linked) {
+      playerTeamId = getPlayerTeam(tournamentId, linked.player_id)?.id ?? null;
+      const participant = getParticipant(tournamentId, linked.player_id);
+      canSelect =
+        tournament.team_formation === 'player_choice' &&
+        tournament.status === 'open' &&
+        tournament.teams_locked_at === null &&
+        !!participant &&
+        (participant.status === 'registered' || participant.status === 'confirmed');
+    }
+  }
+
+  res.json({
+    teams: getTeamsDto(tournamentId),
+    competitionType: tournament.competition_type,
+    teamFormation: tournament.team_formation,
+    teamsLockedAt: tournament.teams_locked_at,
+    playerTeamId,
+    canSelect,
+  });
+});
+
+/**
+ * Roadmap #2 — participant team selection. The player is ALWAYS derived from
+ * the authenticated session → linked canonical player; the client can never
+ * supply a player id. All capacity/lock/state rules are enforced server-side
+ * inside `TeamService`.
+ */
+tournamentCompetitiveRoutes.post(
+  '/tournaments/:tournamentId/team-selection',
+  (req: Request, res: Response) => {
+    const { tournamentId } = req.params;
+    if (!isId(tournamentId)) return badRequest(res, 'invalid_tournament_id');
+
+    const body = req.body as { teamId?: unknown } | undefined;
+    if (!isId(body?.teamId)) return badRequest(res, 'invalid_team_id');
+
+    const user = resolveSession(req);
+    if (!user) {
+      res.status(401).json({ error: 'unauthenticated' });
+      return;
+    }
+    const linked = findLinkedPlayerForUser(user.id);
+    if (!linked) {
+      res.status(409).json({ error: 'account_not_linked', message: 'Link your account to a FalFoos Player first' });
+      return;
+    }
+
+    try {
+      const result = assignPlayerToTeam(tournamentId, linked.player_id, body.teamId, 'player');
+      res.json({
+        teams: getTeamsDto(tournamentId),
+        playerTeamId: getPlayerTeam(tournamentId, linked.player_id)?.id ?? null,
+        idempotent: result.idempotent,
+        switched: result.switched,
+      });
+    } catch (err) {
+      sendTeamError(res, err);
+    }
+  }
+);
 
 tournamentCompetitiveRoutes.get(
   '/tournaments/:tournamentId/players/:playerId',

@@ -20,6 +20,9 @@ export interface ComputedRank {
   progressPct: number;
 }
 
+export type CompetitionType = 'individual' | 'team_vs_team' | 'two_vs_two';
+export type TeamFormation = 'random' | 'player_choice';
+
 export interface TournamentSummary {
   id: string;
   gameId: string;
@@ -34,6 +37,12 @@ export interface TournamentSummary {
   ticketCost: number | null;
   /** R5 — visibility (independent of `status`). True = hidden from listings. */
   hidden: boolean;
+  /** Roadmap #2 — competition configuration. */
+  competitionType: CompetitionType;
+  teamFormation: TeamFormation | null;
+  team1Name: string | null;
+  team2Name: string | null;
+  teamsLockedAt: number | null;
   startsAt: number | null;
   endsAt: number | null;
   participantCount: number;
@@ -44,10 +53,15 @@ export interface TournamentSummary {
   completedMatchCount: number;
   remainingMatchCount: number;
   championPlayerId: string | null;
+  /** Roadmap #2 — champion team for team tournaments. */
+  championTeamId: string | null;
 }
 
 export interface MatchParticipantDto {
-  playerId: string;
+  /** Set for individual competitors; null for team competitors. */
+  playerId: string | null;
+  /** Roadmap #2 — set for team competitors; null for individual competitors. */
+  teamId: string | null;
   slot: number;
   seed: number | null;
   advancedByBye: boolean;
@@ -62,6 +76,8 @@ export interface MatchDto {
   status: string;
   bestOf: number | null;
   winnerPlayerId: string | null;
+  /** Roadmap #2 — winning team id for team matches. */
+  winnerTeamId: string | null;
   nextMatchId: string | null;
   nextMatchSlot: number | null;
   scheduledAt: number | null;
@@ -69,6 +85,24 @@ export interface MatchDto {
   completedAt: number | null;
   ready: boolean;
   players: MatchParticipantDto[];
+}
+
+/** Roadmap #2 — team member projection. */
+export interface TeamMemberDto {
+  playerId: string;
+  displayName: string | null;
+  avatarUrl: string | null;
+}
+
+/** Roadmap #2 — team projection for the client. */
+export interface TeamDto {
+  id: string;
+  teamNo: number;
+  nameAr: string;
+  capacity: number | null;
+  memberCount: number;
+  full: boolean;
+  members: TeamMemberDto[];
 }
 
 export interface BracketRoundDto {

@@ -171,3 +171,74 @@ export function computeMatchElo(
   };
   return { playerA, playerB };
 }
+
+/** One side of a team match: every member's individual rating and Elo delta. */
+export interface TeamEloSideCalculation {
+  ratings: number[];
+  deltas: number[];
+  newRatings: number[];
+}
+
+export interface TeamEloMatchCalculation {
+  playerA: TeamEloSideCalculation;
+  playerB: TeamEloSideCalculation;
+  /** Sum of every member delta across BOTH sides. Always exactly 0. */
+  totalDelta: number;
+}
+
+function teamSideCalculation(
+  ratings: number[],
+  opponentRatings: number[],
+  result: CompetitiveResult,
+  kFactor: number
+): TeamEloSideCalculation {
+  // Each member's delta is the SUM of their individual 1v1 exchanges against
+  // every member of the opposing team, using the existing `computeEloDelta`.
+  // Because each pairwise exchange is exactly zero-sum (symmetric rounding),
+  // the aggregate over both sides is exactly zero for ANY team sizes.
+  const deltas = ratings.map((rating) =>
+    opponentRatings.reduce(
+      (sum, opponentRating) => sum + computeEloDelta(rating, opponentRating, result, kFactor),
+      0
+    )
+  );
+  return {
+    ratings,
+    deltas,
+    newRatings: ratings.map((rating, index) => rating + deltas[index]),
+  };
+}
+
+/**
+ * Zero-sum Elo for a team match (Team vs Team / 2v2), grounded in the existing
+ * 1v1 engine.
+ *
+ * There is NO team rating and NO team Elo: Elo remains a property of each
+ * individual player. Each member's delta is the sum of the standard pairwise
+ * `computeEloDelta` exchanges against the opposing team's members. Since every
+ * pairwise exchange satisfies `d(a,b) + d(b,a) = 0` under the engine's symmetric
+ * rounding, the aggregate `SUM(winning deltas) + SUM(losing deltas)` is exactly
+ * zero regardless of team sizes or the players' ratings.
+ *
+ * This is a strict generalization of `computeMatchElo`: with one player per
+ * side it produces the identical zero-sum 1v1 result.
+ */
+export function computeTeamMatchElo(
+  ratingsA: number[],
+  ratingsB: number[],
+  resultA: CompetitiveResult,
+  config?: Partial<EloConfig>
+): TeamEloMatchCalculation {
+  const resolved = resolveEloConfig(config);
+  assertKFactor(resolved.kFactor);
+  if (ratingsA.length === 0 || ratingsB.length === 0) {
+    throw new Error('eloEngine: a team match requires at least one player per side');
+  }
+  const resultB = invertResult(resultA);
+  const playerA = teamSideCalculation(ratingsA, ratingsB, resultA, resolved.kFactor);
+  const playerB = teamSideCalculation(ratingsB, ratingsA, resultB, resolved.kFactor);
+  const totalDelta =
+    playerA.deltas.reduce((sum, delta) => sum + delta, 0) +
+    playerB.deltas.reduce((sum, delta) => sum + delta, 0);
+  return { playerA, playerB, totalDelta };
+}
