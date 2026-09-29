@@ -27,6 +27,7 @@ export { migration0026LinkIntentsOperation } from './0026_link_intents_operation
 export { migration0027TournamentsTicketCost } from './0027_tournaments_ticket_cost';
 export { migration0028TournamentsHiddenAt } from './0028_tournaments_hidden_at';
 export { migration0029TournamentTeams } from './0029_tournament_teams';
+export { migration0030AdminPermissions } from './0030_admin_permissions';
 
 import { migration0001Init } from './0001_init';
 import { migration0002GuestChannel } from './0002_guest_channel';
@@ -57,6 +58,7 @@ import { migration0026LinkIntentsOperation } from './0026_link_intents_operation
 import { migration0027TournamentsTicketCost } from './0027_tournaments_ticket_cost';
 import { migration0028TournamentsHiddenAt } from './0028_tournaments_hidden_at';
 import { migration0029TournamentTeams } from './0029_tournament_teams';
+import { migration0030AdminPermissions } from './0030_admin_permissions';
 
 /**
  * Ordered migration registry. New migrations are appended here in order —
@@ -92,4 +94,5 @@ export const migrations: { id: string; sql: string }[] = [
   migration0027TournamentsTicketCost,
   migration0028TournamentsHiddenAt,
   migration0029TournamentTeams,
+  migration0030AdminPermissions,
 ];

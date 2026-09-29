@@ -1,5 +1,5 @@
 import { Router, type Request, type Response } from 'express';
-import { requireAdmin } from '../middleware/requireAdmin';
+import { requireSuperAdmin } from '../middleware/authorize';
 import {
   getAllGames,
   getGameById,
@@ -14,7 +14,8 @@ import {
 
 export const adminGamesRoutes = Router();
 
-adminGamesRoutes.use(requireAdmin);
+// Games administration is a SUPER_ADMIN-only area (LIMITED_ADMIN is locked out).
+adminGamesRoutes.use(requireSuperAdmin);
 
 adminGamesRoutes.get('/', (_req: Request, res: Response) => {
   try {

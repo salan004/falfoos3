@@ -1,11 +1,37 @@
 import { apiFetch } from '../utils/api';
 import { useCallback, useEffect, useState } from 'react';
 
+export type AdminTier = 'super' | 'limited';
+
+export interface AdminPermissions {
+  canCreateTournaments: boolean;
+}
+
 export interface AuthUser {
   id: string;
   displayName: string;
   avatarUrl?: string | null;
   role: 'user' | 'admin';
+  /** Present only for admins: full (super) or scoped (limited) access. */
+  adminTier?: AdminTier;
+  /** Present only for admins. */
+  permissions?: AdminPermissions;
+}
+
+/** True when the user is an admin of any tier. */
+export function isAdminUser(user: AuthUser | null | undefined): boolean {
+  return !!user && user.role === 'admin';
+}
+
+/** True only for a SUPER_ADMIN (full administration). */
+export function isSuperAdmin(user: AuthUser | null | undefined): boolean {
+  return !!user && user.role === 'admin' && user.adminTier === 'super';
+}
+
+/** True when the admin may create tournaments (super always may). */
+export function canCreateTournaments(user: AuthUser | null | undefined): boolean {
+  if (!user || user.role !== 'admin') return false;
+  return user.adminTier === 'super' || user.permissions?.canCreateTournaments === true;
 }
 
 /**
@@ -83,11 +109,22 @@ function delay(ms: number): Promise<void> {
 function isAuthUser(value: unknown): value is AuthUser {
   if (!value || typeof value !== 'object') return false;
   const candidate = value as Record<string, unknown>;
-  return (
-    typeof candidate.id === 'string' &&
-    typeof candidate.displayName === 'string' &&
-    (candidate.role === 'user' || candidate.role === 'admin')
-  );
+  if (
+    typeof candidate.id !== 'string' ||
+    typeof candidate.displayName !== 'string' ||
+    (candidate.role !== 'user' && candidate.role !== 'admin')
+  ) {
+    return false;
+  }
+  // Admin tier is optional; when present it must be a known value.
+  if (
+    candidate.adminTier !== undefined &&
+    candidate.adminTier !== 'super' &&
+    candidate.adminTier !== 'limited'
+  ) {
+    return false;
+  }
+  return true;
 }
 
 type FetchOutcome =

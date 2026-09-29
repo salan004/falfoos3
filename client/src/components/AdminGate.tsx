@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { onAdminAuthResult, sendAdminAuth } from '../utils/socket';
-import { useAuthSession } from '../hooks/useAuthSession';
+import { isSuperAdmin, useAuthSession } from '../hooks/useAuthSession';
 
 const TOKEN_KEY = 'falfoos_admin_token';
 
@@ -18,7 +18,9 @@ type AuthState = 'pending' | 'authorized' | 'denied';
  */
 export function AdminGate() {
   const { user, isLoading } = useAuthSession();
-  const isRoleAdmin = user?.role === 'admin';
+  // Only a SUPER_ADMIN gets automatic admin socket tools; a LIMITED_ADMIN must
+  // not inherit the live/admin surface (see server isSocketAdmin).
+  const isRoleAdmin = isSuperAdmin(user);
   const [authState, setAuthState] = useState<AuthState>('pending');
   const [token, setToken] = useState(() => sessionStorage.getItem(TOKEN_KEY) ?? '');
   const [showEmergency, setShowEmergency] = useState(false);

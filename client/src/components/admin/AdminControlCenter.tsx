@@ -1,22 +1,22 @@
 import { useEffect, useState } from 'react';
 import { useRoute } from '../../hooks/useRoute';
-import { useAuthSession } from '../../hooks/useAuthSession';
+import { canCreateTournaments, isSuperAdmin, useAuthSession } from '../../hooks/useAuthSession';
 import { useHubTethers, type HubTetherConfig } from '../../hooks/useHubTethers';
 import { BrandLogo } from '../BrandLogo';
 import { AdminAccessDenied } from './AdminAccessDenied';
+import { ModeratorManager } from './ModeratorManager';
+import { LockIcon } from './AdminIcons';
 
 /**
- * Phase F1 — FalFoos Admin Control Center.
+ * Admin Control Center.
  *
- * The landing route `/dashboard` is a hub, not a dashboard: the FalFoos logo is
- * the visual anchor and exactly three independent ICON branches originate from
- * it (each with its own tether): Games, Locked/under-development, Tournaments.
- * No cards, no tiles, no stat panels.
+ * The landing route `/dashboard` is a hub. Two admin tiers share it:
+ * - SUPER_ADMIN: every branch (Games, Tournaments) + the moderator manager.
+ * - LIMITED_ADMIN: Tournaments (view, and create when permitted) only; Games
+ *   is locked. The lock is also enforced server-side (see middleware/authorize).
  *
  * The public HomePage hub is untouched: this reuses the shared hub surfaces
- * (`.hub-stage`, `.hub-core`, `.hub-orb`, `.hub-ring`, `.hub-tether`) plus the
- * additive `useHubTethers` configuration, and adds only namespaced
- * `.admin-hub-*` classes for the three-branch geometry.
+ * plus the additive `.admin-hub-*` / `.admin-*` classes.
  */
 
 type BranchKey = 'games' | 'development' | 'tournaments';
@@ -26,11 +26,14 @@ interface HubBranch {
   icon: string;
   label: string;
   to: string | null;
+  /** Always locked (under development). */
   locked: boolean;
+  /** Locked only for LIMITED_ADMIN (permission-gated). */
+  superOnly?: boolean;
 }
 
 const BRANCHES: HubBranch[] = [
-  { key: 'games', icon: '🕹️', label: 'الألعاب', to: '/dashboard/games', locked: false },
+  { key: 'games', icon: '🕹️', label: 'الألعاب', to: '/dashboard/games', locked: false, superOnly: true },
   { key: 'development', icon: '🔒', label: 'تحت التطوير', to: null, locked: true },
   { key: 'tournaments', icon: '🏆', label: 'البطولات', to: '/dashboard/tournaments', locked: false },
 ];
@@ -46,6 +49,8 @@ const ADMIN_HUB_CONFIG: Partial<HubTetherConfig> = {
 interface LockedBubble {
   x: number;
   y: number;
+  title: string;
+  sub: string;
 }
 
 export function AdminControlCenter() {
@@ -55,7 +60,6 @@ export function AdminControlCenter() {
 
   const [bubble, setBubble] = useState<LockedBubble | null>(null);
 
-  // Auto-dismiss the locked-section bubble; Escape also closes it.
   useEffect(() => {
     if (!bubble) return;
     const timer = window.setTimeout(() => setBubble(null), 3200);
@@ -83,8 +87,21 @@ export function AdminControlCenter() {
     return <AdminAccessDenied />;
   }
 
+  const superAdmin = isSuperAdmin(user);
+  const mayCreate = canCreateTournaments(user);
+
+  const isLockedForViewer = (branch: HubBranch): boolean =>
+    branch.locked || (branch.superOnly === true && !superAdmin);
+
+  const lockMessage = (branch: HubBranch): { title: string; sub: string } => {
+    if (branch.superOnly && !superAdmin) {
+      return { title: 'مقفل للمشرفين', sub: 'هذا القسم متاح للإدارة الرئيسية فقط' };
+    }
+    return { title: 'تحت التطوير', sub: 'غير متاحة حاليًا' };
+  };
+
   const handleBranch = (branch: HubBranch, e: React.MouseEvent<HTMLButtonElement>) => {
-    if (branch.locked || !branch.to) {
+    if (isLockedForViewer(branch) || !branch.to) {
       const ring = e.currentTarget.querySelector<HTMLElement>('.hub-ring');
       const rect = (ring ?? e.currentTarget).getBoundingClientRect();
       const halfWidth = 120;
@@ -92,14 +109,19 @@ export function AdminControlCenter() {
         Math.max(rect.left + rect.width / 2, halfWidth + 8),
         window.innerWidth - halfWidth - 8
       );
-      setBubble({ x, y: rect.top - 12 });
+      setBubble({ x, y: rect.top - 12, ...lockMessage(branch) });
       return;
     }
     navigate(branch.to);
   };
 
   return (
-    <main className="hub-shell admin-hub-shell">
+    <main className={`hub-shell admin-hub-shell${superAdmin ? ' admin-hub-shell--with-mods' : ''}`}>
+      <header className="admin-welcome" dir="rtl">
+        <span className="admin-welcome-kicker">{superAdmin ? 'SUPER ADMIN' : 'MODERATOR'}</span>
+        <h1 className="admin-welcome-title">أهلًا بك، {user.displayName}</h1>
+      </header>
+
       <div
         className="hub-stage admin-hub-stage"
         role="navigation"
@@ -117,28 +139,33 @@ export function AdminControlCenter() {
           </button>
         </div>
 
-        {BRANCHES.map((branch) => (
-          <button
-            key={branch.key}
-            type="button"
-            className={`hub-orb admin-hub-orb admin-hub-orb-${branch.key}${
-              branch.locked ? ' admin-hub-orb--locked' : ''
-            }`}
-            onClick={(e) => handleBranch(branch, e)}
-            aria-disabled={branch.locked || undefined}
-            aria-label={branch.locked ? `${branch.label} — غير متاحة حاليًا` : branch.label}
-          >
-            <svg className="hub-tether" data-to={branch.key} aria-hidden="true" focusable="false">
-              <path className="hub-tether-halo" />
-              <path className="hub-tether-line" />
-              <path className="hub-tether-pulse" />
-            </svg>
-            <span className="hub-ring" aria-hidden>
-              {branch.icon}
-            </span>
-            <span className="hub-label">{branch.label}</span>
-          </button>
-        ))}
+        {BRANCHES.map((branch) => {
+          const locked = isLockedForViewer(branch);
+          const lockNote = branch.superOnly && !superAdmin ? 'مقفل للمشرفين' : null;
+          return (
+            <button
+              key={branch.key}
+              type="button"
+              className={`hub-orb admin-hub-orb admin-hub-orb-${branch.key}${
+                locked ? ' admin-hub-orb--locked' : ''
+              }`}
+              onClick={(e) => handleBranch(branch, e)}
+              aria-disabled={locked || undefined}
+              aria-label={locked ? `${branch.label} — ${lockNote ?? 'غير متاحة حاليًا'}` : branch.label}
+            >
+              <svg className="hub-tether" data-to={branch.key} aria-hidden="true" focusable="false">
+                <path className="hub-tether-halo" />
+                <path className="hub-tether-line" />
+                <path className="hub-tether-pulse" />
+              </svg>
+              <span className="hub-ring" aria-hidden>
+                {locked ? <LockIcon size={26} /> : branch.icon}
+              </span>
+              <span className="hub-label">{branch.label}</span>
+              {lockNote && <span className="admin-hub-lock-note">{lockNote}</span>}
+            </button>
+          );
+        })}
       </div>
 
       {bubble && (
@@ -148,22 +175,33 @@ export function AdminControlCenter() {
           role="status"
           aria-live="polite"
         >
-          <span className="hub-dev-bubble-title">تحت التطوير</span>
-          <span className="hub-dev-bubble-sub">غير متاحة حاليًا</span>
+          <span className="hub-dev-bubble-title">{bubble.title}</span>
+          <span className="hub-dev-bubble-sub">{bubble.sub}</span>
         </div>
       )}
 
-      <nav className="admin-hub-secondary" aria-label="أدوات إدارية إضافية">
-        <button className="admin-hub-secondary-link" onClick={() => navigate('/dashboard/live')}>
-          📺 لوحة الجلسة المباشرة
-        </button>
-        <button
-          className="admin-hub-secondary-link"
-          onClick={() => navigate('/dashboard/trivia-questions')}
-        >
-          ❓ إدارة أسئلة التريفيا
-        </button>
-      </nav>
+      {superAdmin && (
+        <nav className="admin-hub-secondary" aria-label="أدوات إدارية إضافية">
+          <button className="admin-hub-secondary-link" onClick={() => navigate('/dashboard/live')}>
+            📺 لوحة الجلسة المباشرة
+          </button>
+          <button
+            className="admin-hub-secondary-link"
+            onClick={() => navigate('/dashboard/trivia-questions')}
+          >
+            ❓ إدارة أسئلة التريفيا
+          </button>
+        </nav>
+      )}
+
+      {superAdmin && <ModeratorManager />}
+      {!superAdmin && (
+        <p className="admin-hub-moderator-note">
+          {mayCreate
+            ? 'يمكنك مشاهدة البطولات وإنشاء بطولات جديدة. إدارة البطولات متاحة للإدارة الرئيسية فقط.'
+            : 'يمكنك مشاهدة البطولات. إنشاء البطولات معطّل حاليًا بواسطة الإدارة الرئيسية.'}
+        </p>
+      )}
     </main>
   );
 }

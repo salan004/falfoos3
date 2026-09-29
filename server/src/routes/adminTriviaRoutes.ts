@@ -1,5 +1,5 @@
 import { Router, type Request, type Response } from 'express';
-import { requireAdmin } from '../middleware/requireAdmin';
+import { requireSuperAdmin } from '../middleware/authorize';
 import {
   listQuestions,
   getQuestion,
@@ -21,7 +21,8 @@ import {
 
 export const adminTriviaRoutes = Router();
 
-adminTriviaRoutes.use(requireAdmin);
+// Trivia administration is a SUPER_ADMIN-only area (LIMITED_ADMIN is locked out).
+adminTriviaRoutes.use(requireSuperAdmin);
 
 // Category endpoints
 adminTriviaRoutes.get('/categories', (req: Request, res: Response) => {

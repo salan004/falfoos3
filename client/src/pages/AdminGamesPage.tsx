@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { apiFetch, resolveImageUrl } from '../utils/api';
-import { useAuthSession } from '../hooks/useAuthSession';
+import { isSuperAdmin, useAuthSession } from '../hooks/useAuthSession';
 import { useRoute } from '../hooks/useRoute';
 import { AdminGate } from '../components/AdminGate';
 import { AdminAccessDenied } from '../components/admin/AdminAccessDenied';
@@ -144,7 +144,9 @@ export function AdminGamesPage() {
     );
   }
 
-  if (!user || user.role !== 'admin') {
+  // Games administration is SUPER_ADMIN only; a LIMITED_ADMIN is locked out
+  // (the backend enforces this too — this is only the UX boundary).
+  if (!isSuperAdmin(user)) {
     return <AdminAccessDenied />;
   }
 

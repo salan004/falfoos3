@@ -7705,6 +7705,198 @@ body.broadcast-mode::after { display: none !important; }
   .admin-list-row-actions { width: 100%; }
 }
 
+/* ============================================================
+   Admin Control & Permissions ظ¤ moderator system
+   ============================================================ */
+
+/* ---------- Welcome banner (below the header) ---------- */
+.admin-welcome {
+  width: 100%;
+  text-align: center;
+  padding: 22px 16px 4px;
+  z-index: 2;
+}
+.admin-welcome-kicker {
+  display: inline-block;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.28em;
+  color: var(--arena-cyan, #22d3ee);
+  opacity: 0.9;
+  margin-bottom: 8px;
+}
+.admin-welcome-title {
+  margin: 0;
+  font-size: clamp(1.6rem, 4.2vw, 2.6rem);
+  font-weight: 800;
+  color: var(--text-primary, #f5f7ff);
+  text-shadow: 0 0 26px rgba(34, 211, 238, 0.22), 0 10px 30px rgba(0, 0, 0, 0.5);
+}
+
+/* ---------- Locked branch caption ---------- */
+.admin-hub-lock-note {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: #f5c451;
+  opacity: 0.92;
+  white-space: nowrap;
+}
+.admin-hub-orb--locked .hub-ring svg { opacity: 0.9; }
+
+.admin-hub-moderator-note {
+  width: min(760px, 92%);
+  margin: 4px auto 0;
+  text-align: center;
+  font-size: 0.9rem;
+  line-height: 1.8;
+  color: var(--arena-text-dim, #8f96aa);
+}
+
+/* Extra room so the absolute secondary nav never overlaps the moderator panel. */
+.admin-hub-shell--with-mods { padding-bottom: 150px; }
+
+/* ---------- Moderator manager ---------- */
+.admin-mods {
+  width: min(920px, 94%);
+  margin: 14px auto 0;
+  padding: 22px 22px 20px;
+  border-radius: 18px;
+  border: 1px solid rgba(34, 211, 238, 0.16);
+  background:
+    radial-gradient(120% 120% at 100% 0%, rgba(34, 211, 238, 0.06), transparent 60%),
+    rgba(12, 15, 28, 0.6);
+  box-shadow: 0 18px 46px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  z-index: 2;
+}
+.admin-mods-head { margin-bottom: 16px; }
+.admin-mods-title { margin: 0 0 4px; font-size: 1.15rem; font-weight: 800; color: var(--text-primary); }
+.admin-mods-sub { margin: 0; font-size: 0.85rem; color: var(--text-dim); line-height: 1.7; }
+.admin-mods-error {
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  font-size: 0.85rem;
+  color: var(--neon-red);
+  background: rgba(255, 51, 85, 0.08);
+  border: 1px solid rgba(255, 51, 85, 0.25);
+}
+.admin-mods-hint { font-size: 0.82rem; color: var(--text-dim); padding: 8px 0; }
+
+.admin-mods-add { margin-bottom: 18px; display: flex; flex-direction: column; gap: 8px; }
+.admin-mods-results { list-style: none; margin: 4px 0 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.admin-mods-result {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--border-color);
+  background: rgba(255, 255, 255, 0.03);
+}
+.admin-mods-result-name { flex: 1; font-weight: 600; }
+
+.admin-mods-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.admin-mods-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid var(--border-color);
+  background: rgba(255, 255, 255, 0.03);
+}
+.admin-mods-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  overflow: hidden;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  background: rgba(34, 211, 238, 0.12);
+  border: 1px solid rgba(34, 211, 238, 0.25);
+  font-weight: 800;
+  color: var(--arena-cyan, #22d3ee);
+}
+.admin-mods-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.admin-mods-name { font-weight: 700; min-width: 90px; }
+
+.admin-mods-perm { display: flex; align-items: center; gap: 10px; margin-inline-start: auto; }
+.admin-mods-perm-label { font-size: 0.8rem; color: var(--text-dim); }
+
+.admin-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+}
+.admin-switch:disabled { opacity: 0.6; cursor: not-allowed; }
+.admin-switch-track {
+  width: 46px;
+  height: 26px;
+  border-radius: 999px;
+  position: relative;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid var(--border-color);
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+.admin-switch-thumb {
+  position: absolute;
+  top: 2px;
+  inset-inline-start: 2px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #cbd5e1;
+  transition: inset-inline-start 0.2s ease, background 0.2s ease;
+}
+.admin-switch.is-on .admin-switch-track { background: rgba(34, 211, 238, 0.35); border-color: rgba(34, 211, 238, 0.6); }
+.admin-switch.is-on .admin-switch-thumb { inset-inline-start: 22px; background: #22d3ee; }
+.admin-switch-state { font-size: 0.72rem; font-weight: 800; letter-spacing: 0.06em; min-width: 30px; }
+.admin-switch.is-on .admin-switch-state { color: #22d3ee; }
+.admin-switch.is-off .admin-switch-state { color: var(--text-dim); }
+
+.admin-mods-remove {
+  background: none;
+  border: 1px solid rgba(255, 51, 85, 0.35);
+  color: var(--neon-red);
+  border-radius: 10px;
+  padding: 6px 12px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+.admin-mods-remove:hover { background: rgba(255, 51, 85, 0.12); }
+.admin-mods-remove:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* ---------- Locked / view-only affordances ---------- */
+.admin-locked-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  padding: 8px 14px;
+  border-radius: 10px;
+  border: 1px dashed var(--border-color);
+  background: rgba(255, 255, 255, 0.02);
+}
+.admin-list-row-viewonly { font-size: 0.8rem; color: var(--text-dim); font-weight: 600; }
+
+@media (max-width: 640px) {
+  .admin-mods { padding: 18px 14px; }
+  .admin-mods-row { gap: 10px; }
+  .admin-mods-perm { width: 100%; margin-inline-start: 0; justify-content: space-between; }
+  .admin-hub-shell--with-mods { padding-bottom: 200px; }
+}
+
 
 
 

@@ -2,7 +2,7 @@ import { useCallback, useState } from 'react';
 import { useRoute } from '../hooks/useRoute';
 import { resolveImageUrl } from '../utils/api';
 import { useScrollReveal } from '../hooks/useScrollReveal';
-import { useAuthSession } from '../hooks/useAuthSession';
+import { isSuperAdmin, useAuthSession } from '../hooks/useAuthSession';
 import { useTournamentBracket } from '../hooks/useTournamentBracket';
 import { useSeo } from '../seo/useSeo';
 import { breadcrumbList, DEFAULT_DESCRIPTION } from '../seo/seo';
@@ -65,7 +65,9 @@ export function TournamentDetailPage({ tournamentId }: TournamentDetailPageProps
   const { navigate } = useRoute();
   const headerRef = useScrollReveal<HTMLDivElement>();
   const { user } = useAuthSession();
-  const isAdmin = user?.role === 'admin';
+  // Tournament management (bracket / matches / results / disputes / status)
+  // is SUPER_ADMIN only — a LIMITED_ADMIN is a viewer here, even after creating.
+  const isAdmin = isSuperAdmin(user);
 
   // Post-Phase 8 — bracket/summary/roster/matches come from the shared hook so
   // the normal page and the Broadcast Bracket read the exact same data source.

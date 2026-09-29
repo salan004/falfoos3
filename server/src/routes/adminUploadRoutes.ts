@@ -1,6 +1,6 @@
 import { Router, type NextFunction, type Request, type Response } from 'express';
 import multer from 'multer';
-import { requireAdmin } from '../middleware/requireAdmin';
+import { requirePermission, requireSuperAdmin } from '../middleware/authorize';
 import {
   MAX_IMAGE_BYTES,
   isAllowedImageMime,
@@ -15,12 +15,16 @@ import {
  * accept a single `image` file (multipart/form-data), verify its MIME type and
  * magic bytes, and persist it to the persistent server data directory.
  *
- * Every route is protected by the existing session-based `requireAdmin`
- * middleware — the same authorization used by the other admin APIs.
+ * Authorization is session-based and per-category (see below): game imagery is
+ * SUPER_ADMIN-only; tournament imagery follows the `can_create_tournaments`
+ * permission. Client-side checks are never the security boundary.
  */
 export const adminUploadRoutes = Router();
 
-adminUploadRoutes.use(requireAdmin);
+// Authorization is per-category:
+// - game imagery is SUPER_ADMIN only (Games is a locked area for moderators);
+// - tournament imagery is allowed to a LIMITED_ADMIN ONLY while they hold the
+//   `can_create_tournaments` permission (it is part of tournament creation).
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -56,8 +60,13 @@ function handleUpload(category: UploadCategory) {
   };
 }
 
-adminUploadRoutes.post('/games', upload.single('image'), handleUpload('games'));
-adminUploadRoutes.post('/tournaments', upload.single('image'), handleUpload('tournaments'));
+adminUploadRoutes.post('/games', requireSuperAdmin, upload.single('image'), handleUpload('games'));
+adminUploadRoutes.post(
+  '/tournaments',
+  requirePermission('can_create_tournaments'),
+  upload.single('image'),
+  handleUpload('tournaments')
+);
 
 // Translate multer's low-level errors into clear, stable error codes.
 adminUploadRoutes.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {

@@ -28,6 +28,7 @@ import { recoverPurchaseIntents } from './integrations/purchaseService';
 import { tournamentCompetitiveRoutes } from './routes/tournamentCompetitiveRoutes';
 import { adminTournamentCompetitiveRoutes } from './routes/adminTournamentCompetitiveRoutes';
 import { adminUploadRoutes } from './routes/adminUploadRoutes';
+import { adminPermissionsRoutes } from './routes/adminPermissionsRoutes';
 import { uploadsRootDir } from './uploads/uploadService';
 import { onCompetitiveEvent } from './competitive/competitiveEvents';
 import { captureRawBody } from './middleware/verifyBotWebhook';
@@ -58,11 +59,12 @@ const YOUTUBE_POLL_MS = env.YOUTUBE_POLL_MS ? Math.max(2000, parseInt(env.YOUTUB
 const ADMIN_TOKEN = env.ADMIN_TOKEN ?? randomUUID();
 
 function isSocketAdmin(socket: Socket): boolean {
-  // Phase 9A break-glass token handshake stays the primary path.
+  // Phase 9A break-glass token handshake stays the primary path (never broken).
   if (socket.data?.isAdmin === true) return true;
-  // Phase 11E dual-path: registered users with the admin role qualify too.
+  // Admin Control & Permissions: only a SUPER_ADMIN session qualifies for the
+  // admin socket surface. A LIMITED_ADMIN never receives live/admin tools.
   const identity = socket.data?.identity as SocketIdentity | undefined;
-  return identity?.role === 'admin';
+  return identity?.role === 'admin' && identity?.adminTier === 'super';
 }
 
 /**
@@ -169,6 +171,9 @@ app.use('/api/admin/tournaments', adminTournamentCompetitiveRoutes);
 // static route that serves persisted uploads. Uploads live outside the client
 // bundle under server/data/uploads so production rebuilds cannot delete them.
 app.use('/api/admin/uploads', adminUploadRoutes);
+
+// Admin Control & Permissions — SUPER_ADMIN moderator management.
+app.use('/api/admin/permissions', adminPermissionsRoutes);
 app.use('/api/uploads', express.static(uploadsRootDir(), {
   dotfiles: 'ignore',
   index: false,

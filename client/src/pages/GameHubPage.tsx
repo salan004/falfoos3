@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { apiFetch, resolveImageUrl } from '../utils/api';
 import { useRoute } from '../hooks/useRoute';
 import { useScrollReveal } from '../hooks/useScrollReveal';
-import { useAuthSession } from '../hooks/useAuthSession';
+import { canCreateTournaments, useAuthSession } from '../hooks/useAuthSession';
 import { onCompetitiveEvent, getSocket } from '../utils/socket';
 import { TournamentCard } from '../components/TournamentCard';
 import { TicketPurchasePanel } from '../components/TicketPurchasePanel';
@@ -33,6 +33,7 @@ export function GameHubPage({ gameId }: GameHubPageProps) {
   const { path: routePath, navigate } = useRoute();
   const { user } = useAuthSession();
   const isAdmin = user?.role === 'admin';
+  const mayCreate = canCreateTournaments(user);
   const headerRef = useScrollReveal<HTMLDivElement>();
 
   const [activeTab, setActiveTab] = useState<HubTab>('tournaments');
@@ -271,7 +272,9 @@ export function GameHubPage({ gameId }: GameHubPageProps) {
             )}
           </div>
 
-          {isAdmin && <CreateTournamentForm gameId={gameId} gameName={game?.name_ar ?? ''} onCreated={loadTournaments} />}
+          {mayCreate && (
+            <CreateTournamentForm gameId={gameId} gameName={game?.name_ar ?? ''} onCreated={loadTournaments} />
+          )}
 
           {tournamentsLoading ? (
             <div className="panel text-center py-12 loading-pulse text-[var(--text-dim)]">جارٍ تحميل البطولات…</div>

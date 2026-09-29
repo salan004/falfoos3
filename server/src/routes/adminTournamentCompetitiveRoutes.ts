@@ -11,7 +11,7 @@
  */
 
 import { Router, type Request, type Response } from 'express';
-import { requireAdmin } from '../middleware/requireAdmin';
+import { requireSuperAdmin } from '../middleware/authorize';
 import { resolveSession } from '../auth/session';
 import { BracketError, generateBracket } from '../competitive/BracketService';
 import {
@@ -51,7 +51,9 @@ import { getTournamentById } from '../games/TournamentService';
 
 export const adminTournamentCompetitiveRoutes = Router();
 
-adminTournamentCompetitiveRoutes.use(requireAdmin);
+// Bracket / matches / results / disputes / status / teams are SUPER_ADMIN-only.
+// LIMITED_ADMIN is a viewer (+ optional creator), never a tournament manager.
+adminTournamentCompetitiveRoutes.use(requireSuperAdmin);
 
 const ID_RE = /^[A-Za-z0-9:_-]{1,80}$/;
 const RESULT_SOURCES: MatchResultSource[] = ['admin', 'auto', 'import'];

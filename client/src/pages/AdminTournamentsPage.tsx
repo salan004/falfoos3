@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import { apiFetch, resolveImageUrl } from '../utils/api';
-import { useAuthSession } from '../hooks/useAuthSession';
+import { canCreateTournaments, isSuperAdmin, useAuthSession } from '../hooks/useAuthSession';
 import { useRoute } from '../hooks/useRoute';
 import { AdminGate } from '../components/AdminGate';
 import { AdminAccessDenied } from '../components/admin/AdminAccessDenied';
 import { ImageUploadField } from '../components/admin/ImageUploadField';
+import { LockIcon } from '../components/admin/AdminIcons';
 import { hideTournament, restoreTournament } from '../utils/competitiveApi';
 import { TournamentWithGame, TournamentStatus, CompetitionType, TeamFormation } from '../types/game';
 
@@ -132,7 +133,10 @@ export function AdminTournamentsPage({ gameId }: AdminTournamentsPageProps) {
 
   const loadGames = async () => {
     try {
-      const res = await apiFetch('/api/admin/games');
+      // Public active-games catalog: a LIMITED_ADMIN is allowed to read it and
+      // it exposes exactly the games that can host a new tournament. (The admin
+      // games API is SUPER_ADMIN-only, so it cannot be used for the form here.)
+      const res = await apiFetch('/api/games');
       const data = await res.json();
       if (res.ok) {
         setGames(
@@ -337,6 +341,11 @@ export function AdminTournamentsPage({ gameId }: AdminTournamentsPageProps) {
     return <AdminAccessDenied />;
   }
 
+  // SUPER_ADMIN manages everything; a LIMITED_ADMIN may only view the list and
+  // (when permitted) create a new tournament. The backend enforces the same.
+  const superAdmin = isSuperAdmin(user);
+  const mayCreate = canCreateTournaments(user);
+
   return (
     <main className="page admin-page">
       <div className="admin-page-head">
@@ -344,7 +353,11 @@ export function AdminTournamentsPage({ gameId }: AdminTournamentsPageProps) {
           <span className="admin-page-kicker">🏆 إدارة البطولات</span>
           <h1 className="page-title">البطولات</h1>
           <p className="hero-subtitle">
-            {filteredGameName ? `بطولات: ${filteredGameName}` : 'إنشاء وتعديل البطولات وعرض المشاركين'}
+            {filteredGameName
+              ? `بطولات: ${filteredGameName}`
+              : superAdmin
+                ? 'إنشاء وتعديل البطولات وعرض المشاركين'
+                : 'عرض البطولات' + (mayCreate ? ' وإنشاء بطولة جديدة' : '')}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -360,9 +373,16 @@ export function AdminTournamentsPage({ gameId }: AdminTournamentsPageProps) {
       {!showForm && !viewingParticipants ? (
         <div>
           <div className="flex items-center gap-2 flex-wrap mb-6">
-            <button className="btn-neon" onClick={startCreate}>
-              + إنشاء بطولة جديدة
-            </button>
+            {mayCreate ? (
+              <button className="btn-neon" onClick={startCreate}>
+                + إنشاء بطولة جديدة
+              </button>
+            ) : (
+              <span className="admin-locked-action" title="إنشاء البطولات غير مفعّل لحسابك">
+                <LockIcon size={16} />
+                إنشاء بطولة — غير متاح حاليًا
+              </span>
+            )}
             <span className="text-sm text-[var(--text-dim)]" style={{ marginInlineStart: 'auto' }}>
               العرض:
             </span>
@@ -411,35 +431,39 @@ export function AdminTournamentsPage({ gameId }: AdminTournamentsPageProps) {
                       </div>
                     </div>
                   </div>
-                  <div className="admin-list-row-actions">
-                    <button className="btn-neon text-sm" onClick={() => handleViewParticipants(t.id)}>
-                      {viewingParticipants === t.id ? 'إخفاء المشاركين' : 'المشاركون'}
-                    </button>
-                    <button className="btn-neon text-sm" onClick={() => startEdit(t)}>
-                      تعديل
-                    </button>
-                    {STATUS_ACTIONS[t.status].map((action) => (
-                      <button
-                        key={action.to}
-                        className={`btn-neon text-sm${action.destructive ? ' admin-btn-danger' : ''}`}
-                        onClick={() => changeStatus(t, action)}
-                      >
-                        {action.label}
+                  {superAdmin ? (
+                    <div className="admin-list-row-actions">
+                      <button className="btn-neon text-sm" onClick={() => handleViewParticipants(t.id)}>
+                        {viewingParticipants === t.id ? 'إخفاء المشاركين' : 'المشاركون'}
                       </button>
-                    ))}
-                    {t.hidden_at !== null ? (
-                      <button className="btn-neon text-sm" onClick={() => handleRestore(t)}>
-                        استعادة
+                      <button className="btn-neon text-sm" onClick={() => startEdit(t)}>
+                        تعديل
                       </button>
-                    ) : (
-                      <button
-                        className="btn-neon text-sm admin-btn-danger"
-                        onClick={() => handleHide(t)}
-                      >
-                        إخفاء
-                      </button>
-                    )}
-                  </div>
+                      {STATUS_ACTIONS[t.status].map((action) => (
+                        <button
+                          key={action.to}
+                          className={`btn-neon text-sm${action.destructive ? ' admin-btn-danger' : ''}`}
+                          onClick={() => changeStatus(t, action)}
+                        >
+                          {action.label}
+                        </button>
+                      ))}
+                      {t.hidden_at !== null ? (
+                        <button className="btn-neon text-sm" onClick={() => handleRestore(t)}>
+                          استعادة
+                        </button>
+                      ) : (
+                        <button
+                          className="btn-neon text-sm admin-btn-danger"
+                          onClick={() => handleHide(t)}
+                        >
+                          إخفاء
+                        </button>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="admin-list-row-actions admin-list-row-viewonly">عرض فقط</div>
+                  )}
                 </div>
               ))}
               {visibleTournaments.length === 0 && (

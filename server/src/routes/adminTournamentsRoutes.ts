@@ -1,5 +1,5 @@
 import { Router, type Request, type Response } from 'express';
-import { requireAdmin } from '../middleware/requireAdmin';
+import { requireAdmin, requirePermission, requireSuperAdmin } from '../middleware/authorize';
 import { resolveSession } from '../auth/session';
 import {
   getAllTournaments,
@@ -24,6 +24,9 @@ import { ensureTeamsInitialized } from '../competitive/TeamService';
 
 export const adminTournamentsRoutes = Router();
 
+// View-level gate: SUPER_ADMIN and LIMITED_ADMIN can both read tournaments.
+// Mutations below are additionally gated (create = permission; management =
+// SUPER_ADMIN only), so a limited admin can never manage an existing tournament.
 adminTournamentsRoutes.use(requireAdmin);
 
 const VALID_VISIBILITIES: TournamentVisibility[] = ['visible', 'hidden', 'all'];
@@ -61,7 +64,10 @@ adminTournamentsRoutes.get('/:id', (req: Request, res: Response) => {
   }
 });
 
-adminTournamentsRoutes.get('/:id/participants', (req: Request, res: Response) => {
+// Reading a tournament's participant roster is SUPER_ADMIN-only. The create
+// permission never grants participant visibility (a LIMITED_ADMIN is a viewer
+// of the tournament LIST, not of participant data).
+adminTournamentsRoutes.get('/:id/participants', requireSuperAdmin, (req: Request, res: Response) => {
   try {
     const tournament = getTournamentById(req.params.id);
     if (!tournament) {
@@ -76,7 +82,7 @@ adminTournamentsRoutes.get('/:id/participants', (req: Request, res: Response) =>
   }
 });
 
-adminTournamentsRoutes.post('/', (req: Request, res: Response) => {
+adminTournamentsRoutes.post('/', requirePermission('can_create_tournaments'), (req: Request, res: Response) => {
   try {
     const input = req.body as CreateTournamentInput;
 
@@ -103,7 +109,7 @@ adminTournamentsRoutes.post('/', (req: Request, res: Response) => {
   }
 });
 
-adminTournamentsRoutes.patch('/:id', (req: Request, res: Response) => {
+adminTournamentsRoutes.patch('/:id', requireSuperAdmin, (req: Request, res: Response) => {
   try {
     const body = req.body as (UpdateTournamentInput & { hidden?: unknown }) | undefined;
 
@@ -157,7 +163,7 @@ adminTournamentsRoutes.patch('/:id', (req: Request, res: Response) => {
  * data (participants, matches, corrections, ledgers, purchase intents, images)
  * is preserved. There is NO hard-delete path anywhere in the admin API.
  */
-adminTournamentsRoutes.delete('/:id', (req: Request, res: Response) => {
+adminTournamentsRoutes.delete('/:id', requireSuperAdmin, (req: Request, res: Response) => {
   try {
     const user = resolveSession(req);
     const result = setTournamentHidden(req.params.id, true, user?.id ?? null);
@@ -173,7 +179,7 @@ adminTournamentsRoutes.delete('/:id', (req: Request, res: Response) => {
   }
 });
 
-adminTournamentsRoutes.post('/:id/participants', (req: Request, res: Response) => {
+adminTournamentsRoutes.post('/:id/participants', requireSuperAdmin, (req: Request, res: Response) => {
   try {
     const { player_id, source, ticket_ref } = req.body as {
       player_id: string;

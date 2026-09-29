@@ -2,6 +2,7 @@ import crypto from 'crypto';
 import type { Request, Response } from 'express';
 import { getDb } from '../db/db';
 import { env, isProduction } from '../config/env';
+import { ensureSuperAdmin, getAdminAccess } from './adminPermissions';
 
 /**
  * Phase 11C — opaque browser sessions backed by the Phase 11B `sessions` table.
@@ -18,11 +19,21 @@ const ABSOLUTE_MS = 90 * 24 * 60 * 60 * 1000;
 const OAUTH_STATE_COOKIE = 'falfoos_oauth_state';
 const OAUTH_VERIFIER_COOKIE = 'falfoos_oauth_verifier';
 
+export type AdminTier = 'super' | 'limited';
+
+export interface AdminPermissions {
+  canCreateTournaments: boolean;
+}
+
 export interface SessionUser {
   id: string;
   displayName: string;
   avatarUrl?: string | null;
   role: 'user' | 'admin';
+  /** Present only for admins. super = full access, limited = scoped access. */
+  adminTier?: AdminTier;
+  /** Present only for admins. */
+  permissions?: AdminPermissions;
 }
 
 // isProduction() comes from the centralized config layer (Phase 19).
@@ -115,6 +126,8 @@ function bootstrapAdminRole(userId: string, currentRole: 'user' | 'admin', email
   if (allowList.length === 0 || !allowList.includes(email.toLowerCase())) return;
 
   getDb().prepare('UPDATE users SET role = ? WHERE id = ?').run('admin', userId);
+  // ADMIN_EMAILS designates the primary administrators → full SUPER_ADMIN.
+  ensureSuperAdmin(userId);
   console.log(`[Falfoos] Admin role granted via ADMIN_EMAILS bootstrap (user ${userId})`);
 }
 
@@ -164,7 +177,22 @@ export function upsertGoogleUser(profile: {
     if (refreshed) user.role = refreshed.role;
   }
 
-  return { id: user.id, displayName: user.display_name, avatarUrl: user.avatar_url, role: user.role };
+  const sessionUser: SessionUser = {
+    id: user.id,
+    displayName: user.display_name,
+    avatarUrl: user.avatar_url,
+    role: user.role,
+  };
+  return withAdminAccess(sessionUser);
+}
+
+/** Attaches the admin tier/permissions to an admin session user. */
+function withAdminAccess(user: SessionUser): SessionUser {
+  if (user.role !== 'admin') return user;
+  const access = getAdminAccess(user.id, user.role);
+  user.adminTier = access?.isSuper ? 'super' : 'limited';
+  user.permissions = { canCreateTournaments: access?.canCreateTournaments ?? false };
+  return user;
 }
 
 export function createSession(res: Response, userId: string): void {
@@ -226,12 +254,12 @@ export function resolveSessionBySid(sid: string | undefined): SessionUser | null
     db.prepare('UPDATE sessions SET expires_at = ? WHERE id = ?').run(nextExpiry, sid);
   }
 
-  return {
+  return withAdminAccess({
     id: row.user_id,
     displayName: row.display_name,
     avatarUrl: row.avatar_url,
     role: row.role,
-  };
+  });
 }
 
 /** Revokes the current session (kept in table for audit) and clears the cookie. */

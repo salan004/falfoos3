@@ -1,6 +1,8 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useTriviaQuestions } from '../hooks/useTriviaQuestions';
+import { isSuperAdmin, useAuthSession } from '../hooks/useAuthSession';
 import { AdminGate } from '../components/AdminGate';
+import { AdminAccessDenied } from '../components/admin/AdminAccessDenied';
 import { TriviaQuestionTable } from '../components/admin/TriviaQuestionTable';
 import { TriviaQuestionFormModal } from '../components/admin/TriviaQuestionFormModal';
 import { TriviaPreviewModal } from '../components/admin/TriviaPreviewModal';
@@ -8,6 +10,9 @@ import { TriviaImportModal } from '../components/admin/TriviaImportModal';
 import type { TriviaQuestionAdmin, CreateQuestionInput, UpdateQuestionInput, ImportRowPreview, ImportPreviewResult, ImportCommitResult } from '../types/triviaAdmin';
 
 export function TriviaQuestionsPage() {
+  // Trivia administration is SUPER_ADMIN only; a LIMITED_ADMIN is locked out
+  // (the backend enforces this too — this is only the UX boundary).
+  const { user, isLoading: authLoading } = useAuthSession();
   const {
     questions,
     total,
@@ -94,6 +99,19 @@ export function TriviaQuestionsPage() {
   const handleImportCommit = async (rows: ImportRowPreview[]): Promise<ImportCommitResult> => {
     return await commitImport(rows);
   };
+
+  if (authLoading) {
+    return (
+      <main className="page">
+        <div className="panel text-center py-12 loading-pulse text-[var(--text-dim)]">
+          جارٍ التحقق من الصلاحية…
+        </div>
+      </main>
+    );
+  }
+  if (!isSuperAdmin(user)) {
+    return <AdminAccessDenied />;
+  }
 
   return (
     <main className="page-fade" dir="rtl">

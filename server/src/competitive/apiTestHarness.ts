@@ -12,6 +12,11 @@ import { tournamentCompetitiveRoutes } from '../routes/tournamentCompetitiveRout
 import { gamesRoutes } from '../routes/gamesRoutes';
 import { adminTournamentsRoutes } from '../routes/adminTournamentsRoutes';
 import { adminTournamentCompetitiveRoutes } from '../routes/adminTournamentCompetitiveRoutes';
+import { adminPermissionsRoutes } from '../routes/adminPermissionsRoutes';
+import { adminGamesRoutes } from '../routes/adminGamesRoutes';
+import { adminTriviaRoutes } from '../routes/adminTriviaRoutes';
+import { adminUploadRoutes } from '../routes/adminUploadRoutes';
+import { authRoutes } from '../routes/authRoutes';
 
 export interface TestApi {
   baseUrl: string;
@@ -30,6 +35,11 @@ export async function startTestApi(): Promise<TestApi> {
   // competitive admin sub-paths.
   app.use('/api/admin/tournaments', adminTournamentsRoutes);
   app.use('/api/admin/tournaments', adminTournamentCompetitiveRoutes);
+  app.use('/api/admin/permissions', adminPermissionsRoutes);
+  app.use('/api/admin/games', adminGamesRoutes);
+  app.use('/api/admin/trivia', adminTriviaRoutes);
+  app.use('/api/admin/uploads', adminUploadRoutes);
+  app.use('/api/auth', authRoutes);
 
   const server = http.createServer(app);
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', () => resolve()));

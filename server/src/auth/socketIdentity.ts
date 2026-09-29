@@ -26,6 +26,10 @@ export interface SocketIdentity {
   kind: 'user' | 'guest';
   userId?: string;
   role?: 'user' | 'admin';
+  /** Present only for admins: full (super) or scoped (limited) access. */
+  adminTier?: 'super' | 'limited';
+  /** Present only for admins. */
+  permissions?: { canCreateTournaments: boolean };
   guestId?: string;
   displayName?: string;
   avatarUrl?: string | null;
@@ -76,6 +80,8 @@ export function resolveSocketIdentity(cookieHeader: string | undefined): SocketI
         kind: 'user',
         userId: user.id,
         role: user.role,
+        adminTier: user.adminTier,
+        permissions: user.permissions,
         guestId: guestId ?? undefined,
         displayName: user.displayName,
         avatarUrl: user.avatarUrl,

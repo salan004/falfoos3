@@ -55,6 +55,17 @@ export function seedUser(userId: string, role: 'user' | 'admin' = 'admin'): void
        VALUES (?, ?, NULL, ?, ?)`
     )
     .run(userId, 'Test Admin', role, now);
+  // Mirror the trusted ADMIN_EMAILS bootstrap: a seeded admin receives an
+  // EXPLICIT SUPER_ADMIN row. Runtime never fail-opens on role='admin' alone.
+  if (role === 'admin') {
+    getDb()
+      .prepare(
+        `INSERT OR IGNORE INTO admin_permissions
+           (user_id, is_super, can_create_tournaments, created_at, updated_at, updated_by)
+         VALUES (?, 1, 1, ?, ?, NULL)`
+      )
+      .run(userId, now, now);
+  }
 }
 
 /** Seeds a user + a live session row and returns the session cookie id. */
@@ -69,6 +80,30 @@ export function seedSession(userId: string, role: 'user' | 'admin' = 'admin'): s
     )
     .run(sid, userId, now, now + 24 * 60 * 60 * 1000);
   return sid;
+}
+
+/**
+ * Admin Control & Permissions — seeds an explicit admin_permissions row.
+ * Use `isSuper: false` to make a seeded admin a LIMITED_ADMIN.
+ */
+export function seedAdminPermission(
+  userId: string,
+  options: { isSuper: boolean; canCreateTournaments?: boolean }
+): void {
+  const now = Date.now();
+  getDb()
+    .prepare(
+      `INSERT OR REPLACE INTO admin_permissions
+         (user_id, is_super, can_create_tournaments, created_at, updated_at, updated_by)
+       VALUES (?, ?, ?, ?, ?, NULL)`
+    )
+    .run(
+      userId,
+      options.isSuper ? 1 : 0,
+      options.canCreateTournaments ? 1 : 0,
+      now,
+      now
+    );
 }
 
 export function seedTournament(input: {
