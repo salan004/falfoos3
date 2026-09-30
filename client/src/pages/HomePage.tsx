@@ -19,12 +19,21 @@ import { useHubTethers } from '../hooks/useHubTethers';
  * live navigation entry to the Stream Games section.
  */
 
-const HUB_POSITIONS = [
+interface HubPosition {
+  to: string;
+  icon: string;
+  label: string;
+  pos: 'games' | 'stream-games' | 'leaderboard' | 'links';
+  locked: boolean;
+  ariaLabel?: string;
+}
+
+const HUB_POSITIONS: HubPosition[] = [
   { to: '/games', icon: '🎮', label: 'الألعاب', pos: 'games', locked: true },
   { to: '/stream-games', icon: '🕹️', label: 'ساحة الألعاب والبطولات', pos: 'stream-games', locked: false },
-  { to: '/leaderboard', icon: '🏆', label: 'المتصدرين', pos: 'leaderboard', locked: true },
+  { to: '/leaderboard', icon: '🔒', label: '', pos: 'leaderboard', locked: true, ariaLabel: 'المتصدرين — مقفل' },
   { to: '/links', icon: '🔗', label: 'الروابط', pos: 'links', locked: false },
-] as const;
+];
 
 type DevBubble = { x: number; y: number; variant: 'below' | 'above' };
 
@@ -129,9 +138,10 @@ export function HomePage() {
         {HUB_POSITIONS.map((item) => (
           <button
             key={item.to}
-            className={`hub-orb hub-orb-${item.pos}${item.locked ? ' hub-orb-locked' : ''}`}
+            className={`hub-orb hub-orb-${item.pos}${item.locked ? ' hub-orb-locked' : ''}${item.label ? '' : ' hub-orb-nolabel'}`}
             onClick={(e) => handleOrbClick(item, e)}
             aria-disabled={item.locked || undefined}
+            aria-label={item.ariaLabel}
           >
             <svg
               className="hub-tether"
@@ -150,7 +160,7 @@ export function HomePage() {
             <span className="hub-ring" aria-hidden>
               {item.icon}
             </span>
-            <span className="hub-label">{item.label}</span>
+            {item.label && <span className="hub-label">{item.label}</span>}
           </button>
         ))}
       </div>

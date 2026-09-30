@@ -24,12 +24,12 @@ export function RegisterPage() {
       <div className="content-page register-page-inner">
         <ArenaAtmosphere />
 
-        <header className="register-hero">
+        <header className="register-hero register-intro">
+          <span className="acct-link-icon register-intro-icon" aria-hidden="true">🔗</span>
           <div className="brand-kicker">هوية اللاعب</div>
           <h1 className="hero-title register-title">ربط حسابك بموقع فلفوس</h1>
           <p className="hero-subtitle register-subtitle">
-            اربط حسابك في فلفوس بهوية لاعبك، لتصبح مشاركاتك وبياناتك التنافسية تحت هوية واحدة.
-            هذه عملية ربط هوية فقط، وليست تسجيلاً في بطولة.
+            اربط حسابك بهوية لاعبك في فلفوس لتوحيد مشاركاتك وبياناتك التنافسية تحت هوية واحدة.
           </p>
           <div className="register-bridge" aria-hidden="true">
             <span className="register-bridge-node">حساب Google</span>
@@ -42,11 +42,35 @@ export function RegisterPage() {
 
         <section className="register-why" aria-labelledby="register-why-title">
           <h2 id="register-why-title" className="register-why-title">لماذا تربط حسابك؟</h2>
-          <ul className="acct-link-steps">
-            <li>هوية اللاعب هي هويتك داخل موقع فلفوس، وترتبط بها مشاركاتك في البطولات وبياناتك التنافسية.</li>
-            <li>ربط حسابك بهوية موجودة يحافظ على الهوية وسجلها، ولا ينشئ هوية جديدة.</li>
-            <li>تسجيل هوية جديدة ينشئ هوية جديدة مرتبطة بقناتك.</li>
-            <li>التحقق من قناة YouTube يثبت ملكية الهوية، وحساب Google يُستخدم لتسجيل الدخول إلى الموقع.</li>
+          <ul className="register-why-list">
+            <li>
+              <span className="acct-link-choice-icon" aria-hidden="true">🧩</span>
+              <span className="acct-link-choice-title">هوية موحّدة</span>
+              <span className="acct-link-choice-desc">
+                هوية اللاعب هي هويتك في فلفوس، وترتبط بها مشاركاتك وبياناتك التنافسية.
+              </span>
+            </li>
+            <li>
+              <span className="acct-link-choice-icon" aria-hidden="true">🔗</span>
+              <span className="acct-link-choice-title">ربط يحافظ على سجلك</span>
+              <span className="acct-link-choice-desc">
+                اربط حسابك بهوية موجودة وحافظ على الهوية وسجلها دون إنشاء هوية جديدة.
+              </span>
+            </li>
+            <li>
+              <span className="acct-link-choice-icon" aria-hidden="true">🆕</span>
+              <span className="acct-link-choice-title">تسجيل هوية جديدة</span>
+              <span className="acct-link-choice-desc">
+                إذا لم تكن لديك هوية لاعب، يمكنك تسجيل هوية جديدة مرتبطة بقناتك.
+              </span>
+            </li>
+            <li>
+              <span className="acct-link-choice-icon" aria-hidden="true">🛡️</span>
+              <span className="acct-link-choice-title">تحقق آمن</span>
+              <span className="acct-link-choice-desc">
+                التحقق من قناة YouTube يثبت ملكية الهوية، بينما يُستخدم حساب Google لتسجيل الدخول.
+              </span>
+            </li>
           </ul>
         </section>
 
